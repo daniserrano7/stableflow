@@ -1,0 +1,17 @@
+{
+  "name": "@stableflow/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "pnpm typecheck",
+    "dev": "tsc -p tsconfig.json --watch",
+    "lint": "pnpm typecheck",
+    "test": "echo \"No tests yet for web\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@stableflow/shared": "workspace:*"
+  }
+}
