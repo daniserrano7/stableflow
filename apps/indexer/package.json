@@ -4,13 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm codegen && pnpm typecheck",
     "check": "pnpm typecheck",
-    "dev": "tsc -p tsconfig.json --watch",
+    "codegen": "PONDER_TELEMETRY_DISABLED=1 ponder codegen",
+    "dev": "PONDER_TELEMETRY_DISABLED=1 ponder dev",
+    "start": "PONDER_TELEMETRY_DISABLED=1 ponder start",
     "test": "echo \"No tests yet for indexer\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@stableflow/shared": "workspace:*"
+    "@stableflow/shared": "workspace:*",
+    "hono": "^4.12.18",
+    "ponder": "^0.16.6",
+    "viem": "^2.48.8"
   }
 }
