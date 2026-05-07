@@ -10,6 +10,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "check": "biome check . && pnpm typecheck",
+    "check:env": "pnpm --filter @stableflow/indexer check:env",
     "check:write": "biome check --write .",
     "dev": "pnpm --parallel -r dev",
     "format": "biome format --write .",

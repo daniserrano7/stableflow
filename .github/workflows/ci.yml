@@ -9,6 +9,8 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      PONDER_RPC_URL_8453: https://mainnet.base.org
 
     steps:
       - name: Checkout
@@ -28,6 +30,9 @@ jobs:
 
       - name: Check
         run: pnpm check
+
+      - name: Check env
+        run: pnpm check:env
 
       - name: Build
         run: pnpm build
