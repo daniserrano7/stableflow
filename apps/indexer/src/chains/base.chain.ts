@@ -1,6 +1,7 @@
 import { env } from "../env/env.js";
 
 export const baseRpcUrl = env.PONDER_RPC_URL_8453;
+export const baseDiscoveryStartBlock = env.PONDER_DISCOVERY_START_BLOCK_8453 ?? "latest";
 
 export const baseUsdc = {
   address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",

@@ -59,6 +59,20 @@ const getAddressLabelId = (address: `0x${string}`) => `${base.id}:${address.toLo
 const zeroAddress = "0x0000000000000000000000000000000000000000";
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
+const logDiscoveredLabel = ({
+  address,
+  entityName,
+  role,
+  sourceType,
+}: {
+  address: `0x${string}`;
+  entityName: string;
+  role: string;
+  sourceType: string;
+}) => {
+  console.log(`[discovery] ${entityName} ${role} | ${address} | source=${sourceType}`);
+};
+
 const logCompletedBlocks = (currentBlockNumber: bigint) => {
   for (const [blockNumber, stats] of blockStats) {
     if (blockNumber >= currentBlockNumber) {
@@ -211,7 +225,7 @@ const insertDiscoveredAddressLabel = async ({
     return;
   }
 
-  await context.db
+  const insertedLabel = await context.db
     .insert(discoveredAddressLabels)
     .values({
       id: getAddressLabelId(label.address),
@@ -237,6 +251,15 @@ const insertDiscoveredAddressLabel = async ({
     .onConflictDoNothing();
 
   discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), label);
+
+  if (insertedLabel !== null) {
+    logDiscoveredLabel({
+      address: label.address,
+      entityName: label.entityName,
+      role: label.role,
+      sourceType,
+    });
+  }
 };
 
 const insertDiscoveredProtocolLabel = async ({
@@ -256,7 +279,7 @@ const insertDiscoveredProtocolLabel = async ({
     return;
   }
 
-  await context.db
+  const insertedLabel = await context.db
     .insert(discoveredAddressLabels)
     .values({
       id: getAddressLabelId(label.address),
@@ -282,6 +305,15 @@ const insertDiscoveredProtocolLabel = async ({
     .onConflictDoNothing();
 
   discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), label);
+
+  if (insertedLabel !== null) {
+    logDiscoveredLabel({
+      address: label.address,
+      entityName: label.entityName,
+      role: label.role,
+      sourceType: "onchain_state",
+    });
+  }
 };
 
 const discoverAaveReserveLabels = async ({

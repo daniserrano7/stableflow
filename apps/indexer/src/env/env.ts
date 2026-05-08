@@ -2,6 +2,12 @@ import { z } from "zod";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
+  PONDER_DISCOVERY_START_BLOCK_8453: z
+    .string()
+    .regex(/^\d+$/, "Must be a positive integer block number")
+    .transform(Number)
+    .refine(Number.isSafeInteger, "Must be a safe integer block number")
+    .optional(),
   PONDER_RPC_URL_8453: z.string().url(),
 });
 

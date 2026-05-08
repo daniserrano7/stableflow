@@ -1,7 +1,12 @@
 import { createConfig } from "ponder";
 import { erc20Abi, parseAbi } from "viem";
 import { base } from "viem/chains";
-import { baseProtocolFactories, baseRpcUrl, baseUsdc } from "./src/chains/base.chain.js";
+import {
+  baseDiscoveryStartBlock,
+  baseProtocolFactories,
+  baseRpcUrl,
+  baseUsdc,
+} from "./src/chains/base.chain.js";
 
 const uniswapV3FactoryAbi = parseAbi([
   "event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)",
@@ -35,31 +40,31 @@ export default createConfig({
       abi: aerodromePoolFactoryAbi,
       chain: "base",
       address: baseProtocolFactories.aerodromePoolFactory,
-      startBlock: "latest",
+      startBlock: baseDiscoveryStartBlock,
     },
     MetaMorphoVaultFactory: {
       abi: metaMorphoVaultFactoryAbi,
       chain: "base",
       address: baseProtocolFactories.metaMorphoVaultFactory,
-      startBlock: "latest",
+      startBlock: baseDiscoveryStartBlock,
     },
     PancakeSwapV3Factory: {
       abi: uniswapV3FactoryAbi,
       chain: "base",
       address: baseProtocolFactories.pancakeSwapV3Factory,
-      startBlock: "latest",
+      startBlock: baseDiscoveryStartBlock,
     },
     UniswapV3Factory: {
       abi: uniswapV3FactoryAbi,
       chain: "base",
       address: baseProtocolFactories.uniswapV3Factory,
-      startBlock: "latest",
+      startBlock: baseDiscoveryStartBlock,
     },
   },
   blocks: {
     AaveReserveDiscovery: {
       chain: "base",
-      startBlock: "latest",
+      startBlock: baseDiscoveryStartBlock,
       interval: 1800,
     },
   },
