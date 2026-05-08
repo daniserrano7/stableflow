@@ -33,3 +33,24 @@ export const usdcTransferVolumeBuckets = onchainTable(
     bucketStartIndex: index("usdc_transfer_volume_buckets_bucket_start_idx").on(table.bucketStart),
   }),
 );
+
+export const usdcEntityFlowBuckets = onchainTable(
+  "usdc_entity_flow_buckets",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    tokenAddress: t.hex().notNull(),
+    bucketSize: t.text().notNull(),
+    bucketStart: t.bigint().notNull(),
+    entityId: t.text().notNull(),
+    entityName: t.text().notNull(),
+    category: t.text().notNull(),
+    direction: t.text().notNull(),
+    transferCount: t.bigint().notNull(),
+    totalValue: t.bigint().notNull(),
+  }),
+  (table) => ({
+    bucketStartIndex: index("usdc_entity_flow_buckets_bucket_start_idx").on(table.bucketStart),
+    entityIdIndex: index("usdc_entity_flow_buckets_entity_id_idx").on(table.entityId),
+  }),
+);
