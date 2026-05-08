@@ -55,6 +55,32 @@ export const usdcEntityFlowBuckets = onchainTable(
   }),
 );
 
+export const usdcEntityPairFlowBuckets = onchainTable(
+  "usdc_entity_pair_flow_buckets",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    tokenAddress: t.hex().notNull(),
+    bucketSize: t.text().notNull(),
+    bucketStart: t.bigint().notNull(),
+    fromEntityId: t.text().notNull(),
+    fromEntityName: t.text().notNull(),
+    fromCategory: t.text().notNull(),
+    toEntityId: t.text().notNull(),
+    toEntityName: t.text().notNull(),
+    toCategory: t.text().notNull(),
+    transferCount: t.bigint().notNull(),
+    totalValue: t.bigint().notNull(),
+  }),
+  (table) => ({
+    bucketStartIndex: index("usdc_entity_pair_flow_buckets_bucket_start_idx").on(table.bucketStart),
+    fromEntityIdIndex: index("usdc_entity_pair_flow_buckets_from_entity_id_idx").on(
+      table.fromEntityId,
+    ),
+    toEntityIdIndex: index("usdc_entity_pair_flow_buckets_to_entity_id_idx").on(table.toEntityId),
+  }),
+);
+
 export const discoveredAddressLabels = onchainTable(
   "discovered_address_labels",
   (t) => ({

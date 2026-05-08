@@ -2,6 +2,7 @@ import { type Context, ponder } from "ponder:registry";
 import {
   discoveredAddressLabels,
   usdcEntityFlowBuckets,
+  usdcEntityPairFlowBuckets,
   usdcTransfers,
   usdcTransferVolumeBuckets,
 } from "ponder:schema";
@@ -42,6 +43,11 @@ type FlowLabel = Pick<
 type EntityFlowUpdate = {
   direction: FlowDirection;
   label: FlowLabel;
+};
+
+type EntityPairFlowUpdate = {
+  fromLabel: FlowLabel;
+  toLabel: FlowLabel;
 };
 
 type IndexerContext = Context;
@@ -148,6 +154,38 @@ const getEntityFlowUpdates = ({
   }
 
   return updates;
+};
+
+const getEntityPairFlowUpdate = ({
+  fromLabel,
+  toLabel,
+}: {
+  fromLabel: FlowLabel | undefined;
+  toLabel: FlowLabel | undefined;
+}): EntityPairFlowUpdate | undefined => {
+  if (
+    fromLabel !== undefined &&
+    toLabel !== undefined &&
+    fromLabel.attributionGroup === toLabel.attributionGroup
+  ) {
+    return undefined;
+  }
+
+  let fromFlowLabel: FlowLabel = unidentifiedLabel;
+  let toFlowLabel: FlowLabel = unidentifiedLabel;
+
+  if (fromLabel !== undefined && isFlowBoundaryLabel(fromLabel)) {
+    fromFlowLabel = fromLabel;
+  }
+
+  if (toLabel !== undefined && isFlowBoundaryLabel(toLabel)) {
+    toFlowLabel = toLabel;
+  }
+
+  return {
+    fromLabel: fromFlowLabel,
+    toLabel: toFlowLabel,
+  };
 };
 
 const getFlowLabel = async ({
@@ -439,10 +477,9 @@ ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
         totalValue: row.totalValue + event.args.value,
       }));
 
-    const entityFlowUpdates = getEntityFlowUpdates({
-      fromLabel: await getFlowLabel({ address: event.args.from, context }),
-      toLabel: await getFlowLabel({ address: event.args.to, context }),
-    });
+    const fromLabel = await getFlowLabel({ address: event.args.from, context });
+    const toLabel = await getFlowLabel({ address: event.args.to, context });
+    const entityFlowUpdates = getEntityFlowUpdates({ fromLabel, toLabel });
 
     for (const { direction, label } of entityFlowUpdates) {
       const entityFlowBucketId = [
@@ -466,6 +503,42 @@ ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
           entityName: label.entityName,
           category: label.category,
           direction,
+          transferCount: 1n,
+          totalValue: event.args.value,
+        })
+        .onConflictDoUpdate((row) => ({
+          transferCount: row.transferCount + 1n,
+          totalValue: row.totalValue + event.args.value,
+        }));
+    }
+
+    const entityPairFlowUpdate = getEntityPairFlowUpdate({ fromLabel, toLabel });
+
+    if (entityPairFlowUpdate !== undefined) {
+      const { fromLabel: pairFromLabel, toLabel: pairToLabel } = entityPairFlowUpdate;
+      const entityPairFlowBucketId = [
+        base.id,
+        baseUsdc.address,
+        bucketSize,
+        bucketStart.toString(),
+        pairFromLabel.entityId,
+        pairToLabel.entityId,
+      ].join(":");
+
+      await context.db
+        .insert(usdcEntityPairFlowBuckets)
+        .values({
+          id: entityPairFlowBucketId,
+          chainId: base.id,
+          tokenAddress: baseUsdc.address,
+          bucketSize,
+          bucketStart,
+          fromEntityId: pairFromLabel.entityId,
+          fromEntityName: pairFromLabel.entityName,
+          fromCategory: pairFromLabel.category,
+          toEntityId: pairToLabel.entityId,
+          toEntityName: pairToLabel.entityName,
+          toCategory: pairToLabel.category,
           transferCount: 1n,
           totalValue: event.args.value,
         })
