@@ -1,9 +1,9 @@
 import { ponder } from "ponder:registry";
 import { formatUnits } from "viem";
 import { base } from "viem/chains";
-import { baseUsdc } from "./config/base.js";
-import { db } from "./db/client.js";
-import { usdcTransfers } from "./db/schema.js";
+import { baseUsdc } from "../chains/base.chain.js";
+import { db } from "../db/client.js";
+import { usdcTransfers } from "../db/schema.js";
 
 ponder.on("BaseUsdc:Transfer", async ({ event }) => {
   const amount = formatUnits(event.args.value, baseUsdc.decimals);

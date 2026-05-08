@@ -1,13 +1,14 @@
 import { createConfig } from "ponder";
 import { erc20Abi } from "viem";
 import { base } from "viem/chains";
-import { baseRpcUrl, baseUsdc } from "./src/config/base.js";
+import { baseRpcUrl, baseUsdc } from "../chains/base.chain.js";
 
 export default createConfig({
   chains: {
     base: {
       id: base.id,
       rpc: baseRpcUrl,
+      pollingInterval: 2000,
       ethGetLogsBlockRange: 500,
     },
   },

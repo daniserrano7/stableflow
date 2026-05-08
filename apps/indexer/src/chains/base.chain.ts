@@ -1,4 +1,4 @@
-import { env } from "./env.js";
+import { env } from "../env/env.js";
 
 export const baseRpcUrl = env.PONDER_RPC_URL_8453;
 
