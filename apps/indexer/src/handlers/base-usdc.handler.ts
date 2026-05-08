@@ -802,6 +802,52 @@ ponder.on("AerodromePoolFactory:PoolCreated", async ({ event, context }) => {
   });
 });
 
+ponder.on("AerodromeSlipstreamFactory:PoolCreated", async ({ event, context }) => {
+  await insertDiscoveredAddressLabel({
+    context,
+    event,
+    label: {
+      address: event.args.pool,
+      attributionGroup: "aerodrome",
+      category: "dex",
+      confidence: "high",
+      countingPolicy: "boundary",
+      entityId: "aerodrome",
+      entityName: "Aerodrome",
+      label: "USDC SlipStream pool",
+      role: "pool_instance",
+    },
+    poolKind: `tickSpacing:${event.args.tickSpacing.toString()}`,
+    sourceAddress: event.log.address,
+    sourceEvent: "PoolCreated",
+    token0: event.args.token0,
+    token1: event.args.token1,
+  });
+});
+
+ponder.on("AerodromeSlipstreamPoolFactory:PoolCreated", async ({ event, context }) => {
+  await insertDiscoveredAddressLabel({
+    context,
+    event,
+    label: {
+      address: event.args.pool,
+      attributionGroup: "aerodrome",
+      category: "dex",
+      confidence: "high",
+      countingPolicy: "boundary",
+      entityId: "aerodrome",
+      entityName: "Aerodrome",
+      label: "USDC SlipStream pool",
+      role: "pool_instance",
+    },
+    poolKind: `tickSpacing:${event.args.tickSpacing.toString()}`,
+    sourceAddress: event.log.address,
+    sourceEvent: "PoolCreated",
+    token0: event.args.token0,
+    token1: event.args.token1,
+  });
+});
+
 ponder.on("MetaMorphoVaultFactory:CreateMetaMorpho", async ({ event, context }) => {
   await insertDiscoveredAddressLabel({
     context,

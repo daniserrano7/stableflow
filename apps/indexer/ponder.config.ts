@@ -17,6 +17,10 @@ const aerodromePoolFactoryAbi = parseAbi([
   "event PoolCreated(address indexed token0, address indexed token1, bool indexed stable, address pool, uint256 poolIndex)",
 ]);
 
+const aerodromeSlipstreamFactoryAbi = parseAbi([
+  "event PoolCreated(address indexed token0, address indexed token1, int24 indexed tickSpacing, address pool)",
+]);
+
 const metaMorphoVaultFactoryAbi = parseAbi([
   "event CreateMetaMorpho(address indexed metaMorpho, address indexed caller, address initialOwner, uint256 initialTimelock, address indexed asset, string name, string symbol, bytes32 salt)",
 ]);
@@ -59,6 +63,18 @@ export default createConfig({
       abi: aerodromePoolFactoryAbi,
       chain: "base",
       address: baseProtocolFactories.aerodromePoolFactory,
+      startBlock: baseDiscoveryStartBlock,
+    },
+    AerodromeSlipstreamFactory: {
+      abi: aerodromeSlipstreamFactoryAbi,
+      chain: "base",
+      address: baseProtocolFactories.aerodromeSlipstreamFactory,
+      startBlock: baseDiscoveryStartBlock,
+    },
+    AerodromeSlipstreamPoolFactory: {
+      abi: aerodromeSlipstreamFactoryAbi,
+      chain: "base",
+      address: baseProtocolFactories.aerodromeSlipstreamPoolFactory,
       startBlock: baseDiscoveryStartBlock,
     },
     CircleCctpTokenMessengerV2: {

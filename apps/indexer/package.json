@@ -6,19 +6,31 @@
   "scripts": {
     "build": "pnpm codegen && pnpm typecheck",
     "check": "pnpm typecheck",
-    "check:env": "tsc -p tsconfig.env.json && node --env-file=.env dist/env-check/src/config/check-env.js",
+    "check:env": "tsc -p tsconfig.env.json && node --env-file-if-exists=.env dist/env-check/src/config/check-env.js",
     "codegen": "PONDER_TELEMETRY_DISABLED=1 ponder codegen",
     "dev": "PONDER_TELEMETRY_DISABLED=1 ponder dev",
+    "inspect:build": "tsc -p tsconfig.inspection.json",
+    "inspect:flows": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/flows.js",
+    "inspect:reconcile": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/reconcile.js",
+    "inspect:summary": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/summary.js",
+    "inspect:unidentified": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/unidentified.js",
+    "labels:candidates": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/generate-candidates.js",
+    "labels:promote": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/promote-candidates.js",
+    "labels:reject": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/reject-candidate.js",
     "start": "PONDER_TELEMETRY_DISABLED=1 ponder start",
-    "test": "echo \"No tests yet for indexer\"",
+    "test": "pnpm inspect:build && node --test dist/inspection/src/inspection/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@stableflow/shared": "workspace:*",
     "drizzle-orm": "^0.41.0",
     "hono": "^4.12.18",
+    "pg": "^8.20.0",
     "ponder": "^0.16.6",
     "viem": "^2.48.8",
     "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
   }
 }
