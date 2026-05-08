@@ -1,6 +1,7 @@
 import { type Context, ponder } from "ponder:registry";
 import {
   discoveredAddressLabels,
+  usdcBridgeFlowBuckets,
   usdcEntityFlowBuckets,
   usdcEntityPairFlowBuckets,
   usdcTransfers,
@@ -34,6 +35,7 @@ const blockStats = new Map<bigint, BlockStats>();
 const discoveredFlowLabelsByAddress = new Map<string, FlowLabel>();
 
 type FlowDirection = "in" | "out";
+type BridgeDirection = "inbound" | "outbound";
 
 type FlowLabel = Pick<
   AddressLabel,
@@ -64,6 +66,21 @@ const getAddressLabelId = (address: `0x${string}`) => `${base.id}:${address.toLo
 
 const zeroAddress = "0x0000000000000000000000000000000000000000";
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+const getBucketStart = (timestamp: bigint) => timestamp - (timestamp % bucketSizeSeconds);
+
+const getPaddedAddress = (address: `0x${string}`) =>
+  `0x000000000000000000000000${address.slice(2)}`;
+
+const isBaseUsdcToken = (token: `0x${string}`) => {
+  const normalizedToken = token.toLowerCase();
+  const normalizedBaseUsdc = baseUsdc.address.toLowerCase();
+
+  return (
+    normalizedToken === normalizedBaseUsdc ||
+    normalizedToken === getPaddedAddress(baseUsdc.address).toLowerCase()
+  );
+};
 
 const logDiscoveredLabel = ({
   address,
@@ -186,6 +203,61 @@ const getEntityPairFlowUpdate = ({
     fromLabel: fromFlowLabel,
     toLabel: toFlowLabel,
   };
+};
+
+const upsertBridgeFlowBucket = async ({
+  bridgeId,
+  bridgeName,
+  context,
+  direction,
+  eventCount = 1n,
+  remoteChainId = null,
+  remoteDomain = null,
+  timestamp,
+  totalValue,
+}: {
+  bridgeId: string;
+  bridgeName: string;
+  context: IndexerContext;
+  direction: BridgeDirection;
+  eventCount?: bigint;
+  remoteChainId?: bigint | null;
+  remoteDomain?: number | null;
+  timestamp: bigint;
+  totalValue: bigint;
+}) => {
+  const bucketStart = getBucketStart(timestamp);
+  const bridgeBucketId = [
+    base.id,
+    baseUsdc.address,
+    bucketSize,
+    bucketStart.toString(),
+    bridgeId,
+    direction,
+    remoteChainId?.toString() ?? "no-chain",
+    remoteDomain?.toString() ?? "no-domain",
+  ].join(":");
+
+  await context.db
+    .insert(usdcBridgeFlowBuckets)
+    .values({
+      id: bridgeBucketId,
+      chainId: base.id,
+      tokenAddress: baseUsdc.address,
+      bucketSize,
+      bucketStart,
+      bridgeId,
+      bridgeName,
+      direction,
+      remoteChainId,
+      remoteDomain,
+      eventCount,
+      totalValue,
+    })
+    .onConflictDoUpdate((row) => ({
+      eventCount: row.eventCount + eventCount,
+      totalValue: row.totalValue + totalValue,
+    }));
 };
 
 const getFlowLabel = async ({
@@ -442,7 +514,7 @@ ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
   logCompletedBlocks(event.block.number);
 
   const transferId = `${event.transaction.hash}-${event.log.logIndex}`;
-  const bucketStart = event.block.timestamp - (event.block.timestamp % bucketSizeSeconds);
+  const bucketStart = getBucketStart(event.block.timestamp);
   const bucketId = `${base.id}:${baseUsdc.address}:${bucketSize}:${bucketStart.toString()}`;
 
   const insertedTransfer = await context.db
@@ -564,6 +636,101 @@ ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
   }
 
   blockStats.set(event.block.number, stats);
+});
+
+ponder.on("CircleCctpTokenMessengerV2:DepositForBurn", async ({ event, context }) => {
+  if (!isBaseUsdcToken(event.args.burnToken)) {
+    return;
+  }
+
+  await upsertBridgeFlowBucket({
+    bridgeId: "circle-cctp",
+    bridgeName: "Circle CCTP",
+    context,
+    direction: "outbound",
+    remoteDomain: event.args.destinationDomain,
+    timestamp: event.block.timestamp,
+    totalValue: event.args.amount,
+  });
+});
+
+ponder.on("CircleCctpTokenMessengerV2:MintAndWithdraw", async ({ event, context }) => {
+  if (!isBaseUsdcToken(event.args.mintToken)) {
+    return;
+  }
+
+  await upsertBridgeFlowBucket({
+    bridgeId: "circle-cctp",
+    bridgeName: "Circle CCTP",
+    context,
+    direction: "inbound",
+    timestamp: event.block.timestamp,
+    totalValue: event.args.amount,
+  });
+});
+
+ponder.on("AcrossSpokePool:V3FundsDeposited", async ({ event, context }) => {
+  if (!isBaseUsdcToken(event.args.inputToken)) {
+    return;
+  }
+
+  await upsertBridgeFlowBucket({
+    bridgeId: "across",
+    bridgeName: "Across",
+    context,
+    direction: "outbound",
+    remoteChainId: event.args.destinationChainId,
+    timestamp: event.block.timestamp,
+    totalValue: event.args.inputAmount,
+  });
+});
+
+ponder.on("AcrossSpokePool:FilledV3Relay", async ({ event, context }) => {
+  if (!isBaseUsdcToken(event.args.outputToken)) {
+    return;
+  }
+
+  await upsertBridgeFlowBucket({
+    bridgeId: "across",
+    bridgeName: "Across",
+    context,
+    direction: "inbound",
+    remoteChainId: event.args.originChainId,
+    timestamp: event.block.timestamp,
+    totalValue: event.args.relayExecutionInfo.updatedOutputAmount,
+  });
+});
+
+ponder.on("AcrossSpokePool:FundsDeposited", async ({ event, context }) => {
+  if (!isBaseUsdcToken(event.args.inputToken)) {
+    return;
+  }
+
+  await upsertBridgeFlowBucket({
+    bridgeId: "across",
+    bridgeName: "Across",
+    context,
+    direction: "outbound",
+    remoteChainId: event.args.destinationChainId,
+    timestamp: event.block.timestamp,
+    totalValue: event.args.inputAmount,
+  });
+});
+
+ponder.on("AcrossSpokePool:FilledRelay", async ({ event, context }) => {
+  if (!isBaseUsdcToken(event.args.outputToken)) {
+    return;
+  }
+
+  await upsertBridgeFlowBucket({
+    bridgeId: "across",
+    bridgeName: "Across",
+    context,
+    direction: "inbound",
+    remoteChainId: event.args.originChainId,
+    timestamp: event.block.timestamp,
+    totalValue: event.args.relayExecutionInfo.updatedOutputAmount,
+  });
 });
 
 ponder.on("UniswapV3Factory:PoolCreated", async ({ event, context }) => {

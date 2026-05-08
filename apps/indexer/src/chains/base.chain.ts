@@ -18,4 +18,6 @@ export const baseProtocolFactories = {
 
 export const baseProtocolContracts = {
   aaveV3Pool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
+  acrossSpokePool: "0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64",
+  circleCctpTokenMessengerV2: "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
 } as const;

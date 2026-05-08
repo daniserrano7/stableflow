@@ -81,6 +81,28 @@ export const usdcEntityPairFlowBuckets = onchainTable(
   }),
 );
 
+export const usdcBridgeFlowBuckets = onchainTable(
+  "usdc_bridge_flow_buckets",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    tokenAddress: t.hex().notNull(),
+    bucketSize: t.text().notNull(),
+    bucketStart: t.bigint().notNull(),
+    bridgeId: t.text().notNull(),
+    bridgeName: t.text().notNull(),
+    direction: t.text().notNull(),
+    remoteChainId: t.bigint(),
+    remoteDomain: t.integer(),
+    eventCount: t.bigint().notNull(),
+    totalValue: t.bigint().notNull(),
+  }),
+  (table) => ({
+    bridgeIdIndex: index("usdc_bridge_flow_buckets_bridge_id_idx").on(table.bridgeId),
+    bucketStartIndex: index("usdc_bridge_flow_buckets_bucket_start_idx").on(table.bucketStart),
+  }),
+);
+
 export const discoveredAddressLabels = onchainTable(
   "discovered_address_labels",
   (t) => ({

@@ -752,6 +752,23 @@ Add bridge-specific classifiers:
 - Base bridge events for L1/L2 direction.
 - Across events for origin/destination and relayer behavior.
 
+Implemented first semantic bridge bucket:
+
+- Table: `usdc_bridge_flow_buckets`.
+- Bucket: one-minute `bucket_start`.
+- Direction: relative to Base, using `inbound` for USDC entering Base and `outbound` for USDC leaving Base.
+- CCTP source events:
+  - `DepositForBurn` means outbound from Base when `burnToken` is Base USDC.
+  - `MintAndWithdraw` means inbound to Base when `mintToken` is Base USDC.
+- Across source events:
+  - `V3FundsDeposited` and `FundsDeposited` mean outbound from Base when `inputToken` is Base USDC.
+  - `FilledV3Relay` and `FilledRelay` mean inbound to Base when `outputToken` is Base USDC.
+- Remote dimension:
+  - CCTP stores `remote_domain`.
+  - Across stores `remote_chain_id`.
+
+This table is intentionally separate from `usdc_entity_flow_buckets`. Entity flow buckets answer "which labeled entity touched USDC on Base"; bridge flow buckets answer "did USDC enter or leave Base through a bridge". Those are related but not interchangeable.
+
 ### Phase 6: Candidate Review Pipeline
 
 Add queries for high-volume unknown contracts.
