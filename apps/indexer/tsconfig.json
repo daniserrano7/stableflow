@@ -3,15 +3,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "types": [
-      "node",
-      "ponder/virtual"
-    ]
+    "types": ["node", "ponder/virtual"]
   },
-  "include": [
-    "src/**/*.ts",
-    "src/ponder/ponder.config.ts",
-    "src/ponder/ponder.schema.ts",
-    "src/ponder/ponder-env.d.ts"
-  ]
+  "include": ["src/**/*.ts", "ponder.config.ts", "ponder.schema.ts", "ponder-env.d.ts"]
 }

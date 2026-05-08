@@ -1,15 +1,14 @@
 import { ponder } from "ponder:registry";
+import { usdcTransfers } from "ponder:schema";
 import { formatUnits } from "viem";
 import { base } from "viem/chains";
 import { baseUsdc } from "../chains/base.chain.js";
-import { db } from "../db/client.js";
-import { usdcTransfers } from "../db/schema.js";
 
-ponder.on("BaseUsdc:Transfer", async ({ event }) => {
+ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
   const amount = formatUnits(event.args.value, baseUsdc.decimals);
   const transferId = `${event.transaction.hash}-${event.log.logIndex}`;
 
-  await db
+  await context.db
     .insert(usdcTransfers)
     .values({
       id: transferId,

@@ -14,9 +14,7 @@ if (!parsedEnv.success) {
     return `- ${path}: ${issue.message} (received: ${received})`;
   });
 
-  console.error(
-    `Invalid indexer environment variables:\n${formattedIssues.join("\n")}`,
-  );
+  console.error(`Invalid indexer environment variables:\n${formattedIssues.join("\n")}`);
 
   throw new Error("Invalid indexer environment variables");
 }

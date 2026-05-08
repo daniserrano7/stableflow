@@ -1,7 +1,7 @@
 import { createConfig } from "ponder";
 import { erc20Abi } from "viem";
 import { base } from "viem/chains";
-import { baseRpcUrl, baseUsdc } from "../chains/base.chain.js";
+import { baseRpcUrl, baseUsdc } from "./src/chains/base.chain.js";
 
 export default createConfig({
   chains: {
