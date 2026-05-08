@@ -24,6 +24,19 @@ export type AddressLabel = {
   role: string;
 };
 
+export type DiscoveredAddressLabelInput = Pick<
+  AddressLabel,
+  | "address"
+  | "attributionGroup"
+  | "category"
+  | "confidence"
+  | "countingPolicy"
+  | "entityId"
+  | "entityName"
+  | "label"
+  | "role"
+>;
+
 const baseAddressLabels = [
   {
     address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -441,7 +454,7 @@ const addressLabelsByAddress = new Map(
 export const getBaseAddressLabel = (address: Address) =>
   addressLabelsByAddress.get(address.toLowerCase());
 
-export const isFlowBoundaryLabel = (label: AddressLabel | undefined) =>
+export const isFlowBoundaryLabel = (label: Pick<AddressLabel, "countingPolicy"> | undefined) =>
   label?.countingPolicy === "boundary";
 
 export { baseAddressLabels };

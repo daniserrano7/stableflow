@@ -54,3 +54,32 @@ export const usdcEntityFlowBuckets = onchainTable(
     entityIdIndex: index("usdc_entity_flow_buckets_entity_id_idx").on(table.entityId),
   }),
 );
+
+export const discoveredAddressLabels = onchainTable(
+  "discovered_address_labels",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    address: t.hex().notNull(),
+    entityId: t.text().notNull(),
+    entityName: t.text().notNull(),
+    category: t.text().notNull(),
+    role: t.text().notNull(),
+    attributionGroup: t.text().notNull(),
+    countingPolicy: t.text().notNull(),
+    confidence: t.text().notNull(),
+    sourceType: t.text().notNull(),
+    sourceAddress: t.hex().notNull(),
+    sourceEvent: t.text().notNull(),
+    token0: t.hex(),
+    token1: t.hex(),
+    poolKind: t.text(),
+    firstSeenBlock: t.bigint().notNull(),
+    transactionHash: t.hex().notNull(),
+    logIndex: t.integer().notNull(),
+  }),
+  (table) => ({
+    addressIndex: index("discovered_address_labels_address_idx").on(table.address),
+    entityIdIndex: index("discovered_address_labels_entity_id_idx").on(table.entityId),
+  }),
+);
