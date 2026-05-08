@@ -46,4 +46,11 @@ export default createConfig({
       startBlock: "latest",
     },
   },
+  blocks: {
+    AaveReserveDiscovery: {
+      chain: "base",
+      startBlock: "latest",
+      interval: 1800,
+    },
+  },
 });

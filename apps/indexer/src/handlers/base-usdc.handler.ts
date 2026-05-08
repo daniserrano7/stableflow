@@ -5,9 +5,9 @@ import {
   usdcTransfers,
   usdcTransferVolumeBuckets,
 } from "ponder:schema";
-import { formatUnits } from "viem";
+import { formatUnits, parseAbi } from "viem";
 import { base } from "viem/chains";
-import { baseUsdc } from "../chains/base.chain.js";
+import { baseProtocolContracts, baseUsdc } from "../chains/base.chain.js";
 import {
   type AddressLabel,
   type DiscoveredAddressLabelInput,
@@ -17,6 +17,10 @@ import {
 
 const bucketSize = "1m";
 const bucketSizeSeconds = 60n;
+
+const aaveV3PoolAbi = parseAbi([
+  "function getReserveData(address asset) view returns ((uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt))",
+]);
 
 type BlockStats = {
   bucketStart: bigint;
@@ -51,6 +55,9 @@ const unidentifiedLabel = {
 } as const;
 
 const getAddressLabelId = (address: `0x${string}`) => `${base.id}:${address.toLowerCase()}`;
+
+const zeroAddress = "0x0000000000000000000000000000000000000000";
+const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
 const logCompletedBlocks = (currentBlockNumber: bigint) => {
   for (const [blockNumber, stats] of blockStats) {
@@ -173,6 +180,7 @@ const getFlowLabel = async ({
 const insertDiscoveredAddressLabel = async ({
   context,
   event,
+  firstSeenBlock,
   label,
   poolKind,
   sourceAddress,
@@ -182,10 +190,11 @@ const insertDiscoveredAddressLabel = async ({
 }: {
   context: IndexerContext;
   event: {
-    block: { number: bigint };
-    log: { logIndex: number };
+    block?: { number: bigint };
+    log?: { logIndex: number };
     transaction: { hash: `0x${string}` };
   };
+  firstSeenBlock?: bigint;
   label: DiscoveredAddressLabelInput;
   poolKind: string;
   sourceAddress: `0x${string}`;
@@ -219,14 +228,143 @@ const insertDiscoveredAddressLabel = async ({
       token0,
       token1,
       poolKind,
-      firstSeenBlock: event.block.number,
+      firstSeenBlock: firstSeenBlock ?? event.block?.number ?? 0n,
       transactionHash: event.transaction.hash,
-      logIndex: event.log.logIndex,
+      logIndex: event.log?.logIndex ?? 0,
     })
     .onConflictDoNothing();
 
   discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), label);
 };
+
+const insertDiscoveredProtocolLabel = async ({
+  context,
+  firstSeenBlock,
+  label,
+  sourceAddress,
+  sourceEvent,
+}: {
+  context: IndexerContext;
+  firstSeenBlock?: bigint;
+  label: DiscoveredAddressLabelInput;
+  sourceAddress: `0x${string}`;
+  sourceEvent: string;
+}) => {
+  if (label.address.toLowerCase() === zeroAddress) {
+    return;
+  }
+
+  await context.db
+    .insert(discoveredAddressLabels)
+    .values({
+      id: getAddressLabelId(label.address),
+      chainId: base.id,
+      address: label.address,
+      entityId: label.entityId,
+      entityName: label.entityName,
+      category: label.category,
+      role: label.role,
+      attributionGroup: label.attributionGroup,
+      countingPolicy: label.countingPolicy,
+      confidence: label.confidence,
+      sourceType: "onchain_state",
+      sourceAddress,
+      sourceEvent,
+      token0: baseUsdc.address,
+      token1: null,
+      poolKind: null,
+      firstSeenBlock: firstSeenBlock ?? 0n,
+      transactionHash: zeroHash,
+      logIndex: 0,
+    })
+    .onConflictDoNothing();
+
+  discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), label);
+};
+
+const discoverAaveReserveLabels = async ({
+  context,
+  firstSeenBlock,
+}: {
+  context: IndexerContext;
+  firstSeenBlock?: bigint;
+}) => {
+  const reserveData = await context.client.readContract({
+    abi: aaveV3PoolAbi,
+    address: baseProtocolContracts.aaveV3Pool,
+    functionName: "getReserveData",
+    args: [baseUsdc.address],
+  });
+
+  const aTokenAddress = reserveData.aTokenAddress;
+  const stableDebtTokenAddress = reserveData.stableDebtTokenAddress;
+  const variableDebtTokenAddress = reserveData.variableDebtTokenAddress;
+
+  await insertDiscoveredProtocolLabel({
+    context,
+    firstSeenBlock,
+    label: {
+      address: aTokenAddress,
+      attributionGroup: "aave-v3",
+      category: "lending",
+      confidence: "high",
+      countingPolicy: "boundary",
+      entityId: "aave-v3",
+      entityName: "Aave V3",
+      label: "USDC aToken",
+      role: "a_token",
+    },
+    sourceAddress: baseProtocolContracts.aaveV3Pool,
+    sourceEvent: "getReserveData(USDC)",
+  });
+
+  await insertDiscoveredProtocolLabel({
+    context,
+    firstSeenBlock,
+    label: {
+      address: stableDebtTokenAddress,
+      attributionGroup: "aave-v3",
+      category: "lending",
+      confidence: "high",
+      countingPolicy: "internal",
+      entityId: "aave-v3",
+      entityName: "Aave V3",
+      label: "USDC stable debt token",
+      role: "stable_debt_token",
+    },
+    sourceAddress: baseProtocolContracts.aaveV3Pool,
+    sourceEvent: "getReserveData(USDC)",
+  });
+
+  await insertDiscoveredProtocolLabel({
+    context,
+    firstSeenBlock,
+    label: {
+      address: variableDebtTokenAddress,
+      attributionGroup: "aave-v3",
+      category: "lending",
+      confidence: "high",
+      countingPolicy: "internal",
+      entityId: "aave-v3",
+      entityName: "Aave V3",
+      label: "USDC variable debt token",
+      role: "variable_debt_token",
+    },
+    sourceAddress: baseProtocolContracts.aaveV3Pool,
+    sourceEvent: "getReserveData(USDC)",
+  });
+};
+
+ponder.on("BaseUsdc:setup", async ({ context }) => {
+  await discoverAaveReserveLabels({ context });
+});
+
+ponder.on("AaveReserveDiscovery:block", async ({ event, context }) => {
+  await discoverAaveReserveLabels({
+    context,
+    firstSeenBlock: event.block.number,
+  });
+});
 
 ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
   logCompletedBlocks(event.block.number);

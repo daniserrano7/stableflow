@@ -13,3 +13,7 @@ export const baseProtocolFactories = {
   pancakeSwapV3Factory: "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
   uniswapV3Factory: "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
 } as const;
+
+export const baseProtocolContracts = {
+  aaveV3Pool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
+} as const;
