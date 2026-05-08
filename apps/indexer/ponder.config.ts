@@ -11,6 +11,10 @@ const aerodromePoolFactoryAbi = parseAbi([
   "event PoolCreated(address indexed token0, address indexed token1, bool indexed stable, address pool, uint256 poolIndex)",
 ]);
 
+const metaMorphoVaultFactoryAbi = parseAbi([
+  "event CreateMetaMorpho(address indexed metaMorpho, address indexed caller, address initialOwner, uint256 initialTimelock, address indexed asset, string name, string symbol, bytes32 salt)",
+]);
+
 export default createConfig({
   chains: {
     base: {
@@ -31,6 +35,12 @@ export default createConfig({
       abi: aerodromePoolFactoryAbi,
       chain: "base",
       address: baseProtocolFactories.aerodromePoolFactory,
+      startBlock: "latest",
+    },
+    MetaMorphoVaultFactory: {
+      abi: metaMorphoVaultFactoryAbi,
+      chain: "base",
+      address: baseProtocolFactories.metaMorphoVaultFactory,
       startBlock: "latest",
     },
     PancakeSwapV3Factory: {

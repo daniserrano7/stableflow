@@ -185,8 +185,9 @@ const insertDiscoveredAddressLabel = async ({
   poolKind,
   sourceAddress,
   sourceEvent,
+  sourceType = "factory_event",
   token0,
-  token1,
+  token1 = null,
 }: {
   context: IndexerContext;
   event: {
@@ -199,12 +200,13 @@ const insertDiscoveredAddressLabel = async ({
   poolKind: string;
   sourceAddress: `0x${string}`;
   sourceEvent: string;
+  sourceType?: "factory_event" | "onchain_state";
   token0: `0x${string}`;
-  token1: `0x${string}`;
+  token1?: `0x${string}` | null;
 }) => {
   if (
     token0.toLowerCase() !== baseUsdc.address.toLowerCase() &&
-    token1.toLowerCase() !== baseUsdc.address.toLowerCase()
+    token1?.toLowerCase() !== baseUsdc.address.toLowerCase()
   ) {
     return;
   }
@@ -222,7 +224,7 @@ const insertDiscoveredAddressLabel = async ({
       attributionGroup: label.attributionGroup,
       countingPolicy: label.countingPolicy,
       confidence: label.confidence,
-      sourceType: "factory_event",
+      sourceType,
       sourceAddress,
       sourceEvent,
       token0,
@@ -525,5 +527,27 @@ ponder.on("AerodromePoolFactory:PoolCreated", async ({ event, context }) => {
     sourceEvent: "PoolCreated",
     token0: event.args.token0,
     token1: event.args.token1,
+  });
+});
+
+ponder.on("MetaMorphoVaultFactory:CreateMetaMorpho", async ({ event, context }) => {
+  await insertDiscoveredAddressLabel({
+    context,
+    event,
+    label: {
+      address: event.args.metaMorpho,
+      attributionGroup: "morpho-blue",
+      category: "lending",
+      confidence: "high",
+      countingPolicy: "boundary",
+      entityId: "morpho-blue",
+      entityName: "Morpho Blue",
+      label: event.args.name,
+      role: "vault",
+    },
+    poolKind: "erc4626_vault",
+    sourceAddress: event.log.address,
+    sourceEvent: "CreateMetaMorpho",
+    token0: event.args.asset,
   });
 });
