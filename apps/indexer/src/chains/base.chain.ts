@@ -11,6 +11,7 @@ export const baseUsdc = {
 
 export const baseProtocolFactories = {
   aerodromePoolFactory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+  aerodromeSlipstream3Factory: "0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef",
   aerodromeSlipstreamFactory: "0x5e7BB104d84C7CB9b682AAC2F3D509f5F406809A",
   aerodromeSlipstreamPoolFactory: "0xeC8E5342B19977B4eF8892e02D8DAEcfa1315831",
   metaMorphoVaultFactory: "0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101",

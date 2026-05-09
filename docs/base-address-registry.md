@@ -31,6 +31,11 @@ This file is intentionally conservative. It favors official protocol docs, offic
 | Uniswap V3 | dex | QuoterV2 | `0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a` | high | Uniswap deployment docs |
 | Aerodrome | dex | Router | `0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43` | high | Aerodrome contracts repo |
 | Aerodrome | dex | PoolFactory | `0x420DD381b31aEf6683db6B902084cB0FFECe40Da` | high | Aerodrome contracts repo |
+| Aerodrome | dex | SlipStream | `0x5e7BB104d84C7CB9b682AAC2F3D509f5F406809A` | high | Aerodrome contracts repo / onchain pool factory |
+| Aerodrome | dex | SlipStream 3 Factory | `0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef` | medium | Onchain pool factory / GeckoTerminal |
+| Aerodrome | dex | cbBTC/USDC SlipStream pool | `0x4e962BB3889Bf030368F56810A9c96B83CB3E778` | high | Onchain `factory/token0/token1`; GeckoTerminal |
+| Aerodrome | dex | WETH/USDC SlipStream pool | `0xb2cc224c1c9feE385f8ad6a55b4d94E92359DC59` | high | Onchain `factory/token0/token1`; GeckoTerminal |
+| Aerodrome | dex | WETH/USDC SlipStream 3 pool | `0x3FE04a59eBd38cF06080a6f60A98D124eB59392A` | medium | Onchain `factory/token0/token1`; GeckoTerminal |
 | Aerodrome | dex | FactoryRegistry | `0x5C3F18F06CC09CA1910767A34a20F771039E37C0` | high | Aerodrome contracts repo |
 | Aerodrome | dex | Voter | `0x16613524e02ad97eDfeF371bC883F2F5d6C480A5` | high | Aerodrome contracts repo |
 | Aerodrome | dex | AERO token | `0x940181a94A35A4569E4529A3CDfB74e38FD98631` | high | Aerodrome contracts repo |

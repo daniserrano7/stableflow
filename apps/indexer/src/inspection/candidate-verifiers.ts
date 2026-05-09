@@ -121,6 +121,24 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
         attributionGroup: "aerodrome",
         entityId: "aerodrome",
         entityName: "Aerodrome",
+        factoryAddress: baseProtocolFactories.aerodromeSlipstream3Factory,
+        poolKind: (poolAddress) =>
+          safeReadPoolKind("slipstream_pool", async () => {
+            const tickSpacing = await publicClient.readContract({
+              abi: aerodromeSlipstreamPoolAbi,
+              address: poolAddress,
+              functionName: "tickSpacing",
+            });
+
+            return `tickSpacing:${tickSpacing.toString()}`;
+          }),
+        sourceEvent: "factory() + token0() + token1()",
+        verifier: "aerodrome_slipstream_pool_identity",
+      },
+      {
+        attributionGroup: "aerodrome",
+        entityId: "aerodrome",
+        entityName: "Aerodrome",
         factoryAddress: baseProtocolFactories.aerodromeSlipstreamPoolFactory,
         poolKind: (poolAddress) =>
           safeReadPoolKind("slipstream_pool", async () => {

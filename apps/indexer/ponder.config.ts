@@ -71,6 +71,12 @@ export default createConfig({
       address: baseProtocolFactories.aerodromeSlipstreamFactory,
       startBlock: baseDiscoveryStartBlock,
     },
+    AerodromeSlipstream3Factory: {
+      abi: aerodromeSlipstreamFactoryAbi,
+      chain: "base",
+      address: baseProtocolFactories.aerodromeSlipstream3Factory,
+      startBlock: baseDiscoveryStartBlock,
+    },
     AerodromeSlipstreamPoolFactory: {
       abi: aerodromeSlipstreamFactoryAbi,
       chain: "base",
