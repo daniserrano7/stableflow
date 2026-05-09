@@ -89,6 +89,10 @@ type StoredCandidateDbRow = CandidateDbRow & {
 };
 
 const staticLabelAddresses = baseAddressLabels.map((label) => label.address.toLowerCase());
+const ignoredCandidateAddresses = [
+  ...staticLabelAddresses,
+  "0x0000000000000000000000000000000000000000",
+];
 
 const toBigInt = (value: string) => BigInt(value);
 
@@ -96,10 +100,72 @@ const normalizeAddress = (address: Address) => address.toLowerCase() as Address;
 
 const hasAddressLabelCandidatesTable = async (db: ReadOnlyDb) => {
   const rows = await db.query<{ exists: boolean }>(`
-    select to_regclass('public.address_label_candidates') is not null as exists
+    select to_regclass('public.address_label_candidate_reviews') is not null as exists
   `);
 
   return rows[0]?.exists ?? false;
+};
+
+const ensureAddressLabelCandidateReviewsTable = async (db: OperatorDb) => {
+  await db.execute(`
+    create table if not exists address_label_candidate_reviews (
+      id text primary key,
+      chain_id integer not null,
+      address text not null,
+      status text not null,
+      suggested_entity_id text not null,
+      suggested_entity_name text not null,
+      suggested_category text not null,
+      suggested_role text not null,
+      attribution_group text not null,
+      counting_policy text not null,
+      confidence text not null,
+      evidence_source text not null,
+      evidence_details text not null,
+      verifier text not null,
+      source_address text not null,
+      source_event text not null,
+      token0 text,
+      token1 text,
+      pool_kind text,
+      observed_transfer_count numeric not null,
+      observed_incoming_count numeric not null,
+      observed_outgoing_count numeric not null,
+      observed_incoming_value numeric not null,
+      observed_outgoing_value numeric not null,
+      observed_total_value numeric not null,
+      first_seen_block numeric not null,
+      last_seen_block numeric not null,
+      first_seen_timestamp numeric not null,
+      last_seen_timestamp numeric not null,
+      reviewed_at numeric,
+      promoted_at numeric,
+      rejection_reason text
+    )
+  `);
+
+  await db.execute(`
+    create index if not exists address_label_candidate_reviews_address_idx
+    on address_label_candidate_reviews (address)
+  `);
+
+  await db.execute(`
+    create index if not exists address_label_candidate_reviews_status_idx
+    on address_label_candidate_reviews (status)
+  `);
+
+  await db.execute(`
+    create index if not exists address_label_candidate_reviews_observed_total_value_idx
+    on address_label_candidate_reviews (observed_total_value)
+  `);
+};
+
+const ensurePonderLiveQueryTable = async (db: OperatorDb) => {
+  await db.execute(`
+    create table if not exists live_query_tables (
+      table_name text primary key
+    )
+  `);
 };
 
 const rowToUnidentifiedCandidate = (row: CandidateDbRow): UnidentifiedAddressCandidate => ({
@@ -163,7 +229,7 @@ export const getUnidentifiedAddressCandidates = async (
     : "null::text as candidate_status";
   const candidateJoin = hasCandidateTable
     ? `
-      left join address_label_candidates candidates
+      left join address_label_candidate_reviews candidates
         on lower(candidates.address::text) = address_volume.address
     `
     : "";
@@ -240,7 +306,7 @@ export const getUnidentifiedAddressCandidates = async (
     [
       window.startEpoch.toString(),
       window.endEpochExclusive.toString(),
-      staticLabelAddresses,
+      ignoredCandidateAddresses,
       args.limit,
     ],
   );
@@ -263,9 +329,11 @@ export const upsertAddressLabelCandidate = async ({
   const status: CandidateStatus = verification.confidence === "high" ? "verified" : "candidate";
   const now = BigInt(Math.floor(Date.now() / 1000));
 
+  await ensureAddressLabelCandidateReviewsTable(db);
+
   await db.execute(
     `
-      insert into address_label_candidates (
+      insert into address_label_candidate_reviews (
         id,
         chain_id,
         address,
@@ -352,13 +420,13 @@ export const upsertAddressLabelCandidate = async ({
         observed_incoming_value = excluded.observed_incoming_value,
         observed_outgoing_value = excluded.observed_outgoing_value,
         observed_total_value = excluded.observed_total_value,
-        first_seen_block = least(address_label_candidates.first_seen_block, excluded.first_seen_block),
-        last_seen_block = greatest(address_label_candidates.last_seen_block, excluded.last_seen_block),
-        first_seen_timestamp = least(address_label_candidates.first_seen_timestamp, excluded.first_seen_timestamp),
-        last_seen_timestamp = greatest(address_label_candidates.last_seen_timestamp, excluded.last_seen_timestamp),
+        first_seen_block = least(address_label_candidate_reviews.first_seen_block, excluded.first_seen_block),
+        last_seen_block = greatest(address_label_candidate_reviews.last_seen_block, excluded.last_seen_block),
+        first_seen_timestamp = least(address_label_candidate_reviews.first_seen_timestamp, excluded.first_seen_timestamp),
+        last_seen_timestamp = greatest(address_label_candidate_reviews.last_seen_timestamp, excluded.last_seen_timestamp),
         reviewed_at = excluded.reviewed_at,
         rejection_reason = null
-      where address_label_candidates.status <> 'rejected'
+      where address_label_candidate_reviews.status <> 'rejected'
     `,
     [
       `${base.id}:${candidate.address}`,
@@ -396,6 +464,12 @@ export const upsertAddressLabelCandidate = async ({
 };
 
 export const getVerifiedUnpromotedCandidates = async (db: ReadOnlyDb, limit: number) => {
+  const hasCandidateTable = await hasAddressLabelCandidatesTable(db);
+
+  if (!hasCandidateTable) {
+    return [];
+  }
+
   const rows = await db.query<StoredCandidateDbRow>(
     `
       select
@@ -431,7 +505,7 @@ export const getVerifiedUnpromotedCandidates = async (db: ReadOnlyDb, limit: num
         promoted_at::text,
         rejection_reason,
         '0'::text as unique_counterparties
-      from address_label_candidates
+      from address_label_candidate_reviews
       where status = 'verified'
         and promoted_at is null
       order by observed_total_value desc
@@ -444,6 +518,9 @@ export const getVerifiedUnpromotedCandidates = async (db: ReadOnlyDb, limit: num
 };
 
 export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) => {
+  await ensureAddressLabelCandidateReviewsTable(db);
+  await ensurePonderLiveQueryTable(db);
+
   const candidates = await getVerifiedUnpromotedCandidates(db, limit);
   const now = BigInt(Math.floor(Date.now() / 1000));
 
@@ -519,7 +596,7 @@ export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) =
 
     await db.execute(
       `
-        update address_label_candidates
+        update address_label_candidate_reviews
         set promoted_at = $2::bigint
         where id = $1
       `,
@@ -542,9 +619,11 @@ export const rejectAddressLabelCandidate = async ({
   const normalizedAddress = normalizeAddress(address);
   const now = BigInt(Math.floor(Date.now() / 1000));
 
+  await ensureAddressLabelCandidateReviewsTable(db);
+
   const rows = await db.execute<{ address: Address }>(
     `
-      update address_label_candidates
+      update address_label_candidate_reviews
       set
         status = 'rejected',
         rejection_reason = $3,

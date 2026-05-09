@@ -5,6 +5,7 @@ import {
   getUnidentifiedAddressCandidates,
   upsertAddressLabelCandidate,
 } from "./candidates.js";
+import { verifyKnownCounterpartyPattern } from "./counterparty-pattern-verifier.js";
 import { createOperatorDb } from "./db.js";
 import { formatUsdc, printJson } from "./reporting.js";
 
@@ -18,7 +19,9 @@ const run = async () => {
 
     for (const candidate of candidates) {
       const verification =
-        (await verifyCandidate(candidate)) ?? getFallbackCandidateVerification(candidate);
+        (await verifyCandidate(candidate)) ??
+        (await verifyKnownCounterpartyPattern(db, candidate)) ??
+        getFallbackCandidateVerification(candidate);
 
       await upsertAddressLabelCandidate({
         candidate,
