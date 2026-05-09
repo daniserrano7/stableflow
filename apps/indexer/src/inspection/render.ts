@@ -104,8 +104,7 @@ const renderBridgeFlows = (flows: BridgeFlowRow[]) => {
   }
 
   for (const flow of flows) {
-    const remote = flow.remoteChainId ?? flow.remoteDomain;
-    const remoteLabel = remote === null ? "unknown remote" : `remote=${remote.toString()}`;
+    const remoteLabel = `${flow.remoteNetworkName} (${flow.bridgeRemoteNamespace}=${flow.bridgeRemoteId})`;
 
     console.log(
       `- ${flow.bridgeName} ${flow.direction} (${remoteLabel}): ${formatUsdc(

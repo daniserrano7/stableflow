@@ -60,12 +60,17 @@ const createFakeDb = (): ReadOnlyDb => ({
     if (text.includes("from usdc_bridge_flow_buckets")) {
       return [
         {
+          bridge_remote_id: "1",
+          bridge_remote_namespace: "across-chain-id",
           bridge_id: "across",
           bridge_name: "Across",
           direction: "inbound",
           event_count: "1",
           remote_chain_id: "1",
           remote_domain: null,
+          remote_network_ecosystem: "evm",
+          remote_network_id: "ethereum",
+          remote_network_name: "Ethereum",
           total_value: "1000000",
         },
       ] as Row[];

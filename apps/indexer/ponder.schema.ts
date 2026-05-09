@@ -92,6 +92,11 @@ export const usdcBridgeFlowBuckets = onchainTable(
     bridgeId: t.text().notNull(),
     bridgeName: t.text().notNull(),
     direction: t.text().notNull(),
+    remoteNetworkId: t.text().notNull(),
+    remoteNetworkName: t.text().notNull(),
+    remoteNetworkEcosystem: t.text().notNull(),
+    bridgeRemoteNamespace: t.text().notNull(),
+    bridgeRemoteId: t.text().notNull(),
     remoteChainId: t.bigint(),
     remoteDomain: t.integer(),
     eventCount: t.bigint().notNull(),
@@ -100,6 +105,44 @@ export const usdcBridgeFlowBuckets = onchainTable(
   (table) => ({
     bridgeIdIndex: index("usdc_bridge_flow_buckets_bridge_id_idx").on(table.bridgeId),
     bucketStartIndex: index("usdc_bridge_flow_buckets_bucket_start_idx").on(table.bucketStart),
+    remoteNetworkIdIndex: index("usdc_bridge_flow_buckets_remote_network_id_idx").on(
+      table.remoteNetworkId,
+    ),
+  }),
+);
+
+export const usdcBridgeEvents = onchainTable(
+  "usdc_bridge_events",
+  (t) => ({
+    id: t.text().primaryKey(),
+    chainId: t.integer().notNull(),
+    blockNumber: t.bigint().notNull(),
+    blockTimestamp: t.bigint().notNull(),
+    transactionHash: t.hex().notNull(),
+    logIndex: t.integer().notNull(),
+    tokenAddress: t.hex().notNull(),
+    bridgeId: t.text().notNull(),
+    bridgeName: t.text().notNull(),
+    direction: t.text().notNull(),
+    sourceEvent: t.text().notNull(),
+    remoteNetworkId: t.text().notNull(),
+    remoteNetworkName: t.text().notNull(),
+    remoteNetworkEcosystem: t.text().notNull(),
+    bridgeRemoteNamespace: t.text().notNull(),
+    bridgeRemoteId: t.text().notNull(),
+    remoteChainId: t.bigint(),
+    remoteDomain: t.integer(),
+    value: t.bigint().notNull(),
+  }),
+  (table) => ({
+    blockNumberIndex: index("usdc_bridge_events_block_number_idx").on(table.blockNumber),
+    bridgeIdIndex: index("usdc_bridge_events_bridge_id_idx").on(table.bridgeId),
+    remoteNetworkIdIndex: index("usdc_bridge_events_remote_network_id_idx").on(
+      table.remoteNetworkId,
+    ),
+    transactionHashIndex: index("usdc_bridge_events_transaction_hash_idx").on(
+      table.transactionHash,
+    ),
   }),
 );
 

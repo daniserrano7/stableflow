@@ -1,6 +1,7 @@
 import { type Context, ponder } from "ponder:registry";
 import {
   discoveredAddressLabels,
+  usdcBridgeEvents,
   usdcBridgeFlowBuckets,
   usdcEntityFlowBuckets,
   usdcEntityPairFlowBuckets,
@@ -10,6 +11,11 @@ import {
 import { formatUnits, parseAbi } from "viem";
 import { base } from "viem/chains";
 import { baseProtocolContracts, baseUsdc } from "../chains/base.chain.js";
+import {
+  type ResolvedBridgeRemoteNetwork,
+  resolveAcrossRemoteNetwork,
+  resolveCctpRemoteNetwork,
+} from "../chains/external-networks.js";
 import {
   type AddressLabel,
   type DiscoveredAddressLabelInput,
@@ -80,6 +86,48 @@ const isBaseUsdcToken = (token: `0x${string}`) => {
     normalizedToken === normalizedBaseUsdc ||
     normalizedToken === getPaddedAddress(baseUsdc.address).toLowerCase()
   );
+};
+
+const readUint256FromHex = (value: `0x${string}`, byteOffset: number) => {
+  const start = 2 + byteOffset * 2;
+  const hexValue = value.slice(start, start + 64);
+
+  if (hexValue.length !== 64) {
+    return null;
+  }
+
+  return BigInt(`0x${hexValue}`);
+};
+
+const readUint32FromHex = (value: `0x${string}`, byteOffset: number) => {
+  const start = 2 + byteOffset * 2;
+  const hexValue = value.slice(start, start + 8);
+
+  if (hexValue.length !== 8) {
+    return null;
+  }
+
+  return Number(BigInt(`0x${hexValue}`));
+};
+
+const parseCctpBurnMessageBody = (messageBody: `0x${string}`) => {
+  const byteLength = (messageBody.length - 2) / 2;
+
+  if (byteLength < 196) {
+    return null;
+  }
+
+  const version = readUint32FromHex(messageBody, 0);
+  const amount = readUint256FromHex(messageBody, 68);
+  const feeExecuted = readUint256FromHex(messageBody, 164);
+
+  if (version !== 1 || amount === null || feeExecuted === null || feeExecuted > amount) {
+    return null;
+  }
+
+  return {
+    netAmount: amount - feeExecuted,
+  };
 };
 
 const logDiscoveredLabel = ({
@@ -210,23 +258,59 @@ const upsertBridgeFlowBucket = async ({
   bridgeName,
   context,
   direction,
-  eventCount = 1n,
+  event,
+  remoteNetwork,
   remoteChainId = null,
   remoteDomain = null,
-  timestamp,
+  sourceEvent,
   totalValue,
 }: {
   bridgeId: string;
   bridgeName: string;
   context: IndexerContext;
   direction: BridgeDirection;
-  eventCount?: bigint;
+  event: {
+    block: { number: bigint; timestamp: bigint };
+    log: { logIndex: number };
+    transaction: { hash: `0x${string}` };
+  };
+  remoteNetwork: ResolvedBridgeRemoteNetwork;
   remoteChainId?: bigint | null;
   remoteDomain?: number | null;
-  timestamp: bigint;
+  sourceEvent: string;
   totalValue: bigint;
 }) => {
-  const bucketStart = getBucketStart(timestamp);
+  const bridgeEventId = `${event.transaction.hash}-${event.log.logIndex}`;
+  const insertedBridgeEvent = await context.db
+    .insert(usdcBridgeEvents)
+    .values({
+      id: bridgeEventId,
+      chainId: base.id,
+      blockNumber: event.block.number,
+      blockTimestamp: event.block.timestamp,
+      transactionHash: event.transaction.hash,
+      logIndex: event.log.logIndex,
+      tokenAddress: baseUsdc.address,
+      bridgeId,
+      bridgeName,
+      direction,
+      sourceEvent,
+      remoteNetworkId: remoteNetwork.remoteNetworkId,
+      remoteNetworkName: remoteNetwork.remoteNetworkName,
+      remoteNetworkEcosystem: remoteNetwork.remoteNetworkEcosystem,
+      bridgeRemoteNamespace: remoteNetwork.bridgeRemoteNamespace,
+      bridgeRemoteId: remoteNetwork.bridgeRemoteId,
+      remoteChainId,
+      remoteDomain,
+      value: totalValue,
+    })
+    .onConflictDoNothing();
+
+  if (insertedBridgeEvent === null) {
+    return;
+  }
+
+  const bucketStart = getBucketStart(event.block.timestamp);
   const bridgeBucketId = [
     base.id,
     baseUsdc.address,
@@ -234,6 +318,7 @@ const upsertBridgeFlowBucket = async ({
     bucketStart.toString(),
     bridgeId,
     direction,
+    remoteNetwork.remoteNetworkId,
     remoteChainId?.toString() ?? "no-chain",
     remoteDomain?.toString() ?? "no-domain",
   ].join(":");
@@ -249,13 +334,18 @@ const upsertBridgeFlowBucket = async ({
       bridgeId,
       bridgeName,
       direction,
+      remoteNetworkId: remoteNetwork.remoteNetworkId,
+      remoteNetworkName: remoteNetwork.remoteNetworkName,
+      remoteNetworkEcosystem: remoteNetwork.remoteNetworkEcosystem,
+      bridgeRemoteNamespace: remoteNetwork.bridgeRemoteNamespace,
+      bridgeRemoteId: remoteNetwork.bridgeRemoteId,
       remoteChainId,
       remoteDomain,
-      eventCount,
+      eventCount: 1n,
       totalValue,
     })
     .onConflictDoUpdate((row) => ({
-      eventCount: row.eventCount + eventCount,
+      eventCount: row.eventCount + 1n,
       totalValue: row.totalValue + totalValue,
     }));
 };
@@ -648,14 +738,18 @@ ponder.on("CircleCctpTokenMessengerV2:DepositForBurn", async ({ event, context }
     bridgeName: "Circle CCTP",
     context,
     direction: "outbound",
+    event,
+    remoteNetwork: resolveCctpRemoteNetwork(event.args.destinationDomain),
     remoteDomain: event.args.destinationDomain,
-    timestamp: event.block.timestamp,
+    sourceEvent: "DepositForBurn",
     totalValue: event.args.amount,
   });
 });
 
-ponder.on("CircleCctpTokenMessengerV2:MintAndWithdraw", async ({ event, context }) => {
-  if (!isBaseUsdcToken(event.args.mintToken)) {
+ponder.on("CircleCctpMessageTransmitterV2:MessageReceived", async ({ event, context }) => {
+  const burnMessageBody = parseCctpBurnMessageBody(event.args.messageBody);
+
+  if (burnMessageBody === null) {
     return;
   }
 
@@ -664,8 +758,11 @@ ponder.on("CircleCctpTokenMessengerV2:MintAndWithdraw", async ({ event, context 
     bridgeName: "Circle CCTP",
     context,
     direction: "inbound",
-    timestamp: event.block.timestamp,
-    totalValue: event.args.amount,
+    event,
+    remoteNetwork: resolveCctpRemoteNetwork(event.args.sourceDomain),
+    remoteDomain: event.args.sourceDomain,
+    sourceEvent: "MessageReceived",
+    totalValue: burnMessageBody.netAmount,
   });
 });
 
@@ -679,8 +776,10 @@ ponder.on("AcrossSpokePool:V3FundsDeposited", async ({ event, context }) => {
     bridgeName: "Across",
     context,
     direction: "outbound",
+    event,
+    remoteNetwork: resolveAcrossRemoteNetwork(event.args.destinationChainId),
     remoteChainId: event.args.destinationChainId,
-    timestamp: event.block.timestamp,
+    sourceEvent: "V3FundsDeposited",
     totalValue: event.args.inputAmount,
   });
 });
@@ -695,8 +794,10 @@ ponder.on("AcrossSpokePool:FilledV3Relay", async ({ event, context }) => {
     bridgeName: "Across",
     context,
     direction: "inbound",
+    event,
+    remoteNetwork: resolveAcrossRemoteNetwork(event.args.originChainId),
     remoteChainId: event.args.originChainId,
-    timestamp: event.block.timestamp,
+    sourceEvent: "FilledV3Relay",
     totalValue: event.args.relayExecutionInfo.updatedOutputAmount,
   });
 });
@@ -711,8 +812,10 @@ ponder.on("AcrossSpokePool:FundsDeposited", async ({ event, context }) => {
     bridgeName: "Across",
     context,
     direction: "outbound",
+    event,
+    remoteNetwork: resolveAcrossRemoteNetwork(event.args.destinationChainId),
     remoteChainId: event.args.destinationChainId,
-    timestamp: event.block.timestamp,
+    sourceEvent: "FundsDeposited",
     totalValue: event.args.inputAmount,
   });
 });
@@ -727,8 +830,10 @@ ponder.on("AcrossSpokePool:FilledRelay", async ({ event, context }) => {
     bridgeName: "Across",
     context,
     direction: "inbound",
+    event,
+    remoteNetwork: resolveAcrossRemoteNetwork(event.args.originChainId),
     remoteChainId: event.args.originChainId,
-    timestamp: event.block.timestamp,
+    sourceEvent: "FilledRelay",
     totalValue: event.args.relayExecutionInfo.updatedOutputAmount,
   });
 });

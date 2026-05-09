@@ -57,12 +57,17 @@ export type EntityPairFlowMetrics = {
 };
 
 export type BridgeFlowRow = {
+  bridgeRemoteId: string;
+  bridgeRemoteNamespace: string;
   bridgeId: string;
   bridgeName: string;
   direction: string;
   eventCount: bigint;
   remoteChainId: bigint | null;
   remoteDomain: number | null;
+  remoteNetworkEcosystem: string;
+  remoteNetworkId: string;
+  remoteNetworkName: string;
   totalValue: bigint;
 };
 
@@ -125,12 +130,17 @@ type EntityPairFlowMetricsRow = {
 };
 
 type BridgeFlowDbRow = {
+  bridge_remote_id: string;
+  bridge_remote_namespace: string;
   bridge_id: string;
   bridge_name: string;
   direction: string;
   event_count: string;
   remote_chain_id: string | null;
   remote_domain: number | null;
+  remote_network_ecosystem: string;
+  remote_network_id: string;
+  remote_network_name: string;
   total_value: string;
 };
 
@@ -372,6 +382,11 @@ export const getBridgeFlows = async (db: ReadOnlyDb, window: InspectionWindow, l
         bridge_id,
         bridge_name,
         direction,
+        remote_network_id,
+        remote_network_name,
+        remote_network_ecosystem,
+        bridge_remote_namespace,
+        bridge_remote_id,
         remote_chain_id::text as remote_chain_id,
         remote_domain,
         sum(event_count)::text as event_count,
@@ -379,7 +394,17 @@ export const getBridgeFlows = async (db: ReadOnlyDb, window: InspectionWindow, l
       from usdc_bridge_flow_buckets
       where bucket_start >= $1::bigint
         and bucket_start < $2::bigint
-      group by bridge_id, bridge_name, direction, remote_chain_id, remote_domain
+      group by
+        bridge_id,
+        bridge_name,
+        direction,
+        remote_network_id,
+        remote_network_name,
+        remote_network_ecosystem,
+        bridge_remote_namespace,
+        bridge_remote_id,
+        remote_chain_id,
+        remote_domain
       order by sum(total_value) desc
       limit $3::integer
     `,
@@ -389,12 +414,17 @@ export const getBridgeFlows = async (db: ReadOnlyDb, window: InspectionWindow, l
   return rows.map(
     (row) =>
       ({
+        bridgeRemoteId: row.bridge_remote_id,
+        bridgeRemoteNamespace: row.bridge_remote_namespace,
         bridgeId: row.bridge_id,
         bridgeName: row.bridge_name,
         direction: row.direction,
         eventCount: BigInt(row.event_count),
         remoteChainId: toBigInt(row.remote_chain_id),
         remoteDomain: row.remote_domain,
+        remoteNetworkEcosystem: row.remote_network_ecosystem,
+        remoteNetworkId: row.remote_network_id,
+        remoteNetworkName: row.remote_network_name,
         totalValue: BigInt(row.total_value),
       }) satisfies BridgeFlowRow,
   );

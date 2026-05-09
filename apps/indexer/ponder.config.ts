@@ -27,7 +27,10 @@ const metaMorphoVaultFactoryAbi = parseAbi([
 
 const circleCctpTokenMessengerV2Abi = parseAbi([
   "event DepositForBurn(uint64 indexed nonce, address indexed burnToken, uint256 amount, address indexed depositor, bytes32 mintRecipient, uint32 destinationDomain, bytes32 destinationTokenMessenger, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold)",
-  "event MintAndWithdraw(address indexed mintRecipient, uint256 amount, address indexed mintToken)",
+]);
+
+const circleCctpMessageTransmitterV2Abi = parseAbi([
+  "event MessageReceived(address indexed caller, uint32 sourceDomain, bytes32 indexed nonce, bytes32 sender, uint32 indexed finalityThresholdExecuted, bytes messageBody)",
 ]);
 
 const acrossSpokePoolAbi = parseAbi([
@@ -87,6 +90,12 @@ export default createConfig({
       abi: circleCctpTokenMessengerV2Abi,
       chain: "base",
       address: baseProtocolContracts.circleCctpTokenMessengerV2,
+      startBlock: baseDiscoveryStartBlock,
+    },
+    CircleCctpMessageTransmitterV2: {
+      abi: circleCctpMessageTransmitterV2Abi,
+      chain: "base",
+      address: baseProtocolContracts.circleCctpMessageTransmitterV2,
       startBlock: baseDiscoveryStartBlock,
     },
     MetaMorphoVaultFactory: {
