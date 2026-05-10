@@ -6,11 +6,25 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "pnpm typecheck",
-    "dev": "tsc -p tsconfig.json --watch",
+    "dev": "node --watch --env-file-if-exists=.env.local --import tsx src/main.ts",
+    "start": "node --env-file-if-exists=.env.local dist/main.js",
     "test": "echo \"No tests yet for api\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@stableflow/shared": "workspace:*"
+    "@nestjs/common": "^11.1.19",
+    "@nestjs/core": "^11.1.19",
+    "@nestjs/platform-express": "^11.1.19",
+    "@stableflow/indexer": "workspace:*",
+    "@stableflow/shared": "workspace:*",
+    "drizzle-orm": "^0.41.0",
+    "pg": "^8.20.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.21.0"
   }
 }

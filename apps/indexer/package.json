@@ -3,8 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./ponder-schema": {
+      "types": "./ponder.schema.ts",
+      "default": "./dist/ponder.schema.js"
+    }
+  },
   "scripts": {
-    "build": "pnpm codegen && pnpm typecheck",
+    "build": "pnpm codegen && tsc -p tsconfig.json",
     "check": "pnpm typecheck",
     "check:env": "tsc -p tsconfig.env.json && node --env-file-if-exists=.env dist/env-check/src/config/check-env.js",
     "codegen": "PONDER_TELEMETRY_DISABLED=1 ponder codegen",
