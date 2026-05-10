@@ -1,22 +1,28 @@
 import { z } from "zod";
 
-const envSchema = z.object({
+export const apiEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   PORT: z.coerce.number().int().positive().default(3001),
 });
 
-const parsedEnv = envSchema.safeParse(process.env);
+export type ApiEnvironment = z.infer<typeof apiEnvSchema>;
 
-if (!parsedEnv.success) {
-  const formattedIssues = parsedEnv.error.issues.map((issue) => {
-    const path = issue.path.join(".") || "unknown";
-    const received = "received" in issue ? String(issue.received) : "undefined";
-    return `- ${path}: ${issue.message} (received: ${received})`;
-  });
+const formatApiEnvIssues = (error: z.ZodError): string => {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.join(".") || "unknown";
+      const received = "received" in issue ? String(issue.received) : "undefined";
+      return `- ${path}: ${issue.message} (received: ${received})`;
+    })
+    .join("\n");
+};
 
-  console.error(`Invalid API environment variables:\n${formattedIssues.join("\n")}`);
+export const validateApiEnv = (config: Record<string, unknown>): ApiEnvironment => {
+  const parsedEnv = apiEnvSchema.safeParse(config);
 
-  throw new Error("Invalid API environment variables");
-}
+  if (!parsedEnv.success) {
+    throw new Error(`Invalid API environment variables:\n${formatApiEnvIssues(parsedEnv.error)}`);
+  }
 
-export const env = parsedEnv.data;
+  return parsedEnv.data;
+};

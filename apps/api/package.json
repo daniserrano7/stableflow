@@ -6,13 +6,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "pnpm typecheck",
-    "dev": "node --watch --env-file-if-exists=.env.local --import tsx src/main.ts",
-    "start": "node --env-file-if-exists=.env.local dist/main.js",
+    "dev": "node --import tsx src/main.ts",
+    "start": "node dist/main.js",
     "test": "echo \"No tests yet for api\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.19",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.19",
     "@nestjs/platform-express": "^11.1.19",
     "@stableflow/indexer": "workspace:*",
