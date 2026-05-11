@@ -1,8 +1,18 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDirs": [".", "./.react-router/types"],
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "types": ["@react-router/node", "vite/client"]
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    ".react-router/types/**/*",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "react-router.config.ts",
+    "vite.config.ts"
+  ]
 }
