@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
+import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as indexerSchema from "@stableflow/indexer/ponder-schema";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -13,10 +13,7 @@ export class DatabaseService implements OnModuleDestroy {
   private readonly pool: pg.Pool;
   readonly db: NodePgDatabase<typeof indexerSchema>;
 
-  constructor(
-    @Inject(ConfigService)
-    private readonly configService: ConfigService<ApiEnvironment, true>,
-  ) {
+  constructor(private readonly configService: ConfigService<ApiEnvironment, true>) {
     this.pool = new Pool({
       application_name: "stableflow-api",
       connectionString: this.configService.getOrThrow("DATABASE_URL"),

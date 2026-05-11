@@ -1,10 +1,10 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.service.js";
 
 @Injectable()
 export class HealthService {
-  constructor(@Inject(DatabaseService) private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   getHealth() {
     return {
