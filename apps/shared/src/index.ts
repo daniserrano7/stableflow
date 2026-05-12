@@ -44,3 +44,50 @@ export interface EntityListResponse {
     totalLabels: number;
   };
 }
+
+export interface LiveTransferParty {
+  address: string;
+  category: EntityCategory;
+  displayName: string;
+  entityId: string | null;
+  entityName: string | null;
+  isIdentified: boolean;
+}
+
+export interface LiveTransferAmount {
+  currency: "USDC";
+  formatted: string;
+  raw: string;
+}
+
+export interface LiveTransferCursor {
+  blockNumber: string;
+  logIndex: number;
+}
+
+export interface LiveTransferRow {
+  id: string;
+  amount: LiveTransferAmount;
+  blockNumber: string;
+  blockTimestamp: string;
+  cursor: LiveTransferCursor;
+  entityType: string;
+  from: LiveTransferParty;
+  logIndex: number;
+  to: LiveTransferParty;
+  transactionHash: string;
+}
+
+export interface RecentTransfersResponse {
+  data: LiveTransferRow[];
+  meta: {
+    generatedAt: string;
+    limit: number;
+  };
+}
+
+export interface LiveTransferBatchEvent {
+  cursor: LiveTransferCursor | null;
+  generatedAt: string;
+  transfers: LiveTransferRow[];
+}

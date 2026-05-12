@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./base-address-labels": {
+      "types": "./src/labels/base-address-labels.ts",
+      "default": "./dist/src/labels/base-address-labels.js"
+    },
     "./ponder-schema": {
       "types": "./ponder.schema.ts",
       "default": "./dist/ponder.schema.js"
