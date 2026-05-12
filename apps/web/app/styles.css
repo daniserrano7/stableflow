@@ -69,6 +69,29 @@ h1 {
   line-height: 1.6;
 }
 
+.button-link,
+.text-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 28px;
+  padding: 0 16px;
+  border: 1px solid #24352d;
+  background: #24352d;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.text-link {
+  color: #276b55;
+  font-weight: 700;
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -101,6 +124,112 @@ dd {
   font-weight: 700;
 }
 
+.page {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 32px 0 56px;
+}
+
+.page-header {
+  display: grid;
+  gap: 32px;
+  padding: 40px 0 32px;
+}
+
+.page-header h1 {
+  max-width: none;
+  font-size: clamp(2.5rem, 6vw, 5.5rem);
+}
+
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 32px;
+  overflow: hidden;
+  border: 1px solid #d5dbcf;
+  background: #d5dbcf;
+}
+
+.summary-strip > div {
+  padding: 20px;
+  background: #ffffff;
+}
+
+.summary-strip dd {
+  font-size: 1.8rem;
+}
+
+.content-section {
+  margin-top: 40px;
+}
+
+.content-section h2 {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+}
+
+.category-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.compact-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #d5dbcf;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.compact-card h3,
+.compact-card p {
+  margin: 0;
+}
+
+.compact-card h3 {
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.compact-card p {
+  margin-top: 8px;
+  color: #607269;
+}
+
+.entity-table {
+  width: 100%;
+  overflow: hidden;
+  border-collapse: collapse;
+  border: 1px solid #d5dbcf;
+}
+
+.entity-table th,
+.entity-table td {
+  min-width: 0;
+  padding: 14px;
+  border-bottom: 1px solid #d5dbcf;
+  background: #ffffff;
+  text-align: left;
+  vertical-align: top;
+}
+
+.entity-table th {
+  color: #607269;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.entity-table small {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #607269;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .shell {
     padding: 16px;
@@ -118,5 +247,30 @@ dd {
 
   .status-grid {
     grid-template-columns: 1fr;
+  }
+
+  .page {
+    width: min(100% - 32px, 1180px);
+  }
+
+  .summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .entity-table thead {
+    display: none;
+  }
+
+  .entity-table tr,
+  .entity-table td {
+    display: block;
+  }
+
+  .entity-table td {
+    border-bottom: 0;
+  }
+
+  .entity-table tr {
+    border-bottom: 1px solid #d5dbcf;
   }
 }

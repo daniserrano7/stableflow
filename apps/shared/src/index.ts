@@ -14,3 +14,33 @@ export type MovementKind =
 export type MovementDirection = "inflow" | "outflow" | "neutral";
 
 export type ClassificationConfidence = "low" | "medium" | "high";
+
+export type EntityCategory = string;
+
+export interface EntityCategorySummary {
+  category: EntityCategory;
+  entityCount: number;
+  labelCount: number;
+}
+
+export interface EntitySummary {
+  entityId: string;
+  entityName: string;
+  category: EntityCategory;
+  addressCount: number;
+  labelCount: number;
+  firstSeenBlock: string | null;
+  latestSeenBlock: string | null;
+  roles: string[];
+  sourceTypes: string[];
+}
+
+export interface EntityListResponse {
+  data: EntitySummary[];
+  meta: {
+    categories: EntityCategorySummary[];
+    generatedAt: string;
+    totalEntities: number;
+    totalLabels: number;
+  };
+}

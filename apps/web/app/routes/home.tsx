@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import type { Route } from "./+types/home";
 
 export function meta(_: Route.MetaArgs) {
@@ -20,6 +21,9 @@ export default function Home() {
           <p className="lede">
             A live view of token movement across users, protocols, bridges, and venues.
           </p>
+          <Link className="button-link" to="/entities">
+            View tracked entities
+          </Link>
         </div>
 
         <dl className="status-grid" aria-label="Current scaffold status">
