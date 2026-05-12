@@ -1,0 +1,337 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Stableflow · Design Tokens
+   Tailwind v4 (@theme) + shadcn-compatible CSS variables.
+
+   Usage:
+     1. Import this file once at the app entry.
+     2. Set <html data-theme="dark"> or <html data-theme="light">
+        (the .dark class is also kept in sync for shadcn dark variants).
+     3. Reference tokens as:
+          - Tailwind utilities: bg-background, text-foreground, border-border,
+            bg-card, bg-accent, text-inflow, text-outflow, ring-ring, etc.
+          - Raw CSS: var(--background), var(--surface-2), var(--inflow).
+
+   Color model: OKLCH for perceptually-uniform tinting and chain-agnostic
+   future palettes. The hue line is 254 (cool slate / electric blue family).
+   ───────────────────────────────────────────────────────────────────────── */
+
+@import 'tailwindcss';
+
+/* Map shadcn semantic vars + Stableflow vars into Tailwind v4's @theme so
+   utilities like `bg-background` and `text-inflow` Just Work. */
+@theme inline {
+  /* ── shadcn semantic palette ─────────────────────────────────────────── */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* ── Stableflow surface scale (0 = base, 3 = elevated) ───────────────── */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  /* ── Glass / blur layer ──────────────────────────────────────────────── */
+  --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
+
+  /* ── Flow semantics ──────────────────────────────────────────────────── */
+  --color-inflow: var(--inflow);
+  --color-inflow-soft: var(--inflow-soft);
+  --color-outflow: var(--outflow);
+  --color-outflow-soft: var(--outflow-soft);
+  --color-anomaly: var(--anomaly);
+  --color-anomaly-soft: var(--anomaly-soft);
+  --color-whale: var(--whale);
+  --color-whale-soft: var(--whale-soft);
+  --color-neutral-flow: var(--neutral-flow);
+
+  /* ── Protocol categories (used for tags, glyphs, edges, legends) ─────── */
+  --color-cat-dex: var(--cat-dex);
+  --color-cat-dex-soft: var(--cat-dex-soft);
+  --color-cat-lending: var(--cat-lending);
+  --color-cat-lending-soft: var(--cat-lending-soft);
+  --color-cat-bridge: var(--cat-bridge);
+  --color-cat-bridge-soft: var(--cat-bridge-soft);
+  --color-cat-cex: var(--cat-cex);
+  --color-cat-cex-soft: var(--cat-cex-soft);
+  --color-cat-mint: var(--cat-mint);
+  --color-cat-mint-soft: var(--cat-mint-soft);
+  --color-cat-wallet: var(--cat-wallet);
+  --color-cat-wallet-soft: var(--cat-wallet-soft);
+
+  /* ── Chain accents (room for multi-chain) ────────────────────────────── */
+  --color-chain-base: var(--chain-base);
+  --color-chain-ethereum: var(--chain-ethereum);
+  --color-chain-arbitrum: var(--chain-arbitrum);
+  --color-chain-optimism: var(--chain-optimism);
+  --color-chain-polygon: var(--chain-polygon);
+  --color-chain-solana: var(--chain-solana);
+
+  /* ── Asset accents (room for multi-asset) ────────────────────────────── */
+  --color-asset-usdc: var(--asset-usdc);
+  --color-asset-usdt: var(--asset-usdt);
+  --color-asset-dai: var(--asset-dai);
+  --color-asset-pyusd: var(--asset-pyusd);
+  --color-asset-usds: var(--asset-usds);
+
+  /* ── Typography ──────────────────────────────────────────────────────── */
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:
+    'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas,
+    monospace;
+  --font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale — dense, data-oriented (closer to Linear than marketing) */
+  --text-2xs: 10px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 18px;
+  --text-base: 13px;
+  --text-base--line-height: 20px;
+  --text-md: 14px;
+  --text-md--line-height: 20px;
+  --text-lg: 16px;
+  --text-lg--line-height: 22px;
+  --text-xl: 20px;
+  --text-xl--line-height: 26px;
+  --text-2xl: 26px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 34px;
+  --text-3xl--line-height: 40px;
+  --text-4xl: 48px;
+  --text-4xl--line-height: 54px;
+
+  /* ── Radii ───────────────────────────────────────────────────────────── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 9999px;
+  /* shadcn alias */
+  --radius: var(--radius-lg);
+
+  /* ── Spacing extensions (Tailwind v4 already has 0.5–96; add a few) ───── */
+  --spacing-0_5: 2px;
+  --spacing-1_5: 6px;
+  --spacing-2_5: 10px;
+  --spacing-3_5: 14px;
+
+  /* ── Shadows ─────────────────────────────────────────────────────────── */
+  --shadow-xs: 0 1px 0 oklch(1 0 0 / 0.04) inset;
+  --shadow-sm:
+    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 6px 14px -8px oklch(0 0 0 / 0.55);
+  --shadow-md:
+    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 12px 32px -16px oklch(0 0 0 / 0.7);
+  --shadow-lg:
+    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 24px 60px -20px oklch(0 0 0 / 0.7);
+  --shadow-glow-accent:
+    0 0 0 1px var(--accent) inset, 0 0 24px -4px var(--accent);
+  --shadow-glow-inflow: 0 0 24px -4px var(--inflow);
+  --shadow-glow-anomaly: 0 0 24px -4px var(--anomaly);
+
+  /* ── Motion ──────────────────────────────────────────────────────────── */
+  --ease-out-quart: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 400ms;
+  --duration-slower: 700ms;
+
+  /* ── Z-index scale ───────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-overlay: 50;
+  --z-modal: 100;
+  --z-popover: 200;
+  --z-tooltip: 300;
+  --z-toast: 400;
+
+  /* ── Blur ────────────────────────────────────────────────────────────── */
+  --blur-glass: blur(20px) saturate(140%);
+  --blur-glass-strong: blur(40px) saturate(180%);
+
+  /* ── Container widths ────────────────────────────────────────────────── */
+  --container-page: 1440px;
+  --container-prose: 720px;
+
+  /* ── Sidebar / nav rail ──────────────────────────────────────────────── */
+  --size-rail: 56px;
+  --size-rail-expanded: 220px;
+  --size-topbar: 48px;
+}
+
+/* ── Dark theme (default) ────────────────────────────────────────────────── */
+:root,
+[data-theme='dark'],
+.dark {
+  color-scheme: dark;
+
+  /* shadcn semantic */
+  --background: oklch(0.135 0.012 254);
+  --foreground: oklch(0.965 0.005 254);
+  --card: oklch(0.175 0.014 254);
+  --card-foreground: oklch(0.965 0.005 254);
+  --popover: oklch(0.215 0.016 254);
+  --popover-foreground: oklch(0.965 0.005 254);
+  --primary: oklch(0.74 0.16 245);
+  --primary-foreground: oklch(0.13 0.012 254);
+  --secondary: oklch(0.215 0.016 254);
+  --secondary-foreground: oklch(0.965 0.005 254);
+  --muted: oklch(0.215 0.016 254);
+  --muted-foreground: oklch(0.68 0.013 254);
+  --accent: oklch(0.74 0.16 245);
+  --accent-foreground: oklch(0.13 0.012 254);
+  --accent-soft: oklch(0.74 0.16 245 / 0.18);
+  --destructive: oklch(0.72 0.22 5);
+  --destructive-foreground: oklch(0.98 0.01 5);
+  --border: oklch(0.3 0.018 254 / 0.6);
+  --border-strong: oklch(0.4 0.02 254 / 0.8);
+  --input: oklch(0.215 0.016 254);
+  --ring: oklch(0.74 0.16 245 / 0.55);
+
+  /* surface scale */
+  --surface-0: oklch(0.135 0.012 254);
+  --surface-1: oklch(0.175 0.014 254);
+  --surface-2: oklch(0.215 0.016 254);
+  --surface-3: oklch(0.255 0.018 254);
+
+  /* glass */
+  --glass: oklch(0.22 0.016 254 / 0.55);
+  --glass-strong: oklch(0.22 0.016 254 / 0.75);
+  --grid-line: oklch(0.3 0.018 254 / 0.18);
+
+  /* flow */
+  --inflow: oklch(0.8 0.14 165);
+  --inflow-soft: oklch(0.8 0.14 165 / 0.15);
+  --outflow: oklch(0.8 0.14 70);
+  --outflow-soft: oklch(0.8 0.14 70 / 0.15);
+  --anomaly: oklch(0.72 0.22 5);
+  --anomaly-soft: oklch(0.72 0.22 5 / 0.15);
+  --whale: oklch(0.72 0.22 5);
+  --whale-soft: oklch(0.72 0.22 5 / 0.15);
+  --neutral-flow: oklch(0.68 0.013 254);
+
+  /* protocol categories */
+  --cat-dex: oklch(0.74 0.16 245);
+  --cat-dex-soft: oklch(0.74 0.16 245 / 0.15);
+  --cat-lending: oklch(0.8 0.14 165);
+  --cat-lending-soft: oklch(0.8 0.14 165 / 0.15);
+  --cat-bridge: oklch(0.8 0.14 70);
+  --cat-bridge-soft: oklch(0.8 0.14 70 / 0.15);
+  --cat-cex: oklch(0.72 0.18 320);
+  --cat-cex-soft: oklch(0.72 0.18 320 / 0.15);
+  --cat-mint: oklch(0.74 0.16 245);
+  --cat-mint-soft: oklch(0.74 0.16 245 / 0.15);
+  --cat-wallet: oklch(0.68 0.013 254);
+  --cat-wallet-soft: oklch(0.68 0.013 254 / 0.12);
+
+  /* chains (room to grow) */
+  --chain-base: oklch(0.62 0.2 255);
+  --chain-ethereum: oklch(0.7 0.1 280);
+  --chain-arbitrum: oklch(0.72 0.13 235);
+  --chain-optimism: oklch(0.65 0.22 25);
+  --chain-polygon: oklch(0.62 0.2 295);
+  --chain-solana: oklch(0.78 0.18 155);
+
+  /* assets */
+  --asset-usdc: oklch(0.62 0.2 255);
+  --asset-usdt: oklch(0.72 0.13 165);
+  --asset-dai: oklch(0.78 0.14 80);
+  --asset-pyusd: oklch(0.72 0.13 235);
+  --asset-usds: oklch(0.72 0.13 145);
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────────── */
+[data-theme='light'],
+.light {
+  color-scheme: light;
+
+  --background: oklch(0.985 0.003 254);
+  --foreground: oklch(0.18 0.012 254);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.012 254);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.012 254);
+  --primary: oklch(0.55 0.2 250);
+  --primary-foreground: oklch(0.99 0.005 254);
+  --secondary: oklch(0.94 0.008 254);
+  --secondary-foreground: oklch(0.18 0.012 254);
+  --muted: oklch(0.94 0.008 254);
+  --muted-foreground: oklch(0.46 0.013 254);
+  --accent: oklch(0.55 0.2 250);
+  --accent-foreground: oklch(0.99 0.005 254);
+  --accent-soft: oklch(0.55 0.2 250 / 0.1);
+  --destructive: oklch(0.55 0.22 12);
+  --destructive-foreground: oklch(0.99 0.005 12);
+  --border: oklch(0.88 0.012 254 / 0.9);
+  --border-strong: oklch(0.78 0.014 254 / 0.9);
+  --input: oklch(0.94 0.008 254);
+  --ring: oklch(0.55 0.2 250 / 0.45);
+
+  --surface-0: oklch(0.985 0.003 254);
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.97 0.005 254);
+  --surface-3: oklch(0.94 0.008 254);
+
+  --glass: oklch(1 0 0 / 0.65);
+  --glass-strong: oklch(1 0 0 / 0.85);
+  --grid-line: oklch(0.78 0.014 254 / 0.3);
+
+  --inflow: oklch(0.55 0.14 160);
+  --inflow-soft: oklch(0.55 0.14 160 / 0.12);
+  --outflow: oklch(0.62 0.16 60);
+  --outflow-soft: oklch(0.62 0.16 60 / 0.12);
+  --anomaly: oklch(0.55 0.22 12);
+  --anomaly-soft: oklch(0.55 0.22 12 / 0.12);
+  --whale: oklch(0.55 0.22 12);
+  --whale-soft: oklch(0.55 0.22 12 / 0.12);
+  --neutral-flow: oklch(0.46 0.013 254);
+
+  --cat-dex: oklch(0.55 0.2 250);
+  --cat-dex-soft: oklch(0.55 0.2 250 / 0.1);
+  --cat-lending: oklch(0.55 0.14 160);
+  --cat-lending-soft: oklch(0.55 0.14 160 / 0.1);
+  --cat-bridge: oklch(0.62 0.16 60);
+  --cat-bridge-soft: oklch(0.62 0.16 60 / 0.1);
+  --cat-cex: oklch(0.55 0.2 325);
+  --cat-cex-soft: oklch(0.55 0.2 325 / 0.1);
+  --cat-mint: oklch(0.55 0.2 250);
+  --cat-mint-soft: oklch(0.55 0.2 250 / 0.1);
+  --cat-wallet: oklch(0.46 0.013 254);
+  --cat-wallet-soft: oklch(0.46 0.013 254 / 0.08);
+
+  --chain-base: oklch(0.55 0.22 255);
+  --chain-ethereum: oklch(0.5 0.13 280);
+  --chain-arbitrum: oklch(0.55 0.15 235);
+  --chain-optimism: oklch(0.55 0.22 25);
+  --chain-polygon: oklch(0.5 0.22 295);
+  --chain-solana: oklch(0.55 0.18 155);
+
+  --asset-usdc: oklch(0.55 0.22 255);
+  --asset-usdt: oklch(0.5 0.14 165);
+  --asset-dai: oklch(0.62 0.15 80);
+  --asset-pyusd: oklch(0.55 0.15 235);
+  --asset-usds: oklch(0.5 0.14 145);
+}

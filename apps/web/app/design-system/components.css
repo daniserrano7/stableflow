@@ -1,0 +1,441 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Stableflow · Component recipes
+   Tailwind v4 @utility / @layer classes for the prototype-grade primitives
+   that aren't covered by shadcn. These pair with the React components in
+   ./components — you can use either the class or the component.
+
+   Naming: `sf-<thing>` to avoid collisions with shadcn or app classes.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@layer components {
+  /* ── Panel (card-like, glassy, with optional head) ───────────────────── */
+
+  .sf-panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: var(--glass);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    box-shadow: var(--shadow-sm);
+  }
+  .sf-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sf-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .sf-panel-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  /* live dot — shared by panel titles, chips, etc. */
+  .sf-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--inflow);
+    box-shadow: 0 0 0 3px var(--inflow-soft);
+    animation: sf-pulse 1.6s ease-in-out infinite;
+  }
+
+  /* ── Segmented control ───────────────────────────────────────────────── */
+
+  .sf-seg {
+    display: inline-flex;
+    padding: 2px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  .sf-seg-item {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    border-radius: 999px;
+    transition:
+      color var(--duration-fast) ease,
+      background var(--duration-fast) ease;
+  }
+  .sf-seg-item:hover {
+    color: var(--foreground);
+  }
+  .sf-seg-item[data-state="active"],
+  .sf-seg-item[aria-selected="true"],
+  .sf-seg-item.is-active {
+    background: var(--surface-3);
+    color: var(--foreground);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+
+  /* ── Chip (network, asset, status) ───────────────────────────────────── */
+
+  .sf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.02em;
+    color: var(--muted-foreground);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .sf-chip-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--inflow);
+    box-shadow: 0 0 0 3px var(--inflow-soft);
+    animation: sf-pulse 2s ease-in-out infinite;
+  }
+
+  /* ── Tag (protocol category) ─────────────────────────────────────────── */
+
+  .sf-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--muted-foreground);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .sf-tag[data-cat="dex"] {
+    color: var(--cat-dex);
+    border-color: color-mix(in oklch, var(--cat-dex) 35%, transparent);
+    background: var(--cat-dex-soft);
+  }
+  .sf-tag[data-cat="lending"] {
+    color: var(--cat-lending);
+    border-color: color-mix(in oklch, var(--cat-lending) 35%, transparent);
+    background: var(--cat-lending-soft);
+  }
+  .sf-tag[data-cat="bridge"] {
+    color: var(--cat-bridge);
+    border-color: color-mix(in oklch, var(--cat-bridge) 35%, transparent);
+    background: var(--cat-bridge-soft);
+  }
+  .sf-tag[data-cat="cex"] {
+    color: var(--cat-cex);
+    border-color: color-mix(in oklch, var(--cat-cex) 35%, transparent);
+    background: var(--cat-cex-soft);
+  }
+  .sf-tag[data-cat="mint"] {
+    color: var(--cat-mint);
+    border-color: color-mix(in oklch, var(--cat-mint) 35%, transparent);
+    background: var(--cat-mint-soft);
+  }
+  .sf-tag[data-cat="wallet"] {
+    color: var(--cat-wallet);
+  }
+
+  /* ── KPI card ────────────────────────────────────────────────────────── */
+
+  .sf-kpi {
+    position: relative;
+    overflow: hidden;
+    padding: 14px 16px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+  }
+  .sf-kpi-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sf-kpi-value {
+    margin-top: 6px;
+    font-size: var(--text-2xl);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .sf-kpi-value .sf-kpi-unit {
+    font-size: var(--text-sm);
+    color: var(--muted-foreground);
+    font-weight: 400;
+  }
+  .sf-kpi-delta {
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .sf-kpi-delta[data-trend="up"] {
+    color: var(--inflow);
+  }
+  .sf-kpi-delta[data-trend="down"] {
+    color: var(--outflow);
+  }
+  .sf-kpi-spark {
+    position: absolute;
+    right: 14px;
+    bottom: 12px;
+    width: 84px;
+    height: 36px;
+    pointer-events: none;
+  }
+
+  /* ── Entity cell (avatar + name) ─────────────────────────────────────── */
+
+  .sf-entity {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sf-entity-glyph {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: oklch(0.13 0.012 254);
+    flex-shrink: 0;
+  }
+  .sf-entity-name {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+  .sf-entity-addr {
+    color: var(--muted-foreground);
+    font-size: var(--text-2xs);
+    font-family: var(--font-mono);
+  }
+
+  /* ── Amount (USDC, USD, etc.) ────────────────────────────────────────── */
+
+  .sf-amount {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    font-family: var(--font-mono);
+  }
+  .sf-amount-unit {
+    color: var(--muted-foreground);
+    font-size: var(--text-2xs);
+  }
+  .sf-amount[data-magnitude="large"] {
+    color: var(--accent);
+  }
+  .sf-amount[data-magnitude="whale"] {
+    color: var(--anomaly);
+  }
+  .sf-amount[data-trend="up"] {
+    color: var(--inflow);
+  }
+  .sf-amount[data-trend="down"] {
+    color: var(--outflow);
+  }
+
+  /* ── Data table ──────────────────────────────────────────────────────── */
+
+  .sf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+  }
+  .sf-table thead th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 1;
+  }
+  .sf-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background var(--duration-fast) ease;
+  }
+  .sf-table tbody tr:hover {
+    background: var(--surface-2);
+  }
+  .sf-table tbody td {
+    padding: 9px 14px;
+    vertical-align: middle;
+    color: var(--foreground);
+  }
+  .sf-table tbody tr[data-fresh="true"] {
+    animation: sf-row-in 0.5s var(--ease-out-quart);
+  }
+
+  /* ── Sidebar rail ────────────────────────────────────────────────────── */
+
+  .sf-rail {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: var(--size-rail);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 0;
+    border-right: 1px solid var(--border);
+    background: var(--glass);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+  }
+  .sf-rail-item {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    border-radius: 9px;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    transition:
+      color var(--duration-fast),
+      background var(--duration-fast);
+  }
+  .sf-rail-item:hover {
+    color: var(--foreground);
+    background: var(--surface-2);
+  }
+  .sf-rail-item[data-state="active"] {
+    color: var(--foreground);
+    background: var(--surface-3);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .sf-rail-item[data-state="active"]::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+  }
+
+  /* ── Anomaly feed item ───────────────────────────────────────────────── */
+
+  .sf-anomaly-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    animation: sf-slide-in 0.4s var(--ease-out-quart);
+  }
+  .sf-anomaly-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid;
+  }
+  .sf-anomaly-tag[data-kind="whale"] {
+    color: var(--whale);
+    border-color: color-mix(in oklch, var(--whale) 40%, transparent);
+    background: var(--whale-soft);
+  }
+  .sf-anomaly-tag[data-kind="spike"] {
+    color: var(--accent);
+    border-color: color-mix(in oklch, var(--accent) 40%, transparent);
+    background: var(--accent-soft);
+  }
+  .sf-anomaly-tag[data-kind="drain"] {
+    color: var(--outflow);
+    border-color: color-mix(in oklch, var(--outflow) 40%, transparent);
+    background: var(--outflow-soft);
+  }
+
+  /* ── Flow bar (Top Movers) ───────────────────────────────────────────── */
+
+  .sf-flowbar {
+    position: relative;
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .sf-flowbar > .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    border-radius: 999px;
+    transition: width var(--duration-slow) var(--ease-out-quart);
+  }
+  .sf-flowbar > .fill[data-trend="inflow"],
+  .sf-flowbar > .fill[data-trend="net-pos"] {
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--inflow) 35%, transparent),
+      var(--inflow)
+    );
+  }
+  .sf-flowbar > .fill[data-trend="outflow"],
+  .sf-flowbar > .fill[data-trend="net-neg"] {
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--outflow) 35%, transparent),
+      var(--outflow)
+    );
+  }
+
+  /* ── Keyboard hint ───────────────────────────────────────────────────── */
+
+  .sf-kbd {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: var(--surface-3);
+    color: var(--muted-foreground);
+    border: 1px solid var(--border);
+  }
+}

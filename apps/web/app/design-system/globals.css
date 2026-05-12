@@ -1,0 +1,203 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Stableflow · Global styles
+   Applies after tokens.css. Owns: reset, base typography, body background,
+   ambient backdrop, scrollbars, selection. Keep this file small —
+   recipe-level styles live in components.css; everything else is Tailwind.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@import "tailwindcss";
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--foreground);
+  }
+
+  /* Numbers in data tables, KPIs, etc. */
+  .tabular,
+  [data-tabular],
+  td.num,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus ring — accessible, uses the ring token */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Scrollbars (dark-friendly, slim) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+    background-clip: content-box;
+  }
+
+  /* Mono / display helpers */
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer utilities {
+  /* Ambient backdrop — full-bleed soft radial gradients behind the app */
+  .bg-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(1200px 600px at 12% -10%, var(--accent-soft), transparent 60%),
+      radial-gradient(900px 500px at 88% 110%, var(--accent-soft), transparent 60%),
+      radial-gradient(700px 700px at 60% 40%, var(--inflow-soft), transparent 70%);
+  }
+
+  /* Faint grid; pairs with bg-ambient */
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(1200px 800px at 50% 30%, black 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(1200px 800px at 50% 30%, black 40%, transparent 100%);
+  }
+
+  /* Reusable glass surface */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+  }
+  .glass-strong {
+    background: var(--glass-strong);
+    backdrop-filter: var(--blur-glass-strong);
+    -webkit-backdrop-filter: var(--blur-glass-strong);
+  }
+
+  /* Eyebrow label — small, uppercase, mono, used in panel titles & kpi labels */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+}
+
+/* ── Motion primitives ─────────────────────────────────────────────────── */
+
+@keyframes sf-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.85);
+  }
+}
+@keyframes sf-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sf-row-in {
+  from {
+    background: var(--accent-soft);
+    opacity: 0.4;
+  }
+  to {
+    background: transparent;
+    opacity: 1;
+  }
+}
+@keyframes sf-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@utility animate-pulse-soft {
+  animation: sf-pulse 2s ease-in-out infinite;
+}
+@utility animate-slide-in {
+  animation: sf-slide-in 0.4s var(--ease-out-quart);
+}
+@utility animate-row-in {
+  animation: sf-row-in 0.5s var(--ease-out-quart);
+}
+@utility animate-shimmer {
+  animation: sf-shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-soft,
+  .animate-slide-in,
+  .animate-row-in,
+  .animate-shimmer {
+    animation: none;
+  }
+  * {
+    transition-duration: 0ms;
+    animation-duration: 0ms;
+  }
+}

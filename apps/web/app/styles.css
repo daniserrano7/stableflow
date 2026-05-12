@@ -1,3 +1,7 @@
+@import "./design-system/tokens.css";
+@import "./design-system/globals.css";
+@import "./design-system/components.css";
+
 :root {
   color: #17201b;
   background: #f6f7f3;
@@ -44,7 +48,8 @@ select {
   max-width: 780px;
 }
 
-.eyebrow {
+.shell .eyebrow,
+.page .eyebrow {
   margin: 0 0 16px;
   color: #276b55;
   font-size: 0.82rem;
@@ -53,7 +58,7 @@ select {
   text-transform: uppercase;
 }
 
-h1 {
+.hero h1 {
   max-width: 12ch;
   margin: 0;
   font-size: clamp(3rem, 9vw, 7.5rem);
@@ -108,7 +113,8 @@ h1 {
   background: rgba(255, 255, 255, 0.78);
 }
 
-dt {
+.status-grid dt,
+.summary-strip dt {
   margin-bottom: 8px;
   color: #607269;
   font-size: 0.76rem;
@@ -117,7 +123,8 @@ dt {
   text-transform: uppercase;
 }
 
-dd {
+.status-grid dd,
+.summary-strip dd {
   margin: 0;
   color: #1d2923;
   font-size: 1rem;
@@ -287,7 +294,8 @@ dd {
     padding: 28px;
   }
 
-  h1 {
+  .hero h1,
+  .page-header h1 {
     max-width: 10ch;
     font-size: 3rem;
   }
