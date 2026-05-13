@@ -1,7 +1,11 @@
 import { Links, type LinksFunction, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import stylesHref from "./styles.css?url";
 
-export const links: LinksFunction = () => [{ href: stylesHref, rel: "stylesheet" }];
+export const links: LinksFunction = () => [
+  { href: stylesHref, rel: "stylesheet" },
+  { href: "/brand-icon.svg", rel: "icon", type: "image/svg+xml" },
+  { href: "/brand-icon.svg", rel: "apple-touch-icon" },
+];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

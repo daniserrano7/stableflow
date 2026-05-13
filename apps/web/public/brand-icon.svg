@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="stableflow-brand-gradient" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5ce1ff" />
+      <stop offset="1" stop-color="#7c5cff" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="9" fill="url(#stableflow-brand-gradient)" />
+  <path
+    d="M6 21 C 12 21, 12 11, 19 11 S 27 17, 27 17"
+    stroke="white"
+    stroke-opacity="0.76"
+    stroke-width="1.6"
+    fill="none"
+    stroke-linecap="round"
+  />
+  <path
+    d="M5 26 C 11 26, 14 16, 20 16 S 27 22, 27 22"
+    stroke="white"
+    stroke-opacity="0.44"
+    stroke-width="1.6"
+    fill="none"
+    stroke-linecap="round"
+  />
+</svg>

@@ -15,7 +15,7 @@
    future palettes. The hue line is 254 (cool slate / electric blue family).
    ───────────────────────────────────────────────────────────────────────── */
 
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* Map shadcn semantic vars + Stableflow vars into Tailwind v4's @theme so
    utilities like `bg-background` and `text-inflow` Just Work. */
@@ -92,11 +92,9 @@
   --color-asset-usds: var(--asset-usds);
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono:
-    'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas,
-    monospace;
-  --font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: "Geist", ui-sans-serif, system-ui, sans-serif;
 
   /* Type scale — dense, data-oriented (closer to Linear than marketing) */
   --text-2xs: 10px;
@@ -139,14 +137,10 @@
 
   /* ── Shadows ─────────────────────────────────────────────────────────── */
   --shadow-xs: 0 1px 0 oklch(1 0 0 / 0.04) inset;
-  --shadow-sm:
-    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 6px 14px -8px oklch(0 0 0 / 0.55);
-  --shadow-md:
-    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 12px 32px -16px oklch(0 0 0 / 0.7);
-  --shadow-lg:
-    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 24px 60px -20px oklch(0 0 0 / 0.7);
-  --shadow-glow-accent:
-    0 0 0 1px var(--accent) inset, 0 0 24px -4px var(--accent);
+  --shadow-sm: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 6px 14px -8px oklch(0 0 0 / 0.55);
+  --shadow-md: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 12px 32px -16px oklch(0 0 0 / 0.7);
+  --shadow-lg: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 24px 60px -20px oklch(0 0 0 / 0.7);
+  --shadow-glow-accent: 0 0 0 1px var(--accent) inset, 0 0 24px -4px var(--accent);
   --shadow-glow-inflow: 0 0 24px -4px var(--inflow);
   --shadow-glow-anomaly: 0 0 24px -4px var(--anomaly);
 
@@ -184,7 +178,7 @@
 
 /* ── Dark theme (default) ────────────────────────────────────────────────── */
 :root,
-[data-theme='dark'],
+[data-theme="dark"],
 .dark {
   color-scheme: dark;
 
@@ -264,7 +258,7 @@
 }
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
-[data-theme='light'],
+[data-theme="light"],
 .light {
   color-scheme: light;
 
