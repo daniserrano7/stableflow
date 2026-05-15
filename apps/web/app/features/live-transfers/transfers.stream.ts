@@ -1,4 +1,4 @@
-import { getApiUrl } from "../config/api.server";
+import { getApiUrl } from "../../config/api.server";
 
 export async function loader({ request }: { request: Request }) {
   const requestUrl = new URL(request.url);

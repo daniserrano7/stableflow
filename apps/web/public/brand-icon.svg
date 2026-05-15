@@ -9,7 +9,7 @@
   <path
     d="M6 21 C 12 21, 12 11, 19 11 S 27 17, 27 17"
     stroke="white"
-    stroke-opacity="0.76"
+    stroke-opacity="0.75"
     stroke-width="1.6"
     fill="none"
     stroke-linecap="round"
@@ -17,7 +17,7 @@
   <path
     d="M5 26 C 11 26, 14 16, 20 16 S 27 22, 27 22"
     stroke="white"
-    stroke-opacity="0.44"
+    stroke-opacity="0.4"
     stroke-width="1.6"
     fill="none"
     stroke-linecap="round"

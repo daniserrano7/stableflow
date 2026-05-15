@@ -1,5 +1,5 @@
-import type { LiveTransferParty, LiveTransferRow } from "@stableflow/shared";
-import { ArrowRight, CircleDollarSign } from "lucide-react";
+import type { LiveTransferParty, LiveTransferRow } from '@stableflow/shared';
+import { ArrowRight, CircleDollarSign } from 'lucide-react';
 import {
   Amount,
   Entity,
@@ -9,29 +9,30 @@ import {
   PanelTitle,
   Segmented,
   Tag,
-} from "../design-system/components";
-import type { Category } from "../design-system/tokens";
+} from '../../design-system/components';
+import type { Category } from '../../design-system/tokens';
 
 const categoryLabels: Record<string, Category> = {
-  bridge: "bridge",
-  cex: "cex",
-  dex: "dex",
-  lending: "lending",
-  mint: "mint",
-  wallet: "wallet",
+  bridge: 'bridge',
+  cex: 'cex',
+  dex: 'dex',
+  lending: 'lending',
+  mint: 'mint',
+  wallet: 'wallet',
 };
 
-export type TransferFilter = "all" | "large" | "whale";
+export type TransferFilter = 'all' | 'large' | 'whale';
 
 const filterOptions: { label: string; value: TransferFilter }[] = [
-  { label: "All", value: "all" },
-  { label: ">= $10K", value: "large" },
-  { label: "Whales", value: "whale" },
+  { label: 'All', value: 'all' },
+  { label: '>= $10K', value: 'large' },
+  { label: 'Whales', value: 'whale' },
 ];
 
 interface LiveTransfersTableProps {
   bufferedCount: number;
   filter: TransferFilter;
+  matchingCount: number;
   onFilterChange: (filter: TransferFilter) => void;
   transfers: LiveTransferRow[];
 }
@@ -39,6 +40,7 @@ interface LiveTransfersTableProps {
 export function LiveTransfersTable({
   bufferedCount,
   filter,
+  matchingCount,
   onFilterChange,
   transfers,
 }: LiveTransfersTableProps) {
@@ -47,7 +49,11 @@ export function LiveTransfersTable({
       <PanelHead>
         <PanelTitle live>Live Transfers</PanelTitle>
         <PanelActions>
-          <Segmented value={filter} onChange={onFilterChange} options={filterOptions} />
+          <Segmented
+            value={filter}
+            onChange={onFilterChange}
+            options={filterOptions}
+          />
         </PanelActions>
       </PanelHead>
 
@@ -72,7 +78,10 @@ export function LiveTransfersTable({
           </thead>
           <tbody>
             {transfers.map((transfer, index) => (
-              <tr data-fresh={index === 0 ? "true" : undefined} key={transfer.id}>
+              <tr
+                data-fresh={index === 0 ? 'true' : undefined}
+                key={transfer.id}
+              >
                 <td>
                   <TransferEntity party={transfer.from} />
                 </td>
@@ -101,7 +110,10 @@ export function LiveTransfersTable({
             ))}
             {transfers.length === 0 && (
               <tr>
-                <td className="h-32 text-center text-muted-foreground" colSpan={5}>
+                <td
+                  className="h-32 text-center text-muted-foreground"
+                  colSpan={5}
+                >
                   No transfers match this filter yet.
                 </td>
               </tr>
@@ -112,16 +124,18 @@ export function LiveTransfersTable({
 
       <div className="flex items-center justify-between gap-3 border-border border-t px-3.5 py-2.5 font-mono text-2xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <CircleDollarSign size={13} /> {transfers.length} visible
+          <CircleDollarSign size={13} /> {transfers.length} shown
         </span>
-        <span>{bufferedCount} buffered</span>
+        <span>
+          {matchingCount} matching · {bufferedCount} buffered
+        </span>
       </div>
     </Panel>
   );
 }
 
 export function getTransferAmount(transfer: LiveTransferRow) {
-  return Number.parseFloat(transfer.amount.formatted.replaceAll(",", ""));
+  return Number.parseFloat(transfer.amount.formatted.replaceAll(',', ''));
 }
 
 function TransferEntity({ party }: { party: LiveTransferParty }) {
@@ -139,16 +153,16 @@ function TransferEntity({ party }: { party: LiveTransferParty }) {
 
 function getPartyCategory(party: LiveTransferParty): Category {
   if (!party.isIdentified) {
-    return "wallet";
+    return 'wallet';
   }
 
-  return categoryLabels[party.category.toLowerCase()] ?? "wallet";
+  return categoryLabels[party.category.toLowerCase()] ?? 'wallet';
 }
 
 function getTransferCategory(transfer: LiveTransferRow): Category {
   const toCategory = getPartyCategory(transfer.to);
 
-  if (toCategory !== "wallet") {
+  if (toCategory !== 'wallet') {
     return toCategory;
   }
 
@@ -157,7 +171,7 @@ function getTransferCategory(transfer: LiveTransferRow): Category {
 
 function getEntityGlyph(party: LiveTransferParty, category: Category) {
   if (!party.isIdentified) {
-    return "0x";
+    return '0x';
   }
 
   const source = party.entityName ?? party.displayName;
@@ -166,7 +180,7 @@ function getEntityGlyph(party: LiveTransferParty, category: Category) {
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part.at(0)?.toUpperCase())
-    .join("");
+    .join('');
 
   return initials || category.slice(0, 2).toUpperCase();
 }
@@ -175,12 +189,12 @@ function getTransferMagnitude(transfer: LiveTransferRow) {
   const amount = getTransferAmount(transfer);
 
   if (amount >= 1_000_000) {
-    return "whale";
+    return 'whale';
   }
 
   if (amount >= 10_000) {
-    return "large";
+    return 'large';
   }
 
-  return "small";
+  return 'small';
 }

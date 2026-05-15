@@ -91,3 +91,43 @@ export interface LiveTransferBatchEvent {
   generatedAt: string;
   transfers: LiveTransferRow[];
 }
+
+export type TopEntityFlowMode = "net" | "inflow" | "outflow";
+
+export interface TopEntityFlowAmount {
+  currency: "USDC";
+  formatted: string;
+  raw: string;
+}
+
+export interface TopEntityFlowRow {
+  rank: number;
+  entityId: string;
+  entityName: string;
+  category: EntityCategory;
+  inflow: TopEntityFlowAmount;
+  inflowTransferCount: number;
+  outflow: TopEntityFlowAmount;
+  outflowTransferCount: number;
+  net: TopEntityFlowAmount;
+  netTransferCount: number;
+  selected: TopEntityFlowAmount;
+  selectedTransferCount: number;
+  relativeShare: number;
+  transferCount: number;
+}
+
+export interface TopEntityFlowsResponse {
+  data: TopEntityFlowRow[];
+  meta: {
+    generatedAt: string;
+    includeUnidentified: boolean;
+    limit: number;
+    mode: TopEntityFlowMode;
+    window: {
+      bucketEnd: string;
+      bucketStart: string;
+      minutes: number;
+    };
+  };
+}

@@ -1,9 +1,8 @@
 import type { EntityListResponse } from "@stableflow/shared";
 import { Link, useLoaderData } from "react-router";
-import { getApiUrl } from "../config/api.server";
-import type { Route } from "./+types/entities";
+import { getApiUrl } from "../../config/api.server";
 
-export function meta(_: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "Entities | Stableflow" },
     {
