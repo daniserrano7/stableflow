@@ -11,10 +11,10 @@
     "prefix": ""
   },
   "aliases": {
-    "components": "~/design-system/components",
-    "utils": "~/design-system/lib/utils",
-    "ui": "~/design-system/ui",
-    "lib": "~/design-system/lib",
+    "components": "~/components",
+    "utils": "~/utils/cn",
+    "ui": "~/components/ui",
+    "lib": "~/utils",
     "hooks": "~/hooks"
   },
   "iconLibrary": "lucide"

@@ -10,7 +10,7 @@ const config: Config = {
     "./src/**/*.{ts,tsx,js,jsx,html,mdx}",
     "./app/**/*.{ts,tsx,js,jsx,mdx}",
     "./components/**/*.{ts,tsx,js,jsx}",
-    "./app/design-system/**/*.{ts,tsx,js,jsx,css}",
+    "./app/styles/**/*.{ts,tsx,js,jsx,css}",
   ],
   theme: {
     // All design tokens live in tokens.css `@theme`. Don't duplicate here.

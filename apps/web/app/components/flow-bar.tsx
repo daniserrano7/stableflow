@@ -1,16 +1,13 @@
-// FlowBar — horizontal magnitude bar used in Top Movers, anomaly meters, etc.
-
 import * as React from "react";
-import { cn } from "../lib/utils";
+import { cn } from "~/utils/cn";
 
 export interface FlowBarProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** 0..100 */
   value: number;
   trend: "inflow" | "outflow" | "net-pos" | "net-neg";
 }
 
-export const FlowBar = React.forwardRef<HTMLDivElement, FlowBarProps>(
-  ({ className, value, trend, ...props }, ref) => (
+const FlowBar = React.forwardRef<HTMLDivElement, FlowBarProps>(
+  ({ className, trend, value, ...props }, ref) => (
     <div ref={ref} className={cn("sf-flowbar", className)} {...props}>
       <div
         className="fill"
@@ -21,3 +18,5 @@ export const FlowBar = React.forwardRef<HTMLDivElement, FlowBarProps>(
   ),
 );
 FlowBar.displayName = "FlowBar";
+
+export { FlowBar };

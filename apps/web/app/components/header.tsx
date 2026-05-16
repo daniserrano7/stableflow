@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { Chip } from "../design-system/components";
+import { Chip } from "./chip";
 
 export function AppHeader() {
   return (

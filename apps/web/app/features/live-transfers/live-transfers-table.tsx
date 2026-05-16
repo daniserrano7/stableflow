@@ -7,10 +7,18 @@ import {
   PanelActions,
   PanelHead,
   PanelTitle,
-  Segmented,
   Tag,
-} from '../../design-system/components';
-import type { Category } from '../../design-system/tokens';
+} from '~/components';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '~/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group';
+import type { Category } from '~/styles/tokens';
 
 const categoryLabels: Record<string, Category> = {
   bridge: 'bridge',
@@ -49,77 +57,88 @@ export function LiveTransfersTable({
       <PanelHead>
         <PanelTitle live>Live Transfers</PanelTitle>
         <PanelActions>
-          <Segmented
+          <ToggleGroup
+            aria-label="Transfer filter"
+            type="single"
             value={filter}
-            onChange={onFilterChange}
-            options={filterOptions}
-          />
+            onValueChange={(nextFilter) => {
+              if (isTransferFilter(nextFilter)) {
+                onFilterChange(nextFilter);
+              }
+            }}
+          >
+            {filterOptions.map((option) => (
+              <ToggleGroupItem key={option.value} value={option.value}>
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </PanelActions>
       </PanelHead>
 
       <div className="overflow-x-auto">
-        <table className="sf-table min-w-[820px]">
-          <thead>
-            <tr>
-              <th className="w-[32%]" scope="col">
+        <Table className="sf-table min-w-[820px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[32%]" scope="col">
                 From
-              </th>
-              <th className="w-8" aria-label="Direction" scope="col" />
-              <th className="w-[32%]" scope="col">
+              </TableHead>
+              <TableHead className="w-8" aria-label="Direction" scope="col" />
+              <TableHead className="w-[32%]" scope="col">
                 To
-              </th>
-              <th className="w-[20%] text-right" scope="col">
+              </TableHead>
+              <TableHead className="w-[20%] text-right" scope="col">
                 Amount
-              </th>
-              <th className="w-[16%] text-right" scope="col">
+              </TableHead>
+              <TableHead className="w-[16%] text-right" scope="col">
                 Protocol
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {transfers.map((transfer, index) => (
-              <tr
+              <TableRow
                 data-fresh={index === 0 ? 'true' : undefined}
                 key={transfer.id}
               >
-                <td>
+                <TableCell>
                   <TransferEntity party={transfer.from} />
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <span
                     className="inline-flex size-6 items-center justify-center text-muted-foreground"
                     aria-hidden
                   >
                     <ArrowRight size={14} />
                   </span>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <TransferEntity party={transfer.to} />
-                </td>
-                <td className="text-right">
+                </TableCell>
+                <TableCell className="text-right">
                   <Amount
                     value={getTransferAmount(transfer)}
                     magnitude={getTransferMagnitude(transfer)}
                     unit={transfer.amount.currency}
                   />
-                </td>
-                <td className="text-right">
+                </TableCell>
+                <TableCell className="text-right">
                   <Tag category={getTransferCategory(transfer)} />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
             {transfers.length === 0 && (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   className="h-32 text-center text-muted-foreground"
                   colSpan={5}
                 >
                   No transfers match this filter yet.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-border border-t px-3.5 py-2.5 font-mono text-2xs text-muted-foreground">
@@ -136,6 +155,10 @@ export function LiveTransfersTable({
 
 export function getTransferAmount(transfer: LiveTransferRow) {
   return Number.parseFloat(transfer.amount.formatted.replaceAll(',', ''));
+}
+
+function isTransferFilter(value: string): value is TransferFilter {
+  return value === 'all' || value === 'large' || value === 'whale';
 }
 
 function TransferEntity({ party }: { party: LiveTransferParty }) {

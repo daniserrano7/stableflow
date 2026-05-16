@@ -1,12 +1,12 @@
-# Stableflow Design System — Usage
+# Stableflow Styles - Usage
 
 ## Imports
 
 ```css
 /* app/styles.css */
-@import "./design-system/tokens.css";       /* tokens + Tailwind v4 @theme */
-@import "./design-system/globals.css";      /* reset, base, scrollbars, motion utilities */
-@import "./design-system/components.css";   /* recipe classes (.sf-panel, .sf-kpi, …) */
+@import "./styles/tokens.css";       /* tokens + Tailwind v4 @theme */
+@import "./styles/globals.css";      /* reset, base, scrollbars, motion utilities */
+@import "./styles/components.css";   /* recipe classes (.sf-panel, .sf-kpi, ...) */
 ```
 
 ```html
@@ -17,7 +17,7 @@
 To switch themes:
 
 ```ts
-import { setTheme } from "~/design-system/tokens";
+import { setTheme } from "~/styles/tokens";
 setTheme("light"); // or "dark"
 ```
 
@@ -71,11 +71,11 @@ Type scale runs `2xs (10px) → 4xl (48px)`. Dense by default — body is **13px
 
 | Component | Class recipe | Notes |
 |-----------|--------------|-------|
-| `<Button>` | — | shadcn-style cva variants: `default / secondary / ghost / outline / destructive / glow / link` × `sm / md / lg / icon` |
+| `<Button>` | - | ShadCN/Radix primitive in `components/ui/button` |
 | `<Panel> / <PanelHead> / <PanelTitle> / <PanelActions>` | `.sf-panel` | The glassy card. Use `<PanelTitle live>` for the green pulse |
-| `<Segmented>` | `.sf-seg` | Pill tab group used in panel heads |
-| `<Chip>` | `.sf-chip` | Network / asset / status pills |
-| `<Tag category>` | `.sf-tag` | Protocol category pill |
+| `<ToggleGroup>` | `.sf-seg` styling equivalent | ShadCN/Radix primitive used for segmented filters |
+| `<Chip>` | `.sf-chip` | Stableflow network / asset / status pill backed by `ui/badge` |
+| `<Tag category>` | `.sf-tag` | Stableflow protocol category pill backed by `ui/badge` |
 | `<KPI>` + `<Sparkline>` | `.sf-kpi` | Stat card with optional sparkline & delta |
 | `<Entity>` | `.sf-entity` | Glyph + name (or short addr) |
 | `<Amount>` | `.sf-amount` | Auto-colored by magnitude or trend |
@@ -129,9 +129,9 @@ All motion is wrapped in a `prefers-reduced-motion` reset.
 Same as chains, but also add a `data-cat` selector in `components.css` under `.sf-tag` so the existing Tag component picks it up.
 
 ### Adding a new component primitive
-1. Create `components/Foo.tsx` (forwarded ref, `cn()`-merged className).
+1. Create `components/foo.tsx` (forwarded ref, `cn()`-merged className).
 2. If it needs a CSS recipe, add `.sf-foo` under `@layer components` in `components.css`.
-3. Re-export from `components/index.ts`.
+3. Re-export from `components/index.ts` if it is app-wide.
 4. Document in this file's table.
 
 ## Compatibility with the prototype
@@ -142,7 +142,7 @@ The prototype (`index.html` at project root) ships its own inline `style.css` so
 |-----------------|--------------------------|
 | `.panel`        | `.sf-panel` / `<Panel>` |
 | `.kpi`          | `.sf-kpi` / `<KPI>` |
-| `.seg`          | `.sf-seg` / `<Segmented>` |
+| `.seg`          | `.sf-seg` / `<ToggleGroup>` |
 | `.chip`         | `.sf-chip` / `<Chip>` |
 | `.tag.*`        | `.sf-tag[data-cat=*]` / `<Tag>` |
 | `.entity*`      | `.sf-entity*` / `<Entity>` |

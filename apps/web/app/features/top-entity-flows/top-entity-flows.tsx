@@ -13,9 +13,9 @@ import {
   PanelActions,
   PanelHead,
   PanelTitle,
-  Segmented,
-} from '../../design-system/components';
-import { CATEGORY, type Category } from '../../design-system/tokens';
+} from '~/components';
+import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group';
+import { CATEGORY, type Category } from '~/styles/tokens';
 import {
   fetchTopEntityFlows,
   getMatchingInitialTopEntityFlows,
@@ -94,26 +94,41 @@ export function TopEntityFlows({ initialFlows }: TopEntityFlowsProps) {
       <PanelHead>
         <PanelTitle live>Top Entity Flows</PanelTitle>
         <PanelActions className="flex-wrap">
-          <Segmented<TopEntityFlowWindow>
+          <ToggleGroup
             aria-label="Flow window"
-            onChange={(nextWindowMinutes) =>
-              nextWindowMinutes === windowMinutes
-                ? undefined
-                : updateFlowSearchParams({ windowMinutes: nextWindowMinutes })
-            }
-            options={topEntityFlowWindowOptions}
+            type="single"
             value={windowMinutes}
-          />
-          <Segmented<TopEntityFlowMode>
+            onValueChange={(nextWindowMinutes) => {
+              if (
+                isTopEntityFlowWindow(nextWindowMinutes) &&
+                nextWindowMinutes !== windowMinutes
+              ) {
+                updateFlowSearchParams({ windowMinutes: nextWindowMinutes });
+              }
+            }}
+          >
+            {topEntityFlowWindowOptions.map((option) => (
+              <ToggleGroupItem key={option.value} value={option.value}>
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <ToggleGroup
             aria-label="Flow mode"
-            onChange={(nextMode) =>
-              nextMode === mode
-                ? undefined
-                : updateFlowSearchParams({ mode: nextMode })
-            }
-            options={topEntityFlowModeOptions}
+            type="single"
             value={mode}
-          />
+            onValueChange={(nextMode) => {
+              if (isTopEntityFlowMode(nextMode) && nextMode !== mode) {
+                updateFlowSearchParams({ mode: nextMode });
+              }
+            }}
+          >
+            {topEntityFlowModeOptions.map((option) => (
+              <ToggleGroupItem key={option.value} value={option.value}>
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </PanelActions>
       </PanelHead>
 
@@ -216,6 +231,14 @@ const getFlowTrend = (
   }
 
   return flow.selected.raw.startsWith('-') ? 'net-neg' : 'net-pos';
+};
+
+const isTopEntityFlowWindow = (value: string): value is TopEntityFlowWindow => {
+  return value === '5' || value === '15' || value === '60';
+};
+
+const isTopEntityFlowMode = (value: string): value is TopEntityFlowMode => {
+  return value === 'inflow' || value === 'outflow' || value === 'net';
 };
 
 const getKnownCategory = (category: string): Category | undefined => {

@@ -1,8 +1,8 @@
 /* ─────────────────────────────────────────────────────────────────────────
    Stableflow · Component recipes
-   Tailwind v4 @utility / @layer classes for the prototype-grade primitives
-   that aren't covered by shadcn. These pair with the React components in
-   ./components — you can use either the class or the component.
+   Tailwind v4 @utility / @layer classes for Stableflow-specific recipes.
+   The React wrappers live in app/components; ShadCN/Radix primitives live
+   in app/components/ui.
 
    Naming: `sf-<thing>` to avoid collisions with shadcn or app classes.
    ───────────────────────────────────────────────────────────────────────── */
@@ -52,7 +52,7 @@
     animation: sf-pulse 1.6s ease-in-out infinite;
   }
 
-  /* ── Segmented control ───────────────────────────────────────────────── */
+  /* ── Toggle group / segmented control ────────────────────────────────── */
 
   .sf-seg {
     display: inline-flex;
@@ -80,6 +80,7 @@
     color: var(--foreground);
   }
   .sf-seg-item[data-state="active"],
+  .sf-seg-item[data-state="on"],
   .sf-seg-item[aria-selected="true"],
   .sf-seg-item.is-active {
     background: var(--surface-3);

@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Amount,
   AnomalyItem,
-  Button,
   Chip,
   Entity,
   FlowBar,
@@ -15,11 +14,12 @@ import {
   PanelTitle,
   Rail,
   RailItem,
-  Segmented,
   Sparkline,
   Tag,
-} from "~/design-system/components";
-import { ASSET, CATEGORY, type Category, CHAIN } from "~/design-system/tokens";
+} from "~/components";
+import { Button } from "~/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { ASSET, CATEGORY, type Category, CHAIN } from "~/styles/tokens";
 
 const semanticTokens = [
   "background",
@@ -184,15 +184,20 @@ export default function DesignSystemRoute() {
                 Component primitives
               </PanelTitle>
               <PanelActions>
-                <Segmented
+                <ToggleGroup
+                  aria-label="Preview range"
+                  type="single"
                   value={activeRange}
-                  onChange={setActiveRange}
-                  options={[
-                    { label: "Live", value: "live" },
-                    { label: "1H", value: "1h" },
-                    { label: "24H", value: "24h" },
-                  ]}
-                />
+                  onValueChange={(nextRange) => {
+                    if (nextRange) {
+                      setActiveRange(nextRange);
+                    }
+                  }}
+                >
+                  <ToggleGroupItem value="live">Live</ToggleGroupItem>
+                  <ToggleGroupItem value="1h">1H</ToggleGroupItem>
+                  <ToggleGroupItem value="24h">24H</ToggleGroupItem>
+                </ToggleGroup>
               </PanelActions>
             </PanelHead>
             <PanelBody className="grid gap-5">

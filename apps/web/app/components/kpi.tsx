@@ -1,7 +1,5 @@
-// KPI card — number + label + delta + sparkline. Used in the top stats strip.
-
 import * as React from "react";
-import { cn } from "../lib/utils";
+import { cn } from "~/utils/cn";
 
 export interface KPIProps extends React.HTMLAttributes<HTMLDivElement> {
   label: React.ReactNode;
@@ -11,8 +9,8 @@ export interface KPIProps extends React.HTMLAttributes<HTMLDivElement> {
   spark?: React.ReactNode;
 }
 
-export const KPI = React.forwardRef<HTMLDivElement, KPIProps>(
-  ({ className, label, value, unit, delta, spark, ...props }, ref) => (
+const KPI = React.forwardRef<HTMLDivElement, KPIProps>(
+  ({ className, delta, label, spark, unit, value, ...props }, ref) => (
     <div ref={ref} className={cn("sf-kpi", className)} {...props}>
       <div className="sf-kpi-label">{label}</div>
       <div className="sf-kpi-value">
@@ -30,13 +28,12 @@ export const KPI = React.forwardRef<HTMLDivElement, KPIProps>(
 );
 KPI.displayName = "KPI";
 
-// Lightweight inline sparkline — drop in <Sparkline data={[…]} />
-export function Sparkline({
-  data,
+function Sparkline({
   color = "var(--accent)",
-  width = 84,
+  data,
   height = 36,
   strokeWidth = 1.4,
+  width = 84,
 }: {
   data: number[];
   color?: string;
@@ -45,6 +42,7 @@ export function Sparkline({
   strokeWidth?: number;
 }) {
   if (!data || data.length < 2) return null;
+
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -59,23 +57,25 @@ export function Sparkline({
 
   return (
     <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
       aria-label="Sparkline trend"
+      height={height}
+      role="img"
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
     >
       <title>Sparkline trend</title>
       <path d={dArea} fill={color} opacity="0.18" />
       <path
         d={d}
-        stroke={color}
-        strokeWidth={strokeWidth}
         fill="none"
-        strokeLinejoin="round"
+        stroke={color}
         strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={strokeWidth}
       />
-      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="2" fill={color} />
+      <circle cx={lastPoint[0]} cy={lastPoint[1]} fill={color} r="2" />
     </svg>
   );
 }
+
+export { KPI, Sparkline };

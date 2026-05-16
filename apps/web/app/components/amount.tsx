@@ -1,27 +1,25 @@
-// Amount — formats and colors a number by magnitude (small/large/whale)
-// or by trend (up/down). Used in tables and lists.
-
 import * as React from "react";
-import { cn, fmtUSDC } from "../lib/utils";
-import { classifyAmount } from "../tokens";
+import { classifyAmount } from "~/styles/tokens";
+import { cn } from "~/utils/cn";
+import { fmtUSDC } from "~/utils/format";
 
 export interface AmountProps extends React.HTMLAttributes<HTMLSpanElement> {
   value: number;
   unit?: string;
   trend?: "up" | "down";
-  /** Override automatic magnitude classification */
   magnitude?: "small" | "large" | "whale";
 }
 
-export const Amount = React.forwardRef<HTMLSpanElement, AmountProps>(
-  ({ className, value, unit = "USDC", trend, magnitude, ...props }, ref) => {
+const Amount = React.forwardRef<HTMLSpanElement, AmountProps>(
+  ({ className, magnitude, trend, unit = "USDC", value, ...props }, ref) => {
     const mag = magnitude ?? classifyAmount(Math.abs(value));
+
     return (
       <span
         ref={ref}
+        className={cn("sf-amount", className)}
         data-magnitude={mag}
         data-trend={trend}
-        className={cn("sf-amount", className)}
         {...props}
       >
         {fmtUSDC(value)}
@@ -31,3 +29,5 @@ export const Amount = React.forwardRef<HTMLSpanElement, AmountProps>(
   },
 );
 Amount.displayName = "Amount";
+
+export { Amount };

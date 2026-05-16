@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Links, type LinksFunction, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { TooltipProvider } from "./components/ui/tooltip";
 import stylesHref from "./styles.css?url";
 
 export const links: LinksFunction = () => [
@@ -41,7 +42,9 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <TooltipProvider delayDuration={150}>
+        <Outlet />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

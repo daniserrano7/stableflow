@@ -1,3 +1,3 @@
-@import "./design-system/tokens.css";
-@import "./design-system/globals.css";
-@import "./design-system/components.css";
+@import "./styles/tokens.css";
+@import "./styles/globals.css";
+@import "./styles/components.css";

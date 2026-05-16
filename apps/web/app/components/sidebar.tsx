@@ -1,7 +1,8 @@
 import { BarChart3, Blocks, Coins, Link2, Network, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { cn } from "../design-system/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { cn } from "../utils/cn";
 
 const sidebarItems = [
   { href: "/", icon: Network, isActive: true, label: "Flow" },
@@ -67,22 +68,24 @@ function SidebarItem({
   to: string;
 }) {
   return (
-    <Link
-      aria-label={label}
-      className={cn(
-        "group relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-surface-2 hover:text-foreground",
-        isActive &&
-          "bg-surface-3 text-foreground ring-1 ring-border before:absolute before:top-1/2 before:-left-2.5 before:h-3.5 before:w-1 before:-translate-y-1/2 before:rounded-sm before:bg-accent before:shadow-glow-accent before:content-['']",
-      )}
-      to={to}
-    >
-      {icon}
-      {hasBadge && (
-        <span className="absolute top-1 right-1 size-1.5 rounded-full bg-anomaly ring-2 ring-background" />
-      )}
-      <span className="pointer-events-none absolute top-1/2 left-11 z-50 -translate-y-1/2 -translate-x-1 whitespace-nowrap rounded-sm border border-border bg-surface-3 px-2.5 py-1.5 font-mono text-2xs text-foreground uppercase tracking-wider opacity-0 shadow-sm transition duration-fast group-hover:translate-x-0 group-hover:opacity-100">
-        {label}
-      </span>
-    </Link>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          aria-label={label}
+          className={cn(
+            "relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-surface-2 hover:text-foreground",
+            isActive &&
+              "bg-surface-3 text-foreground ring-1 ring-border before:absolute before:top-1/2 before:-left-2.5 before:h-3.5 before:w-1 before:-translate-y-1/2 before:rounded-sm before:bg-accent before:shadow-glow-accent before:content-['']",
+          )}
+          to={to}
+        >
+          {icon}
+          {hasBadge && (
+            <span className="absolute top-1 right-1 size-1.5 rounded-full bg-anomaly ring-2 ring-background" />
+          )}
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   );
 }
