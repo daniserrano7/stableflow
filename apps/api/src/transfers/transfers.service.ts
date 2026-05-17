@@ -11,11 +11,10 @@ import type {
 import { and, asc, desc, eq, gt, inArray, or } from "drizzle-orm";
 import { concatMap, filter, from, interval, map, Observable, startWith } from "rxjs";
 import { DatabaseService } from "../database/database.service.js";
+import { toTokenAmount } from "../tokens/base-usdc.js";
 
 const defaultRecentTransfersLimit = 20;
 const liveTransfersPollIntervalMs = 1_000;
-const usdcDecimals = 6;
-const usdcSymbol = "USDC";
 
 interface AddressLabel {
   address: string;
@@ -146,11 +145,7 @@ export class TransfersService {
       const to = this.toTransferParty(record.toAddress, labels);
 
       return {
-        amount: {
-          currency: usdcSymbol,
-          formatted: formatTokenAmount(record.value, usdcDecimals),
-          raw: record.value.toString(),
-        },
+        amount: toTokenAmount(record.value),
         blockNumber: record.blockNumber.toString(),
         blockTimestamp: new Date(Number(record.blockTimestamp) * 1000).toISOString(),
         cursor: {
@@ -238,17 +233,6 @@ export class TransfersService {
     return Math.min(Math.max(Math.trunc(limit), 1), defaultRecentTransfersLimit);
   }
 }
-
-const formatTokenAmount = (value: bigint, decimals: number) => {
-  const divisor = 10n ** BigInt(decimals);
-  const whole = value / divisor;
-  const fraction = value % divisor;
-  const formattedFraction = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
-
-  return formattedFraction.length > 0
-    ? `${whole.toString()}.${formattedFraction}`
-    : whole.toString();
-};
 
 const cropAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 

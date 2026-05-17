@@ -55,7 +55,7 @@ export interface LiveTransferParty {
 }
 
 export interface LiveTransferAmount {
-  currency: "USDC";
+  currency: StablecoinSymbol;
   formatted: string;
   raw: string;
 }
@@ -95,7 +95,7 @@ export interface LiveTransferBatchEvent {
 export type TopEntityFlowMode = "net" | "inflow" | "outflow";
 
 export interface TopEntityFlowAmount {
-  currency: "USDC";
+  currency: StablecoinSymbol;
   formatted: string;
   raw: string;
 }

@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { usdcEntityFlowBuckets } from "@stableflow/indexer/ponder-schema";
 import type {
-  TopEntityFlowAmount,
   TopEntityFlowMode,
   TopEntityFlowRow,
   TopEntityFlowsResponse,
 } from "@stableflow/shared";
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.service.js";
+import { toTokenAmount } from "../tokens/base-usdc.js";
 
 const defaultLimit = 8;
 const defaultMode = "net" satisfies TopEntityFlowMode;
@@ -17,8 +17,6 @@ const maxLimit = 20;
 const maxWindowMinutes = 24 * 60;
 const minWindowMinutes = 1;
 const oneMinuteBucketSize = "1m";
-const usdcDecimals = 6;
-const usdcSymbol = "USDC";
 
 interface TopEntityFlowOptions {
   limit?: number;
@@ -167,16 +165,16 @@ const toTopEntityFlowRows = (
     category: row.category,
     entityId: row.entityId,
     entityName: row.entityName,
-    inflow: toAmount(row.inflowValue),
+    inflow: toTokenAmount(row.inflowValue),
     inflowTransferCount: Number(row.inflowTransferCount),
-    net: toAmount(row.netValue),
+    net: toTokenAmount(row.netValue),
     netTransferCount: Number(row.netTransferCount),
-    outflow: toAmount(row.outflowValue),
+    outflow: toTokenAmount(row.outflowValue),
     outflowTransferCount: Number(row.outflowTransferCount),
     rank: index + 1,
     relativeShare:
       topMagnitude === 0n ? 0 : Number((row.selectedMagnitude * 10_000n) / topMagnitude) / 100,
-    selected: toAmount(row.selectedValue),
+    selected: toTokenAmount(row.selectedValue),
     selectedTransferCount: Number(row.selectedTransferCount),
     transferCount: Number(row.selectedTransferCount),
   }));
@@ -251,25 +249,6 @@ const getBucketWindow = (minutes: number, latestBucketStartSeconds: number | nul
     bucketStartSeconds: bucketEndSeconds - minutes * 60,
     minutes,
   };
-};
-
-const toAmount = (value: bigint): TopEntityFlowAmount => ({
-  currency: usdcSymbol,
-  formatted: formatTokenAmount(value, usdcDecimals),
-  raw: value.toString(),
-});
-
-const formatTokenAmount = (value: bigint, decimals: number) => {
-  const sign = value < 0n ? "-" : "";
-  const absoluteValue = abs(value);
-  const divisor = 10n ** BigInt(decimals);
-  const whole = absoluteValue / divisor;
-  const fraction = absoluteValue % divisor;
-  const formattedFraction = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
-  const unsignedFormatted =
-    formattedFraction.length > 0 ? `${whole.toString()}.${formattedFraction}` : whole.toString();
-
-  return `${sign}${unsignedFormatted}`;
 };
 
 const abs = (value: bigint) => (value < 0n ? -value : value);
