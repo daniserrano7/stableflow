@@ -1,14 +1,6 @@
-import type { LiveTransferParty, LiveTransferRow } from '@stableflow/shared';
-import { ArrowRight, CircleDollarSign } from 'lucide-react';
-import {
-  Amount,
-  Entity,
-  Panel,
-  PanelActions,
-  PanelHead,
-  PanelTitle,
-  Tag,
-} from '~/components';
+import type { LiveTransferParty, LiveTransferRow } from "@stableflow/shared";
+import { ArrowRight, CircleDollarSign } from "lucide-react";
+import { Amount, Entity, Panel, PanelActions, PanelHead, PanelTitle, Tag } from "~/components";
 import {
   Table,
   TableBody,
@@ -16,30 +8,31 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '~/components/ui/table';
-import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group';
-import type { Category } from '~/styles/tokens';
+} from "~/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import type { Category } from "~/styles/tokens";
 
 const categoryLabels: Record<string, Category> = {
-  bridge: 'bridge',
-  cex: 'cex',
-  dex: 'dex',
-  lending: 'lending',
-  mint: 'mint',
-  wallet: 'wallet',
+  bridge: "bridge",
+  cex: "cex",
+  dex: "dex",
+  lending: "lending",
+  mint: "mint",
+  wallet: "wallet",
 };
 
-export type TransferFilter = 'all' | 'large' | 'whale';
+export type TransferFilter = "all" | "large" | "whale";
 
 const filterOptions: { label: string; value: TransferFilter }[] = [
-  { label: 'All', value: 'all' },
-  { label: '>= $10K', value: 'large' },
-  { label: 'Whales', value: 'whale' },
+  { label: "All", value: "all" },
+  { label: ">= $10K", value: "large" },
+  { label: "Whales", value: "whale" },
 ];
 
 interface LiveTransfersTableProps {
   bufferedCount: number;
   filter: TransferFilter;
+  freshTransferIds: ReadonlySet<string>;
   matchingCount: number;
   onFilterChange: (filter: TransferFilter) => void;
   transfers: LiveTransferRow[];
@@ -48,6 +41,7 @@ interface LiveTransfersTableProps {
 export function LiveTransfersTable({
   bufferedCount,
   filter,
+  freshTransferIds,
   matchingCount,
   onFilterChange,
   transfers,
@@ -96,9 +90,9 @@ export function LiveTransfersTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transfers.map((transfer, index) => (
+            {transfers.map((transfer) => (
               <TableRow
-                data-fresh={index === 0 ? 'true' : undefined}
+                data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
                 key={transfer.id}
               >
                 <TableCell>
@@ -129,10 +123,7 @@ export function LiveTransfersTable({
             ))}
             {transfers.length === 0 && (
               <TableRow>
-                <TableCell
-                  className="h-32 text-center text-muted-foreground"
-                  colSpan={5}
-                >
+                <TableCell className="h-32 text-center text-muted-foreground" colSpan={5}>
                   No transfers match this filter yet.
                 </TableCell>
               </TableRow>
@@ -154,11 +145,11 @@ export function LiveTransfersTable({
 }
 
 export function getTransferAmount(transfer: LiveTransferRow) {
-  return Number.parseFloat(transfer.amount.formatted.replaceAll(',', ''));
+  return Number.parseFloat(transfer.amount.formatted.replaceAll(",", ""));
 }
 
 function isTransferFilter(value: string): value is TransferFilter {
-  return value === 'all' || value === 'large' || value === 'whale';
+  return value === "all" || value === "large" || value === "whale";
 }
 
 function TransferEntity({ party }: { party: LiveTransferParty }) {
@@ -176,16 +167,16 @@ function TransferEntity({ party }: { party: LiveTransferParty }) {
 
 function getPartyCategory(party: LiveTransferParty): Category {
   if (!party.isIdentified) {
-    return 'wallet';
+    return "wallet";
   }
 
-  return categoryLabels[party.category.toLowerCase()] ?? 'wallet';
+  return categoryLabels[party.category.toLowerCase()] ?? "wallet";
 }
 
 function getTransferCategory(transfer: LiveTransferRow): Category {
   const toCategory = getPartyCategory(transfer.to);
 
-  if (toCategory !== 'wallet') {
+  if (toCategory !== "wallet") {
     return toCategory;
   }
 
@@ -194,7 +185,7 @@ function getTransferCategory(transfer: LiveTransferRow): Category {
 
 function getEntityGlyph(party: LiveTransferParty, category: Category) {
   if (!party.isIdentified) {
-    return '0x';
+    return "0x";
   }
 
   const source = party.entityName ?? party.displayName;
@@ -203,7 +194,7 @@ function getEntityGlyph(party: LiveTransferParty, category: Category) {
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part.at(0)?.toUpperCase())
-    .join('');
+    .join("");
 
   return initials || category.slice(0, 2).toUpperCase();
 }
@@ -212,12 +203,12 @@ function getTransferMagnitude(transfer: LiveTransferRow) {
   const amount = getTransferAmount(transfer);
 
   if (amount >= 1_000_000) {
-    return 'whale';
+    return "whale";
   }
 
   if (amount >= 10_000) {
-    return 'large';
+    return "large";
   }
 
-  return 'small';
+  return "small";
 }
