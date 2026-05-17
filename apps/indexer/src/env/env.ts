@@ -2,6 +2,14 @@ import { z } from "zod";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
+  DATABASE_SCHEMA: z
+    .string()
+    .regex(
+      /^[A-Za-z_][A-Za-z0-9_]{0,44}$/,
+      "Must be a valid Postgres schema name up to 45 characters",
+    )
+    .refine((value) => value !== "ponder_sync", "Schema name is reserved by Ponder")
+    .default("public"),
   PONDER_DISCOVERY_START_BLOCK_8453: z
     .string()
     .regex(/^\d+$/, "Must be a positive integer block number")

@@ -54,7 +54,7 @@ export default createConfig({
       abi: erc20Abi,
       chain: "base",
       address: baseUsdc.address,
-      startBlock: "latest",
+      startBlock: baseDiscoveryStartBlock,
     },
     AcrossSpokePool: {
       abi: acrossSpokePoolAbi,

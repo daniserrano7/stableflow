@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = "http://localhost:3001/v1";
+const DEFAULT_API_BASE_URL = "http://localhost:3000/v1";
 
 export const getApiBaseUrl = () => {
   return (process.env.STABLEFLOW_API_URL ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");

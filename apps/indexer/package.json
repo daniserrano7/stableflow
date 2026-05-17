@@ -16,9 +16,9 @@
   "scripts": {
     "build": "pnpm codegen && tsc -p tsconfig.json",
     "check": "pnpm typecheck",
-    "check:env": "tsc -p tsconfig.env.json && node --env-file-if-exists=.env dist/env-check/src/config/check-env.js",
+    "check:env": "tsc -p tsconfig.env.json && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/env-check/src/env/check-env.js",
     "codegen": "PONDER_TELEMETRY_DISABLED=1 ponder codegen",
-    "dev": "PONDER_TELEMETRY_DISABLED=1 ponder dev",
+    "dev-dangerously": "DATABASE_SCHEMA=${DATABASE_SCHEMA:-public} PONDER_TELEMETRY_DISABLED=1 ponder dev",
     "inspect:build": "tsc -p tsconfig.inspection.json",
     "inspect:flows": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/flows.js",
     "inspect:reconcile": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/reconcile.js",
@@ -27,7 +27,7 @@
     "labels:candidates": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/generate-candidates.js",
     "labels:promote": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/promote-candidates.js",
     "labels:reject": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/reject-candidate.js",
-    "start": "PONDER_TELEMETRY_DISABLED=1 ponder start",
+    "start": "DATABASE_SCHEMA=${DATABASE_SCHEMA:-public} PONDER_TELEMETRY_DISABLED=1 ponder start",
     "test": "pnpm inspect:build && node --test dist/inspection/src/inspection/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
