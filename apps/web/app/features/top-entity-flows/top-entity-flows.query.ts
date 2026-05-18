@@ -8,7 +8,7 @@ import {
   type TopEntityFlowWindow,
 } from "./top-entity-flows.params";
 
-export const topEntityFlowRefreshIntervalMs = 15_000;
+export const topEntityFlowRefreshIntervalMs = 2_000;
 
 interface TopEntityFlowsQueryOptions {
   mode: TopEntityFlowMode;

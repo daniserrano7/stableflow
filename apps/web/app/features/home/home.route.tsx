@@ -1,34 +1,36 @@
-import type { RecentTransfersResponse, TopEntityFlowsResponse } from "@stableflow/shared";
-import { useState } from "react";
-import type { ShouldRevalidateFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
-import { AppHeader } from "../../components/header";
-import { AppSidebar } from "../../components/sidebar";
-import { getApiUrl } from "../../config/api.server";
+import type {
+  RecentTransfersResponse,
+  TopEntityFlowsResponse,
+} from '@stableflow/shared';
+import { useState } from 'react';
+import type { ShouldRevalidateFunctionArgs } from 'react-router';
+import { useLoaderData } from 'react-router';
+import { AppHeader } from '../../components/header';
+import { AppSidebar } from '../../components/sidebar';
+import { getApiUrl } from '../../config/api.server';
+import { LiveTransfersGraph } from '../live-transfers/live-transfers-graph';
+import { LiveTransfersTable } from '../live-transfers/live-transfers-table';
 import {
-  getTransferAmount,
-  LiveTransfersTable,
+  transferMatchesFilter,
   type TransferFilter,
-} from "../live-transfers/live-transfers-table";
-import { useLiveTransfers } from "../live-transfers/use-live-transfers";
-import { TopEntityFlows } from "../top-entity-flows/top-entity-flows";
+} from '../live-transfers/live-transfers.utils';
+import { useLiveTransfers } from '../live-transfers/use-live-transfers';
+import { TopEntityFlows } from '../top-entity-flows/top-entity-flows';
 import {
   appendTopEntityFlowSearchParams,
   normalizeTopEntityFlowMode,
   normalizeTopEntityFlowWindow,
   topEntityFlowSearchParamNames,
-} from "../top-entity-flows/top-entity-flows.params";
+} from '../top-entity-flows/top-entity-flows.params';
 
-const largeTransferThreshold = 10_000;
 const maxVisibleTransferRows = 20;
-const whaleThreshold = 1_000_000;
 
 export function meta() {
   return [
-    { title: "Stableflow" },
+    { title: 'Stableflow' },
     {
-      content: "USDC flow intelligence on Base.",
-      name: "description",
+      content: 'USDC flow intelligence on Base.',
+      name: 'description',
     },
   ];
 }
@@ -38,46 +40,53 @@ interface HomeLoaderData {
   transfers: RecentTransfersResponse;
 }
 
-export async function loader({ request }: { request: Request }): Promise<HomeLoaderData> {
+export async function loader({
+  request,
+}: {
+  request: Request;
+}): Promise<HomeLoaderData> {
   const requestUrl = new URL(request.url);
-  const topEntityFlowsUrl = new URL(getApiUrl("/flows/top-entities"));
+  const topEntityFlowsUrl = new URL(getApiUrl('/flows/top-entities'));
 
   appendTopEntityFlowSearchParams(topEntityFlowsUrl, {
-    mode: normalizeTopEntityFlowMode(requestUrl.searchParams.get("mode")),
-    windowMinutes: normalizeTopEntityFlowWindow(requestUrl.searchParams.get("windowMinutes")),
+    mode: normalizeTopEntityFlowMode(requestUrl.searchParams.get('mode')),
+    windowMinutes: normalizeTopEntityFlowWindow(
+      requestUrl.searchParams.get('windowMinutes'),
+    ),
   });
 
   const [transfersResponse, topEntityFlowsResponse] = await Promise.all([
-    fetch(getApiUrl("/transfers/recent?limit=20"), {
+    fetch(getApiUrl('/transfers/recent?limit=20'), {
       headers: {
-        accept: "application/json",
+        accept: 'application/json',
       },
       signal: request.signal,
     }),
     fetch(topEntityFlowsUrl, {
       headers: {
-        accept: "application/json",
+        accept: 'application/json',
       },
       signal: request.signal,
     }),
   ]);
 
   if (!transfersResponse.ok) {
-    throw new Response("Unable to load recent transfers", {
+    throw new Response('Unable to load recent transfers', {
       status: transfersResponse.status,
       statusText: transfersResponse.statusText,
     });
   }
 
   if (!topEntityFlowsResponse.ok) {
-    throw new Response("Unable to load top entity flows", {
+    throw new Response('Unable to load top entity flows', {
       status: topEntityFlowsResponse.status,
       statusText: topEntityFlowsResponse.statusText,
     });
   }
 
   return {
-    topEntityFlows: (await topEntityFlowsResponse.json()) as TopEntityFlowsResponse,
+    topEntityFlows:
+      (await topEntityFlowsResponse.json()) as TopEntityFlowsResponse,
     transfers: (await transfersResponse.json()) as RecentTransfersResponse,
   };
 }
@@ -94,7 +103,8 @@ export function shouldRevalidate({
   const currentNonFlowSearch = getSearchWithoutTopEntityFlowParams(currentUrl);
   const nextNonFlowSearch = getSearchWithoutTopEntityFlowParams(nextUrl);
   const hasFlowSearchChange = topEntityFlowSearchParamNames.some(
-    (name) => currentUrl.searchParams.get(name) !== nextUrl.searchParams.get(name),
+    (name) =>
+      currentUrl.searchParams.get(name) !== nextUrl.searchParams.get(name),
   );
 
   if (hasFlowSearchChange && currentNonFlowSearch === nextNonFlowSearch) {
@@ -107,22 +117,14 @@ export function shouldRevalidate({
 export default function Home() {
   const loaderData = useLoaderData<typeof loader>();
   const initialTransfers = loaderData.transfers.data;
-  const { freshTransferIds, transfers } = useLiveTransfers({ initialTransfers });
-  const [filter, setFilter] = useState<TransferFilter>("all");
-
-  const matchingTransfers = transfers.filter((transfer) => {
-    const amount = getTransferAmount(transfer);
-
-    if (filter === "whale") {
-      return amount >= whaleThreshold;
-    }
-
-    if (filter === "large") {
-      return amount >= largeTransferThreshold;
-    }
-
-    return true;
+  const { freshTransferIds, transfers } = useLiveTransfers({
+    initialTransfers,
   });
+  const [filter, setFilter] = useState<TransferFilter>('all');
+
+  const matchingTransfers = transfers.filter((transfer) =>
+    transferMatchesFilter(transfer, filter),
+  );
   const visibleTransfers = matchingTransfers.slice(0, maxVisibleTransferRows);
 
   return (
@@ -139,14 +141,24 @@ export default function Home() {
         <AppHeader />
 
         <div className="grid gap-3.5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(28rem,0.8fr)]">
-          <LiveTransfersTable
-            bufferedCount={transfers.length}
-            filter={filter}
-            freshTransferIds={freshTransferIds}
-            matchingCount={matchingTransfers.length}
-            onFilterChange={setFilter}
-            transfers={visibleTransfers}
-          />
+          <div className="flex min-w-0 flex-col gap-3.5">
+            <LiveTransfersGraph
+              bufferedCount={transfers.length}
+              filter={filter}
+              freshTransferIds={freshTransferIds}
+              matchingCount={matchingTransfers.length}
+              onFilterChange={setFilter}
+              transfers={matchingTransfers}
+            />
+            <LiveTransfersTable
+              bufferedCount={transfers.length}
+              filter={filter}
+              freshTransferIds={freshTransferIds}
+              matchingCount={matchingTransfers.length}
+              onFilterChange={setFilter}
+              transfers={visibleTransfers}
+            />
+          </div>
           <TopEntityFlows initialFlows={loaderData.topEntityFlows} />
         </div>
 

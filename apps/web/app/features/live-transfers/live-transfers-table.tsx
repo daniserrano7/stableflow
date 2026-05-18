@@ -10,24 +10,16 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
-import type { Category } from "~/styles/tokens";
-
-const categoryLabels: Record<string, Category> = {
-  bridge: "bridge",
-  cex: "cex",
-  dex: "dex",
-  lending: "lending",
-  mint: "mint",
-  wallet: "wallet",
-};
-
-export type TransferFilter = "all" | "large" | "whale";
-
-const filterOptions: { label: string; value: TransferFilter }[] = [
-  { label: "All", value: "all" },
-  { label: ">= $10K", value: "large" },
-  { label: "Whales", value: "whale" },
-];
+import {
+  getEntityGlyph,
+  getPartyCategory,
+  getTransferAmount,
+  getTransferCategory,
+  getTransferMagnitude,
+  isTransferFilter,
+  transferFilterOptions,
+  type TransferFilter,
+} from "./live-transfers.utils";
 
 interface LiveTransfersTableProps {
   bufferedCount: number;
@@ -61,7 +53,7 @@ export function LiveTransfersTable({
               }
             }}
           >
-            {filterOptions.map((option) => (
+            {transferFilterOptions.map((option) => (
               <ToggleGroupItem key={option.value} value={option.value}>
                 {option.label}
               </ToggleGroupItem>
@@ -144,14 +136,6 @@ export function LiveTransfersTable({
   );
 }
 
-export function getTransferAmount(transfer: LiveTransferRow) {
-  return Number.parseFloat(transfer.amount.formatted.replaceAll(",", ""));
-}
-
-function isTransferFilter(value: string): value is TransferFilter {
-  return value === "all" || value === "large" || value === "whale";
-}
-
 function TransferEntity({ party }: { party: LiveTransferParty }) {
   const category = getPartyCategory(party);
 
@@ -163,52 +147,4 @@ function TransferEntity({ party }: { party: LiveTransferParty }) {
       name={party.displayName}
     />
   );
-}
-
-function getPartyCategory(party: LiveTransferParty): Category {
-  if (!party.isIdentified) {
-    return "wallet";
-  }
-
-  return categoryLabels[party.category.toLowerCase()] ?? "wallet";
-}
-
-function getTransferCategory(transfer: LiveTransferRow): Category {
-  const toCategory = getPartyCategory(transfer.to);
-
-  if (toCategory !== "wallet") {
-    return toCategory;
-  }
-
-  return getPartyCategory(transfer.from);
-}
-
-function getEntityGlyph(party: LiveTransferParty, category: Category) {
-  if (!party.isIdentified) {
-    return "0x";
-  }
-
-  const source = party.entityName ?? party.displayName;
-  const initials = source
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.at(0)?.toUpperCase())
-    .join("");
-
-  return initials || category.slice(0, 2).toUpperCase();
-}
-
-function getTransferMagnitude(transfer: LiveTransferRow) {
-  const amount = getTransferAmount(transfer);
-
-  if (amount >= 1_000_000) {
-    return "whale";
-  }
-
-  if (amount >= 10_000) {
-    return "large";
-  }
-
-  return "small";
 }
