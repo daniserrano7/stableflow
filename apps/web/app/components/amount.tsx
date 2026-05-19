@@ -10,6 +10,17 @@ export interface AmountProps extends React.HTMLAttributes<HTMLSpanElement> {
   magnitude?: "small" | "large" | "whale";
 }
 
+const magnitudeClasses = {
+  large: "text-accent",
+  small: "",
+  whale: "text-anomaly",
+} satisfies Record<NonNullable<AmountProps["magnitude"]>, string>;
+
+const trendClasses = {
+  down: "text-outflow",
+  up: "text-inflow",
+} satisfies Record<NonNullable<AmountProps["trend"]>, string>;
+
 const Amount = React.forwardRef<HTMLSpanElement, AmountProps>(
   ({ className, magnitude, trend, unit = "USDC", value, ...props }, ref) => {
     const mag = magnitude ?? classifyAmount(Math.abs(value));
@@ -17,13 +28,18 @@ const Amount = React.forwardRef<HTMLSpanElement, AmountProps>(
     return (
       <span
         ref={ref}
-        className={cn("sf-amount", className)}
+        className={cn(
+          "inline-flex items-baseline gap-1 font-mono font-medium tabular-nums",
+          magnitudeClasses[mag],
+          trend && trendClasses[trend],
+          className,
+        )}
         data-magnitude={mag}
         data-trend={trend}
         {...props}
       >
         {fmtUSDC(value)}
-        {unit && <span className="sf-amount-unit">{unit}</span>}
+        {unit && <span className="text-2xs text-muted-foreground">{unit}</span>}
       </span>
     );
   },

@@ -9,23 +9,44 @@ export interface KPIProps extends React.HTMLAttributes<HTMLDivElement> {
   spark?: React.ReactNode;
 }
 
+const deltaTrendClasses = {
+  down: 'text-outflow',
+  flat: 'text-muted-foreground',
+  up: 'text-inflow',
+} satisfies Record<NonNullable<KPIProps['delta']>['trend'], string>;
+
 const KPI = React.forwardRef<HTMLDivElement, KPIProps>(
   ({ className, delta, label, spark, unit, value, ...props }, ref) => (
-    <div ref={ref} className={cn('sf-kpi', className)} {...props}>
+    <div
+      ref={ref}
+      className={cn(
+        'relative flex w-full items-center justify-between gap-1.5 overflow-hidden rounded-lg border border-border bg-glass px-4 py-3.5 [backdrop-filter:var(--blur-glass)] [-webkit-backdrop-filter:var(--blur-glass)]',
+        className,
+      )}
+      {...props}
+    >
       <div>
-        <div className="sf-kpi-label">{label}</div>
-        <div className="sf-kpi-value">
+        <div className="flex flex-wrap items-center gap-1.5 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
+          {label}
+        </div>
+        <div className="mt-1.5 flex items-baseline gap-1.5 font-medium text-2xl tabular-nums tracking-normal">
           {value}
-          {unit && <span className="sf-kpi-unit">{unit}</span>}
+          {unit && <span className="font-normal text-muted-foreground text-sm">{unit}</span>}
         </div>
         {delta && (
-          <div className="sf-kpi-delta" data-trend={delta.trend}>
+          <div
+            className={cn(
+              'mt-1 flex flex-wrap items-center gap-1 font-mono text-xs',
+              deltaTrendClasses[delta.trend],
+            )}
+            data-trend={delta.trend}
+          >
             {delta.trend === 'up' ? '▲' : delta.trend === 'down' ? '▼' : '→'}{' '}
             {delta.value}
           </div>
         )}
       </div>
-      {spark && <div className="sf-kpi-spark">{spark}</div>}
+      {spark && <div className="pointer-events-none w-full flex-1">{spark}</div>}
     </div>
   ),
 );

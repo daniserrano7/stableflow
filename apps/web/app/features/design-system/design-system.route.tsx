@@ -82,7 +82,7 @@ export default function DesignSystemRoute() {
             </h1>
             <p className="mt-4 max-w-2xl text-md text-muted-foreground">
               This page previews the local Tailwind v4 theme, shadcn-compatible component setup, and
-              Stableflow-specific recipes used for live tables, flow maps, protocol surfaces, and
+              Stableflow-specific primitives used for live tables, flow maps, protocol surfaces, and
               inspection views.
             </p>
           </div>
@@ -280,8 +280,7 @@ export default function DesignSystemRoute() {
             <p>Use semantic tokens like bg-card, text-foreground, border-border, and ring-ring.</p>
             <p>Route new colors through tokens.css before using them in components or charts.</p>
             <p>
-              Use recipe classes and primitives for panels, KPIs, live rows, tags, entities, and
-              amounts.
+              Use component primitives for panels, KPIs, live rows, tags, entities, and amounts.
             </p>
           </PanelBody>
         </Panel>

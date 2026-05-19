@@ -63,7 +63,7 @@ export function LiveTransfersTable({
       </PanelHead>
 
       <div className="overflow-x-auto">
-        <Table className="sf-table min-w-[820px]">
+        <Table className="min-w-[820px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[32%]" scope="col">

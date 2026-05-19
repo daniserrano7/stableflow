@@ -1,8 +1,8 @@
 /* ─────────────────────────────────────────────────────────────────────────
    Stableflow · Global styles
    Applies after tokens.css. Owns: reset, base typography, body background,
-   ambient backdrop, scrollbars, selection. Keep this file small —
-   recipe-level styles live in components.css; everything else is Tailwind.
+   ambient backdrop, scrollbars, selection, and shared motion/background
+   utilities. Component-level styling lives in Tailwind classes.
    ───────────────────────────────────────────────────────────────────────── */
 
 @import "tailwindcss";

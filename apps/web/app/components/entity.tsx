@@ -12,15 +12,17 @@ export interface EntityProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 const Entity = React.forwardRef<HTMLSpanElement, EntityProps>(
   ({ category, className, color, glyph, isWallet, name, ...props }, ref) => (
-    <span ref={ref} className={cn("sf-entity", className)} {...props}>
+    <span ref={ref} className={cn("inline-flex items-center gap-2", className)} {...props}>
       <span
         aria-hidden
-        className="sf-entity-glyph"
+        className="inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] font-mono font-semibold text-[9px] text-[oklch(0.13_0.012_254)]"
         style={{ background: color ?? `var(--cat-${category ?? "wallet"})` }}
       >
         {glyph}
       </span>
-      <span className={isWallet ? "sf-entity-addr" : "sf-entity-name"}>{name}</span>
+      <span className={isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground"}>
+        {name}
+      </span>
     </span>
   ),
 );

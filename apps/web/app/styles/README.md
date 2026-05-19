@@ -1,8 +1,9 @@
 # Stableflow Styles
 
-Tailwind v4 tokens, CSS recipes, and docs for the Stableflow web app. React
-components live in `app/components`, with ShadCN/Radix primitives in
-`app/components/ui`.
+Tailwind v4 tokens, shared utilities, and docs for the Stableflow web app.
+React components live in `app/components`, with ShadCN/Radix primitives in
+`app/components/ui`. Composite component styling is colocated as Tailwind
+classes in those React wrappers.
 
 ## Files
 
@@ -11,7 +12,6 @@ components live in `app/components`, with ShadCN/Radix primitives in
 | `tokens.css`         | Tailwind v4 `@theme` + light/dark CSS variables (the heart of the system) |
 | `globals.css`        | App reset, ambient backdrop, base typography, scrollbar styling |
 | `tailwind.config.ts` | Optional v4 config for content paths & plugins (Tailwind v4 is mostly CSS-first) |
-| `components.css`     | Recipe-style classes for Stableflow composites (panel, kpi, chip, tag, etc.) |
 | `tokens.ts`          | Typed JS export of the same tokens for charts / d3 / SVG code |
 | `usage.md`           | Quickstart, migration notes, naming conventions, do/don't |
 
@@ -29,7 +29,6 @@ In the web app stylesheet:
 ```css
 @import "./styles/tokens.css";
 @import "./styles/globals.css";
-@import "./styles/components.css";
 ```
 
 In your top-level HTML element:

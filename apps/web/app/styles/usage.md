@@ -6,7 +6,6 @@
 /* app/styles.css */
 @import "./styles/tokens.css";       /* tokens + Tailwind v4 @theme */
 @import "./styles/globals.css";      /* reset, base, scrollbars, motion utilities */
-@import "./styles/components.css";   /* recipe classes (.sf-panel, .sf-kpi, ...) */
 ```
 
 ```html
@@ -69,21 +68,19 @@ Type scale runs `2xs (10px) → 4xl (48px)`. Dense by default — body is **13px
 
 ## Component primitives
 
-| Component | Class recipe | Notes |
-|-----------|--------------|-------|
-| `<Button>` | - | ShadCN/Radix primitive in `components/ui/button` |
-| `<Panel> / <PanelHead> / <PanelTitle> / <PanelActions>` | `.sf-panel` | The glassy card. Use `<PanelTitle live>` for the green pulse |
-| `<ToggleGroup>` | `.sf-seg` styling equivalent | ShadCN/Radix primitive used for segmented filters |
-| `<Chip>` | `.sf-chip` | Stableflow network / asset / status pill backed by `ui/badge` |
-| `<Tag category>` | `.sf-tag` | Stableflow protocol category pill backed by `ui/badge` |
-| `<KPI>` + `<Sparkline>` | `.sf-kpi` | Stat card with optional sparkline & delta |
-| `<Entity>` | `.sf-entity` | Glyph + name (or short addr) |
-| `<Amount>` | `.sf-amount` | Auto-colored by magnitude or trend |
-| `<Rail> / <RailItem>` | `.sf-rail` | Left icon nav, Linear-style |
-| `<FlowBar>` | `.sf-flowbar` | Horizontal magnitude bar with gradient fill |
-| `<AnomalyItem>` | `.sf-anomaly-item` | Row in the anomaly feed |
-
-Every recipe class also works without the React component (so you can use it in plain HTML, web components, SVG <foreignObject>, etc.).
+| Component | Styling location | Notes |
+|-----------|------------------|-------|
+| `<Button>` | `components/ui/button` | ShadCN/Radix primitive |
+| `<Panel> / <PanelHead> / <PanelTitle> / <PanelActions>` | `components/panel` | The glassy card. Use `<PanelTitle live>` for the green pulse |
+| `<ToggleGroup>` | `components/ui/toggle-group` | ShadCN/Radix primitive used for segmented filters |
+| `<Chip>` | `components/chip` | Stableflow network / asset / status pill backed by `ui/badge` |
+| `<Tag category>` | `components/tag` | Stableflow protocol category pill backed by `ui/badge` |
+| `<KPI>` + `<Sparkline>` | `components/kpi` | Stat card with optional sparkline & delta |
+| `<Entity>` | `components/entity` | Glyph + name (or short addr) |
+| `<Amount>` | `components/amount` | Auto-colored by magnitude or trend |
+| `<Rail> / <RailItem>` | `components/rail` | Left icon nav, Linear-style |
+| `<FlowBar>` | `components/flow-bar` | Horizontal magnitude bar with gradient fill |
+| `<AnomalyItem>` | `components/anomaly-item` | Row in the anomaly feed |
 
 ## Motion
 
@@ -110,7 +107,7 @@ All motion is wrapped in a `prefers-reduced-motion` reset.
 
 ✅ **Do** route any new color through `tokens.css`. Adding a new chain? Add `--chain-foo` + `--color-chain-foo` and you instantly have `bg-chain-foo` etc.
 
-✅ **Do** prefer the recipe classes for stable composite primitives. They are versionable in a single CSS file and survive React refactors.
+✅ **Do** prefer the React primitives for stable composite UI. Their Tailwind classes are colocated with the component that owns the behavior.
 
 ❌ **Don't** hard-code hex/oklch values in components. If you need it twice, it belongs in `tokens.css`.
 
@@ -126,11 +123,11 @@ All motion is wrapped in a `prefers-reduced-motion` reset.
 3. Add an entry to `CHAIN` in `tokens.ts`.
 
 ### Adding a new protocol category
-Same as chains, but also add a `data-cat` selector in `components.css` under `.sf-tag` so the existing Tag component picks it up.
+Same as chains, but also update the category class map in `components/tag.tsx` so the existing `Tag` component picks it up.
 
 ### Adding a new component primitive
 1. Create `components/foo.tsx` (forwarded ref, `cn()`-merged className).
-2. If it needs a CSS recipe, add `.sf-foo` under `@layer components` in `components.css`.
+2. Compose the default Tailwind classes in that component. Add shared CSS utilities only for primitives like reused keyframes or background layers.
 3. Re-export from `components/index.ts` if it is app-wide.
 4. Document in this file's table.
 
@@ -140,16 +137,16 @@ The prototype (`index.html` at project root) ships its own inline `style.css` so
 
 | Prototype class | Design system equivalent |
 |-----------------|--------------------------|
-| `.panel`        | `.sf-panel` / `<Panel>` |
-| `.kpi`          | `.sf-kpi` / `<KPI>` |
-| `.seg`          | `.sf-seg` / `<ToggleGroup>` |
-| `.chip`         | `.sf-chip` / `<Chip>` |
-| `.tag.*`        | `.sf-tag[data-cat=*]` / `<Tag>` |
-| `.entity*`      | `.sf-entity*` / `<Entity>` |
-| `.amount.*`     | `.sf-amount[data-magnitude=*]` / `<Amount>` |
-| `.sidebar` + `.sb-item` | `.sf-rail` / `<Rail>` |
-| `.mover-bar`    | `.sf-flowbar` / `<FlowBar>` |
-| `.anomaly-item` | `.sf-anomaly-item` / `<AnomalyItem>` |
+| `.panel`        | `<Panel>` |
+| `.kpi`          | `<KPI>` |
+| `.seg`          | `<ToggleGroup>` |
+| `.chip`         | `<Chip>` |
+| `.tag.*`        | `<Tag category="…">` |
+| `.entity*`      | `<Entity>` |
+| `.amount.*`     | `<Amount>` |
+| `.sidebar` + `.sb-item` | `<Rail>` |
+| `.mover-bar`    | `<FlowBar>` |
+| `.anomaly-item` | `<AnomalyItem>` |
 | `.bg-ambient` / `.bg-grid` | same |
 
 CSS variables are identical so existing inline styles keep working as you migrate piece by piece.
