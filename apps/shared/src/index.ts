@@ -92,6 +92,56 @@ export interface LiveTransferBatchEvent {
   transfers: LiveTransferRow[];
 }
 
+export type FlowGraphNodeKind = "entity" | "network" | "wallet";
+
+export type FlowGraphEdgeKind = "bridge" | "transfer";
+
+export interface FlowGraphAmount {
+  currency: StablecoinSymbol;
+  formatted: string;
+  raw: string;
+}
+
+export interface FlowGraphNode {
+  category: EntityCategory;
+  ecosystem: string | null;
+  id: string;
+  inflow: FlowGraphAmount;
+  kind: FlowGraphNodeKind;
+  name: string;
+  outflow: FlowGraphAmount;
+  total: FlowGraphAmount;
+  transferCount: number;
+}
+
+export interface FlowGraphEdge {
+  amount: FlowGraphAmount;
+  count: number;
+  fromId: string;
+  id: string;
+  kind: FlowGraphEdgeKind;
+  toId: string;
+}
+
+export interface FlowGraphResponse {
+  data: {
+    edges: FlowGraphEdge[];
+    nodes: FlowGraphNode[];
+  };
+  meta: {
+    generatedAt: string;
+    limit: {
+      edges: number;
+      nodes: number;
+    };
+    window: {
+      bucketEnd: string;
+      bucketStart: string;
+      minutes: number;
+    };
+  };
+}
+
 export type TopEntityFlowMode = "net" | "inflow" | "outflow";
 
 export interface TopEntityFlowAmount {

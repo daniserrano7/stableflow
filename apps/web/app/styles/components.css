@@ -306,7 +306,7 @@
     color: var(--foreground);
   }
   .sf-table tbody tr[data-fresh="true"] {
-    animation: sf-row-in 0.5s var(--ease-out-quart);
+    animation: sf-row-in 0.9s ease-out;
   }
 
   /* ── Sidebar rail ────────────────────────────────────────────────────── */

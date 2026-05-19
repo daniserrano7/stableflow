@@ -1,59 +1,65 @@
-import type { LiveTransferParty, LiveTransferRow } from "@stableflow/shared";
+import type { FlowGraphResponse, LiveTransferParty, LiveTransferRow } from "@stableflow/shared";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { CircleDollarSign, GitBranch, Network } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Panel, PanelActions, PanelHead, PanelTitle } from "~/components";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
-import { CATEGORY, type Category } from "~/styles/tokens";
+import { CATEGORY, type Category, CHAIN, type Chain } from "~/styles/tokens";
 import { fmtUSD } from "~/utils/format";
+import {
+  isLiveTransferGraphWindow,
+  type LiveTransferGraphWindow,
+  liveTransferGraphWindowOptions,
+  normalizeLiveTransferGraphWindow,
+} from "./live-transfer-graph.params";
+import {
+  fetchLiveTransferGraph,
+  getMatchingInitialLiveTransferGraph,
+  liveTransferGraphQueryKey,
+  liveTransferGraphRefreshIntervalMs,
+} from "./live-transfer-graph.query";
 import {
   getEntityGlyph,
   getPartyCategory,
   getTransferAmount,
   getTransferMagnitude,
-  isTransferFilter,
   largeTransferThreshold,
-  transferFilterOptions,
-  type TransferFilter,
   whaleThreshold,
 } from "./live-transfers.utils";
 
 const maxGraphNodes = 24;
-const maxGraphEdges = 42;
+const maxGraphEdges = 30;
 const maxParticles = 80;
 const minGraphWidth = 320;
-const minGraphHeight = 320;
+const minGraphHeight = 460;
+const graphBottomInset = 44;
+const graphMinimumRowGap = 10;
+const graphTopInset = 32;
+const graphVerticalInset = graphTopInset + graphBottomInset;
 const unidentifiedWalletNodeId = "wallet:unidentified";
 const unidentifiedWalletName = "Unidentified wallets";
 
-const unidentifiedWalletParty: LiveTransferParty = {
-  address: unidentifiedWalletNodeId,
-  category: "unidentified",
-  displayName: unidentifiedWalletName,
-  entityId: null,
-  entityName: null,
-  isIdentified: false,
-};
+type GraphNodeCategory = Category | "network";
 
 interface LiveTransfersGraphProps {
   bufferedCount: number;
-  filter: TransferFilter;
   freshTransferIds: ReadonlySet<string>;
-  matchingCount: number;
-  onFilterChange: (filter: TransferFilter) => void;
+  initialGraph: FlowGraphResponse;
   transfers: LiveTransferRow[];
 }
 
 interface GraphNode {
-  category: Category;
+  category: GraphNodeCategory;
+  ecosystem: string | null;
   glyph: string;
   id: string;
   inflow: number;
   isAggregate: boolean;
   isIdentified: boolean;
+  isNetwork: boolean;
   isWallet: boolean;
   name: string;
   outflow: number;
-  party: LiveTransferParty;
   rank: number;
   total: number;
   transferCount: number;
@@ -64,6 +70,7 @@ interface GraphEdge {
   count: number;
   fromId: string;
   id: string;
+  kind: "bridge" | "transfer";
   latestTransferId: string;
   latestTimestamp: string;
   magnitude: "small" | "large" | "whale";
@@ -83,13 +90,6 @@ interface Point {
   y: number;
 }
 
-interface PositionedPoint extends Point {
-  anchorX: number;
-  anchorY: number;
-  vx: number;
-  vy: number;
-}
-
 interface EdgeGeometry {
   control: Point;
   edge: GraphEdge;
@@ -97,6 +97,22 @@ interface EdgeGeometry {
   label: Point;
   path: string;
   start: Point;
+}
+
+interface Rect {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}
+
+interface EdgeLabelGeometry {
+  edgeId: string;
+  height: number;
+  text: string;
+  width: number;
+  x: number;
+  y: number;
 }
 
 interface GraphGeometry {
@@ -121,16 +137,15 @@ interface TransferGraphBuildOptions {
 }
 
 interface TopologyState {
-  filter: TransferFilter;
   graph: TransferGraph;
+  nodeSignature: string;
+  windowMinutes: LiveTransferGraphWindow;
 }
 
 export function LiveTransfersGraph({
   bufferedCount,
-  filter,
   freshTransferIds,
-  matchingCount,
-  onFilterChange,
+  initialGraph,
   transfers,
 }: LiveTransfersGraphProps) {
   const rawMarkerId = useId();
@@ -138,21 +153,53 @@ export function LiveTransfersGraph({
     () => `live-transfer-arrow-${rawMarkerId.replace(/:/g, "")}`,
     [rawMarkerId],
   );
-  const [topologyState, setTopologyState] = useState<TopologyState>(() => ({
-    filter,
-    graph: buildTransferGraph(transfers),
-  }));
+  const [windowMinutes, setWindowMinutes] = useState<LiveTransferGraphWindow>(() =>
+    normalizeLiveTransferGraphWindow(initialGraph.meta.window.minutes.toString()),
+  );
+  const initialData = getMatchingInitialLiveTransferGraph(initialGraph, { windowMinutes });
+  const graphQuery = useQuery({
+    initialData,
+    initialDataUpdatedAt:
+      initialData === undefined ? undefined : Date.parse(initialData.meta.generatedAt),
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => fetchLiveTransferGraph({ signal, windowMinutes }),
+    queryKey: liveTransferGraphQueryKey({ windowMinutes }),
+    refetchInterval: liveTransferGraphRefreshIntervalMs,
+    retry: 2,
+    staleTime: 10_000,
+  });
+  const graphResponse = graphQuery.data ?? initialGraph;
+  const responseGraph = useMemo(
+    () => buildTransferGraphFromResponse(graphResponse),
+    [graphResponse],
+  );
+  const responseMatchesWindow =
+    normalizeLiveTransferGraphWindow(graphResponse.meta.window.minutes.toString()) ===
+    windowMinutes;
+  const fallbackLiveGraph = useMemo(() => buildTransferGraph(transfers), [transfers]);
+  const candidateGraph =
+    responseMatchesWindow && responseGraph.nodes.length > 0 ? responseGraph : fallbackLiveGraph;
+  const candidateNodeSignature = useMemo(() => getNodeSignature(candidateGraph), [candidateGraph]);
+  const [topologyState, setTopologyState] = useState<TopologyState | null>(null);
   const topologyGraph =
-    topologyState.filter === filter ? topologyState.graph : buildTransferGraph(transfers);
+    topologyState !== null &&
+    (topologyState.windowMinutes === windowMinutes || !responseMatchesWindow)
+      ? topologyState.graph
+      : candidateGraph;
+  const metricsGraph = responseMatchesWindow ? candidateGraph : topologyGraph;
   const liveGraph = useMemo(
-    () => applyLiveMetricsToTopology(topologyGraph, transfers),
-    [topologyGraph, transfers],
+    () => applyGraphMetricsToTopology(topologyGraph, metricsGraph),
+    [metricsGraph, topologyGraph],
   );
   const visibleEdgeIds = useMemo(
     () => new Set(topologyGraph.edges.map((edge) => edge.id)),
     [topologyGraph.edges],
   );
-  const [wrapRef, size] = useElementSize();
+  const graphCanvasHeight = useMemo(
+    () => getGraphCanvasHeight(topologyGraph.nodes),
+    [topologyGraph.nodes],
+  );
+  const [wrapRef, size] = useElementSize(graphCanvasHeight);
   const geometry = useMemo(
     () => createGraphGeometry(topologyGraph, size.width, size.height),
     [topologyGraph, size.height, size.width],
@@ -165,21 +212,27 @@ export function LiveTransfersGraph({
   const seenFreshTransferIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
+    if (!responseMatchesWindow && topologyState !== null) {
+      return;
+    }
+
     const shouldRebuildTopology =
-      topologyState.filter !== filter ||
-      (topologyState.graph.nodes.length === 0 && transfers.length > 0);
+      topologyState === null ||
+      topologyState.windowMinutes !== windowMinutes ||
+      hasNewGraphNodes(candidateGraph, topologyState.graph);
 
     if (!shouldRebuildTopology) {
       return;
     }
 
     setTopologyState({
-      filter,
-      graph: buildTransferGraph(transfers),
+      graph: candidateGraph,
+      nodeSignature: candidateNodeSignature,
+      windowMinutes,
     });
     setParticles([]);
     seenFreshTransferIdsRef.current.clear();
-  }, [filter, topologyState.filter, topologyState.graph.nodes.length, transfers]);
+  }, [candidateGraph, candidateNodeSignature, responseMatchesWindow, topologyState, windowMinutes]);
 
   useEffect(() => {
     const retainedTransferIds = new Set(transfers.map((transfer) => transfer.id));
@@ -194,10 +247,7 @@ export function LiveTransfersGraph({
     const nextParticles: GraphParticle[] = [];
 
     for (const transfer of transfers) {
-      if (
-        !freshTransferIds.has(transfer.id) ||
-        seenFreshTransferIdsRef.current.has(transfer.id)
-      ) {
+      if (!freshTransferIds.has(transfer.id) || seenFreshTransferIdsRef.current.has(transfer.id)) {
         continue;
       }
 
@@ -220,10 +270,12 @@ export function LiveTransfersGraph({
     }
 
     if (nextParticles.length > 0) {
-      setParticles((currentParticles) => [
-        ...currentParticles.filter((particle) => now - particle.startedAt < particle.durationMs),
-        ...nextParticles,
-      ].slice(-maxParticles));
+      setParticles((currentParticles) =>
+        [
+          ...currentParticles.filter((particle) => now - particle.startedAt < particle.durationMs),
+          ...nextParticles,
+        ].slice(-maxParticles),
+      );
     }
   }, [freshTransferIds, transfers, visibleEdgeIds]);
 
@@ -243,7 +295,9 @@ export function LiveTransfersGraph({
   }, [particles.length]);
 
   const now = useAnimationFrameTime(particles.length > 0);
-  const liveParticles = particles.filter((particle) => now - particle.startedAt < particle.durationMs);
+  const liveParticles = particles.filter(
+    (particle) => now - particle.startedAt < particle.durationMs,
+  );
   const activeEdgeIds = new Set(liveParticles.map((particle) => particle.edgeId));
   const activeNodeIds = new Set<string>();
 
@@ -256,24 +310,31 @@ export function LiveTransfersGraph({
     }
   }
 
-  const edgeLabelLimit = size.width < 520 ? 4 : 8;
+  const edgeLabelLimit = size.width < 520 ? 3 : 6;
+  const edgeLabels = useMemo(
+    () => createEdgeLabels(geometry, liveGraph, edgeLabelLimit),
+    [edgeLabelLimit, geometry, liveGraph],
+  );
 
   return (
-    <Panel className="min-h-[430px]">
+    <Panel className="min-h-[580px]">
       <PanelHead className="flex-wrap gap-2">
         <PanelTitle live>Flow Graph</PanelTitle>
         <PanelActions>
           <ToggleGroup
-            aria-label="Graph transfer filter"
+            aria-label="Graph window"
             type="single"
-            value={filter}
-            onValueChange={(nextFilter) => {
-              if (isTransferFilter(nextFilter)) {
-                onFilterChange(nextFilter);
+            value={windowMinutes}
+            onValueChange={(nextWindowMinutes) => {
+              if (
+                isLiveTransferGraphWindow(nextWindowMinutes) &&
+                nextWindowMinutes !== windowMinutes
+              ) {
+                setWindowMinutes(nextWindowMinutes);
               }
             }}
           >
-            {transferFilterOptions.map((option) => (
+            {liveTransferGraphWindowOptions.map((option) => (
               <ToggleGroupItem key={option.value} value={option.value}>
                 {option.label}
               </ToggleGroupItem>
@@ -282,10 +343,10 @@ export function LiveTransfersGraph({
         </PanelActions>
       </PanelHead>
 
-      <div ref={wrapRef} className="h-[360px] min-h-[360px] md:h-[410px]">
+      <div ref={wrapRef} className="min-h-[480px]" style={{ height: graphCanvasHeight }}>
         {topologyGraph.nodes.length === 0 ? (
           <div className="flex h-full items-center justify-center px-4 text-center font-mono text-muted-foreground text-xs">
-            No transfers match this filter yet.
+            No graph data for this window yet.
           </div>
         ) : (
           <svg
@@ -327,34 +388,47 @@ export function LiveTransfersGraph({
                       d={edgeGeometry.path}
                       fill="none"
                       markerEnd={`url(#${markerId})`}
-                      opacity={isActive ? 0.82 : 0.46}
-                      stroke={getMagnitudeColor(edge.amount)}
+                      opacity={isActive ? 0.84 : 0.34}
+                      stroke={getEdgeColor(edge)}
+                      strokeDasharray={edge.kind === "bridge" ? "5 5" : undefined}
                       strokeLinecap="round"
                       strokeWidth={getEdgeWidth(edge, liveGraph.edges) + (isActive ? 1.25 : 0)}
                       style={{ transition: "opacity 180ms ease, stroke-width 220ms ease" }}
                     >
                       <title>{getEdgeTitle(edge, liveGraph.nodesById)}</title>
                     </path>
-                    {topologyEdge.rank <= edgeLabelLimit && edge.amount > 0 && (
-                      <text
-                        fill="var(--foreground)"
-                        fontFamily="var(--font-mono)"
-                        fontSize={10}
-                        fontWeight={600}
-                        stroke="var(--background)"
-                        strokeLinejoin="round"
-                        strokeWidth={3}
-                        style={{ paintOrder: "stroke" }}
-                        textAnchor="middle"
-                        x={edgeGeometry.label.x}
-                        y={edgeGeometry.label.y - 5}
-                      >
-                        {formatGraphUSD(edge.amount)}
-                      </text>
-                    )}
                   </g>
                 );
               })}
+            </g>
+
+            <g>
+              {edgeLabels.map((label) => (
+                <g key={label.edgeId} transform={`translate(${label.x}, ${label.y})`}>
+                  <rect
+                    fill="var(--background)"
+                    height={label.height}
+                    opacity={0.86}
+                    rx={4}
+                    stroke="var(--border)"
+                    strokeOpacity={0.78}
+                    width={label.width}
+                    x={-label.width / 2}
+                    y={-label.height / 2}
+                  />
+                  <text
+                    dominantBaseline="middle"
+                    fill="var(--foreground)"
+                    fontFamily="var(--font-mono)"
+                    fontSize={10}
+                    fontWeight={700}
+                    textAnchor="middle"
+                    y={0.5}
+                  >
+                    {label.text}
+                  </text>
+                </g>
+              ))}
             </g>
 
             <g>
@@ -418,7 +492,7 @@ export function LiveTransfersGraph({
                 }
 
                 const isActive = activeNodeIds.has(node.id);
-                const nodeColor = getNodeColor(node.category);
+                const nodeColor = getNodeColor(node);
 
                 return (
                   <g key={node.id} transform={`translate(${position.x}, ${position.y})`}>
@@ -466,9 +540,12 @@ export function LiveTransfersGraph({
                       x={0}
                       y={radius + 15}
                     >
-                      {truncateLabel(node.name, node.isAggregate ? 22 : node.isWallet ? 14 : 18)}
+                      {truncateLabel(
+                        node.name,
+                        node.isAggregate || node.isNetwork ? 22 : node.isWallet ? 14 : 18,
+                      )}
                     </text>
-                    {!node.isWallet && (
+                    {!node.isWallet && shouldRenderNodeCategoryLabel(node, topologyGraph.nodes) && (
                       <text
                         fill="var(--muted-foreground)"
                         fontFamily="var(--font-mono)"
@@ -481,7 +558,7 @@ export function LiveTransfersGraph({
                         x={0}
                         y={radius + 27}
                       >
-                        {CATEGORY[node.category].label}
+                        {getNodeCategoryLabel(node)}
                       </text>
                     )}
                   </g>
@@ -500,27 +577,27 @@ export function LiveTransfersGraph({
           <GitBranch size={13} /> {topologyGraph.edges.length} routes
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <CircleDollarSign size={13} /> {matchingCount} matching · {bufferedCount} buffered
+          <CircleDollarSign size={13} /> {formatWindowLabel(windowMinutes)} window · {bufferedCount}{" "}
+          live buffered
         </span>
       </div>
     </Panel>
   );
 }
 
-function applyLiveMetricsToTopology(
+function applyGraphMetricsToTopology(
   topologyGraph: TransferGraph,
-  transfers: LiveTransferRow[],
+  metricsGraph: TransferGraph,
 ): TransferGraph {
-  const metricsGraph = buildTransferGraph(transfers, { limitTopology: false });
   const nodes = topologyGraph.nodes.map((node) => {
     const metrics = metricsGraph.nodesById.get(node.id);
 
     return {
       ...node,
-      inflow: metrics?.inflow ?? 0,
-      outflow: metrics?.outflow ?? 0,
-      total: metrics?.total ?? 0,
-      transferCount: metrics?.transferCount ?? 0,
+      inflow: metrics?.inflow ?? node.inflow,
+      outflow: metrics?.outflow ?? node.outflow,
+      total: metrics?.total ?? node.total,
+      transferCount: metrics?.transferCount ?? node.transferCount,
     };
   });
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
@@ -529,8 +606,9 @@ function applyLiveMetricsToTopology(
 
     return {
       ...edge,
-      amount: metrics?.amount ?? 0,
-      count: metrics?.count ?? 0,
+      amount: metrics?.amount ?? edge.amount,
+      count: metrics?.count ?? edge.count,
+      kind: metrics?.kind ?? edge.kind,
       latestTransferId: metrics?.latestTransferId ?? edge.latestTransferId,
       latestTimestamp: metrics?.latestTimestamp ?? edge.latestTimestamp,
       magnitude: metrics?.magnitude ?? "small",
@@ -544,6 +622,47 @@ function applyLiveMetricsToTopology(
     nodes,
     nodesById,
   };
+}
+
+function buildTransferGraphFromResponse(response: FlowGraphResponse): TransferGraph {
+  const nodes = response.data.nodes.map((node) => {
+    const category = getGraphNodeCategory(node.category, node.kind);
+    const isWallet = node.kind === "wallet" || category === "wallet";
+    const isNetwork = node.kind === "network";
+
+    return {
+      category,
+      ecosystem: node.ecosystem,
+      glyph: getGraphNodeGlyph(node.name, category, isNetwork),
+      id: node.id,
+      inflow: getGraphAmount(node.inflow),
+      isAggregate: node.kind === "wallet",
+      isIdentified: node.kind !== "wallet",
+      isNetwork,
+      isWallet,
+      name: node.name,
+      outflow: getGraphAmount(node.outflow),
+      total: getGraphAmount(node.total),
+      transferCount: node.transferCount,
+    };
+  });
+  const edges = response.data.edges.map((edge) => {
+    const amount = getGraphAmount(edge.amount);
+
+    return {
+      amount,
+      count: edge.count,
+      fromId: edge.fromId,
+      id: edge.id,
+      kind: edge.kind,
+      latestTransferId: edge.id,
+      latestTimestamp: response.meta.window.bucketEnd,
+      magnitude: getAmountMagnitude(amount),
+      toId: edge.toId,
+    };
+  });
+
+  return createTransferGraph(nodes, edges);
 }
 
 function buildTransferGraph(
@@ -583,6 +702,7 @@ function buildTransferGraph(
         count: 1,
         fromId: fromNode.id,
         id: edgeId,
+        kind: "transfer",
         latestTransferId: transfer.id,
         latestTimestamp: transfer.blockTimestamp,
         magnitude: getTransferMagnitude(transfer),
@@ -617,7 +737,9 @@ function buildTransferGraph(
       break;
     }
 
-    const missingNodeIds = [edge.fromId, edge.toId].filter((nodeId) => !selectedNodeIds.has(nodeId));
+    const missingNodeIds = [edge.fromId, edge.toId].filter(
+      (nodeId) => !selectedNodeIds.has(nodeId),
+    );
 
     if (selectedNodeIds.size + missingNodeIds.length > maxGraphNodes) {
       continue;
@@ -667,8 +789,7 @@ function createTransferGraph(
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const edges = edgesWithoutRank
     .filter(
-      (edge) =>
-        edge.fromId !== edge.toId && nodesById.has(edge.fromId) && nodesById.has(edge.toId),
+      (edge) => edge.fromId !== edge.toId && nodesById.has(edge.fromId) && nodesById.has(edge.toId),
     )
     .map((edge, index) => ({ ...edge, rank: index + 1 }));
   const edgesById = new Map(edges.map((edge) => [edge.id, edge]));
@@ -681,10 +802,7 @@ function createTransferGraph(
   };
 }
 
-function upsertNode(
-  nodesById: Map<string, Omit<GraphNode, "rank">>,
-  party: LiveTransferParty,
-) {
+function upsertNode(nodesById: Map<string, Omit<GraphNode, "rank">>, party: LiveTransferParty) {
   const id = getPartyNodeId(party);
   const currentNode = nodesById.get(id);
 
@@ -696,15 +814,16 @@ function upsertNode(
   const category = isAggregate ? "wallet" : getPartyCategory(party);
   const node = {
     category,
+    ecosystem: null,
     glyph: isAggregate ? "0x" : getEntityGlyph(party, category),
     id,
     inflow: 0,
     isAggregate,
     isIdentified: isAggregate ? false : party.isIdentified,
+    isNetwork: false,
     isWallet: category === "wallet",
     name: isAggregate ? unidentifiedWalletName : party.displayName,
     outflow: 0,
-    party: isAggregate ? unidentifiedWalletParty : party,
     total: 0,
     transferCount: 0,
   };
@@ -746,6 +865,130 @@ function createGraphGeometry(graph: TransferGraph, width: number, height: number
   };
 }
 
+function createEdgeLabels(
+  geometry: GraphGeometry,
+  graph: TransferGraph,
+  edgeLabelLimit: number,
+): EdgeLabelGeometry[] {
+  const reservedRects = createNodeReservedRects(geometry, graph.nodes);
+  const labels: EdgeLabelGeometry[] = [];
+  const candidates = geometry.edges
+    .map((edgeGeometry) => ({
+      edge: graph.edgesById.get(edgeGeometry.edge.id) ?? edgeGeometry.edge,
+      edgeGeometry,
+    }))
+    .filter(({ edge, edgeGeometry }) => edgeGeometry.edge.rank <= edgeLabelLimit && edge.amount > 0)
+    .sort((a, b) => a.edgeGeometry.edge.rank - b.edgeGeometry.edge.rank);
+
+  for (const { edge, edgeGeometry } of candidates) {
+    const text = formatGraphUSD(edge.amount);
+    const width = Math.max(44, text.length * 6.4 + 14);
+    const height = 18;
+    const normal = getEdgeNormal(edgeGeometry);
+    const base = {
+      x: edgeGeometry.label.x,
+      y: edgeGeometry.label.y - 6,
+    };
+    const offsetCandidates = [0, 18, -18, 34, -34, 52, -52];
+    let placedLabel: EdgeLabelGeometry | null = null;
+
+    for (const offset of offsetCandidates) {
+      const x = clamp(base.x + normal.x * offset, width / 2 + 8, geometry.width - width / 2 - 8);
+      const y = clamp(base.y + normal.y * offset, height / 2 + 8, geometry.height - height / 2 - 8);
+      const rect = {
+        height,
+        width,
+        x: x - width / 2,
+        y: y - height / 2,
+      };
+
+      if (reservedRects.some((reservedRect) => rectsOverlap(rect, reservedRect))) {
+        continue;
+      }
+
+      placedLabel = {
+        edgeId: edge.id,
+        height,
+        text,
+        width,
+        x,
+        y,
+      };
+      reservedRects.push(expandRect(rect, 5));
+      break;
+    }
+
+    if (placedLabel !== null) {
+      labels.push(placedLabel);
+    }
+  }
+
+  return labels;
+}
+
+function createNodeReservedRects(geometry: GraphGeometry, nodes: GraphNode[]) {
+  const rects: Rect[] = [];
+
+  for (const node of nodes) {
+    const position = geometry.positions.get(node.id);
+    const radius = geometry.radii.get(node.id) ?? 10;
+
+    if (position === undefined) {
+      continue;
+    }
+
+    rects.push(
+      expandRect(
+        {
+          height: (radius + 14) * 2,
+          width: (radius + 14) * 2,
+          x: position.x - radius - 14,
+          y: position.y - radius - 14,
+        },
+        4,
+      ),
+    );
+
+    rects.push(
+      expandRect(
+        {
+          height: node.isWallet || !shouldRenderNodeCategoryLabel(node, nodes) ? 22 : 34,
+          width: Math.min(148, Math.max(72, node.name.length * 6.2)),
+          x: position.x - Math.min(148, Math.max(72, node.name.length * 6.2)) / 2,
+          y: position.y + radius + 6,
+        },
+        4,
+      ),
+    );
+  }
+
+  return rects;
+}
+
+function getEdgeNormal(edgeGeometry: EdgeGeometry): Point {
+  const dx = edgeGeometry.end.x - edgeGeometry.start.x;
+  const dy = edgeGeometry.end.y - edgeGeometry.start.y;
+  const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+
+  return {
+    x: -dy / distance,
+    y: dx / distance,
+  };
+}
+
+function rectsOverlap(a: Rect, b: Rect) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+function expandRect(rect: Rect, amount: number): Rect {
+  return {
+    height: rect.height + amount * 2,
+    width: rect.width + amount * 2,
+    x: rect.x - amount,
+    y: rect.y - amount,
+  };
+}
+
 function layoutTransferGraph(
   nodes: GraphNode[],
   edges: GraphEdge[],
@@ -753,8 +996,6 @@ function layoutTransferGraph(
   width: number,
   height: number,
 ) {
-  const positions = new Map<string, PositionedPoint>();
-
   if (nodes.length === 0) {
     return new Map<string, Point>();
   }
@@ -767,149 +1008,176 @@ function layoutTransferGraph(
       : new Map([[node.id, { x: width / 2, y: height / 2 }]]);
   }
 
-  const categorySlots = getCategorySlots(nodes);
-  const maxAbsNet = Math.max(1, ...nodes.map((node) => Math.abs(node.inflow - node.outflow)));
+  const columns = new Map<number, GraphNode[]>();
+  const columnsByNodeId = new Map<string, number>();
+  const adjacency = new Map<string, { id: string; weight: number }[]>();
 
   for (const node of nodes) {
-    const slot = categorySlots.get(node.id) ?? { count: 1, index: 0, lane: 0, laneCount: 1 };
+    const column = getLayoutColumn(node);
+    const group = columns.get(column) ?? [];
+
+    group.push(node);
+    columns.set(column, group);
+    columnsByNodeId.set(node.id, column);
+  }
+
+  for (const edge of edges) {
+    const weight = Math.max(1, Math.log1p(edge.amount));
+    const fromNeighbors = adjacency.get(edge.fromId) ?? [];
+    const toNeighbors = adjacency.get(edge.toId) ?? [];
+
+    fromNeighbors.push({ id: edge.toId, weight });
+    toNeighbors.push({ id: edge.fromId, weight });
+    adjacency.set(edge.fromId, fromNeighbors);
+    adjacency.set(edge.toId, toNeighbors);
+  }
+
+  const columnIds = [...columns.keys()].sort((a, b) => a - b);
+  const orderedColumns = new Map(
+    columnIds.map((column) => [
+      column,
+      [...(columns.get(column) ?? [])].sort(compareNodesWithStableTie),
+    ]),
+  );
+  let yByNodeId = getColumnYMap(orderedColumns, height, radii);
+
+  for (let iteration = 0; iteration < 8; iteration += 1) {
+    for (const column of columnIds) {
+      const group = orderedColumns.get(column) ?? [];
+
+      group.sort(
+        (a, b) =>
+          getNeighborBarycenter(a, column, adjacency, columnsByNodeId, yByNodeId) -
+            getNeighborBarycenter(b, column, adjacency, columnsByNodeId, yByNodeId) ||
+          compareNodesWithStableTie(a, b),
+      );
+    }
+
+    yByNodeId = getColumnYMap(orderedColumns, height, radii);
+  }
+
+  const positions = new Map<string, Point>();
+  const activeColumnCount = columnIds.length;
+
+  for (const node of nodes) {
     const radius = radii.get(node.id) ?? 10;
-    const laneY = 54 + ((height - 108) * (slot.lane + 0.5)) / slot.laneCount;
-    const laneSpread = Math.min(82, Math.max(26, height / Math.max(3, slot.laneCount) * 0.28));
-    const relativeIndex =
-      slot.count <= 1 ? 0 : (slot.index - (slot.count - 1) / 2) / Math.max(1, slot.count - 1);
-    const balance = clamp((node.inflow - node.outflow) / maxAbsNet, -1, 1);
-    const anchorX = clamp(
-      width * 0.5 + balance * width * 0.33 + getCategoryXBias(node.category) * width * 0.14,
-      Math.max(76, radius + 52),
-      width - Math.max(76, radius + 52),
-    );
-    const anchorY = clamp(
-      laneY + relativeIndex * laneSpread * 2 + (hashToUnit(node.id) - 0.5) * 18,
-      radius + 44,
-      height - radius - 44,
+    const column = columnsByNodeId.get(node.id) ?? 1;
+    const x = getLayoutColumnX(column, activeColumnCount, width, radius);
+    const y = clamp(
+      yByNodeId.get(node.id) ?? height / 2,
+      radius + graphTopInset,
+      height - radius - graphBottomInset,
     );
 
-    positions.set(node.id, {
-      anchorX,
-      anchorY,
-      vx: 0,
-      vy: 0,
-      x: anchorX,
-      y: anchorY,
+    positions.set(node.id, { x, y });
+  }
+
+  return positions;
+}
+
+function getLayoutColumn(node: GraphNode) {
+  if (node.isNetwork) {
+    return 3;
+  }
+
+  if (node.category === "bridge") {
+    return 2;
+  }
+
+  if (node.category === "dex" || node.category === "lending") {
+    return 1;
+  }
+
+  return 0;
+}
+
+function getLayoutColumnX(
+  column: number,
+  activeColumnCount: number,
+  width: number,
+  radius: number,
+) {
+  const fallbackColumnX = activeColumnCount <= 1 ? 0.5 : 0.15 + column * 0.24;
+  const columnXById = new Map([
+    [0, 0.09],
+    [1, 0.34],
+    [2, 0.64],
+    [3, 0.91],
+  ]);
+  const x = width * (columnXById.get(column) ?? fallbackColumnX);
+
+  return clamp(x, Math.max(66, radius + 42), width - Math.max(66, radius + 42));
+}
+
+function getColumnYMap(
+  columns: Map<number, GraphNode[]>,
+  height: number,
+  radii: Map<string, number>,
+) {
+  const yByNodeId = new Map<string, number>();
+  const top = graphTopInset;
+  const bottom = height - graphBottomInset;
+  const availableHeight = Math.max(80, bottom - top);
+
+  for (const group of columns.values()) {
+    if (group.length === 1) {
+      const node = group[0];
+
+      if (node !== undefined) {
+        yByNodeId.set(node.id, top + availableHeight / 2);
+      }
+
+      continue;
+    }
+
+    const rowHeights = group.map((node) =>
+      getNodeVerticalFootprint(node, radii.get(node.id) ?? 10, group),
+    );
+    const rowHeightTotal = rowHeights.reduce((total, rowHeight) => total + rowHeight, 0);
+    const gap = Math.max(
+      graphMinimumRowGap,
+      (availableHeight - rowHeightTotal) / (group.length + 1),
+    );
+    let cursor = top + gap;
+
+    group.forEach((node, index) => {
+      const rowHeight = rowHeights[index] ?? 64;
+
+      yByNodeId.set(node.id, cursor + rowHeight / 2);
+      cursor += rowHeight + gap;
     });
   }
 
-  const k = Math.sqrt((width * height) / nodes.length) * 0.58;
-  let temperature = Math.min(width, height) / 7;
-  const maxEdgeAmount = Math.max(1, ...edges.map((edge) => edge.amount));
+  return yByNodeId;
+}
 
-  for (let iteration = 0; iteration < 180; iteration += 1) {
-    for (const point of positions.values()) {
-      point.vx = 0;
-      point.vy = 0;
+function getNeighborBarycenter(
+  node: GraphNode,
+  column: number,
+  adjacency: Map<string, { id: string; weight: number }[]>,
+  columnsByNodeId: Map<string, number>,
+  yByNodeId: Map<string, number>,
+) {
+  const neighbors = adjacency.get(node.id) ?? [];
+  let total = 0;
+  let weight = 0;
+
+  for (const neighbor of neighbors) {
+    if (columnsByNodeId.get(neighbor.id) === column) {
+      continue;
     }
 
-    for (let i = 0; i < nodes.length; i += 1) {
-      const sourceNode = nodes[i];
+    const neighborY = yByNodeId.get(neighbor.id);
 
-      if (sourceNode === undefined) {
-        continue;
-      }
-
-      const a = positions.get(sourceNode.id);
-
-      if (a === undefined) {
-        continue;
-      }
-
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const targetNode = nodes[j];
-
-        if (targetNode === undefined) {
-          continue;
-        }
-
-        const b = positions.get(targetNode.id);
-
-        if (b === undefined) {
-          continue;
-        }
-
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        const distance = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
-        const force = (k * k) / distance;
-        const fx = (dx / distance) * force;
-        const fy = (dy / distance) * force;
-
-        a.vx += fx;
-        a.vy += fy;
-        b.vx -= fx;
-        b.vy -= fy;
-      }
+    if (neighborY === undefined) {
+      continue;
     }
 
-    for (const edge of edges) {
-      const a = positions.get(edge.fromId);
-      const b = positions.get(edge.toId);
-
-      if (a === undefined || b === undefined) {
-        continue;
-      }
-
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const distance = Math.max(0.01, Math.sqrt(dx * dx + dy * dy));
-      const edgeWeight = Math.log1p(edge.amount) / Math.log1p(maxEdgeAmount);
-      const fromRadius = radii.get(edge.fromId) ?? 10;
-      const toRadius = radii.get(edge.toId) ?? 10;
-      const targetDistance = fromRadius + toRadius + 120 + edgeWeight * 36;
-      const stretch = distance - targetDistance;
-      const force =
-        stretch > 0 ? stretch * (0.025 + edgeWeight * 0.025) : stretch * 0.006;
-      const fx = (dx / distance) * force;
-      const fy = (dy / distance) * force;
-
-      a.vx -= fx;
-      a.vy -= fy;
-      b.vx += fx;
-      b.vy += fy;
-    }
-
-    for (const node of nodes) {
-      const point = positions.get(node.id);
-
-      if (point === undefined) {
-        continue;
-      }
-
-      point.vx += (point.anchorX - point.x) * 0.55;
-      point.vy += (point.anchorY - point.y) * 0.42;
-    }
-
-    for (const node of nodes) {
-      const point = positions.get(node.id);
-      const radius = radii.get(node.id) ?? 10;
-
-      if (point === undefined) {
-        continue;
-      }
-
-      const displacement = Math.max(0.01, Math.sqrt(point.vx * point.vx + point.vy * point.vy));
-      const step = Math.min(displacement, temperature);
-
-      point.x += (point.vx / displacement) * step;
-      point.y += (point.vy / displacement) * step;
-      point.x = clamp(point.x, Math.max(78, radius + 56), width - Math.max(78, radius + 56));
-      point.y = clamp(point.y, radius + 42, height - radius - 48);
-    }
-
-    temperature *= 0.975;
+    total += neighborY * neighbor.weight;
+    weight += neighbor.weight;
   }
 
-  return new Map(
-    [...positions.entries()].map(([nodeId, point]) => [nodeId, { x: point.x, y: point.y }]),
-  );
+  return weight === 0 ? (yByNodeId.get(node.id) ?? 0) : total / weight;
 }
 
 function createEdgeGeometry(
@@ -935,8 +1203,8 @@ function createEdgeGeometry(
   };
   const reverseEdgeId = `${edge.toId}->${edge.fromId}`;
   const hasReverseEdge = edgeIds.has(reverseEdgeId);
-  const curveSign = hasReverseEdge ? (edge.id < reverseEdgeId ? 1 : -1) : hashToUnit(edge.id) > 0.5 ? 1 : -1;
-  const curvature = hasReverseEdge ? 0.24 : 0.14;
+  const curveSign = hasReverseEdge ? (edge.id < reverseEdgeId ? 1 : -1) : start.y <= end.y ? 1 : -1;
+  const curvature = hasReverseEdge ? 0.2 : 0.035;
   const edgeDx = end.x - start.x;
   const edgeDy = end.y - start.y;
   const edgeDistance = Math.max(1, Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy));
@@ -960,9 +1228,12 @@ function createEdgeGeometry(
   };
 }
 
-function useElementSize() {
+function useElementSize(initialHeight: number) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState({ height: 410, width: 900 });
+  const [size, setSize] = useState({
+    height: Math.max(minGraphHeight, Math.round(initialHeight)),
+    width: 900,
+  });
 
   useEffect(() => {
     const node = ref.current;
@@ -1017,41 +1288,14 @@ function useAnimationFrameTime(enabled: boolean) {
   return now === 0 ? getHighResNow() : now;
 }
 
-function getCategorySlots(nodes: GraphNode[]) {
-  const categoryOrder: Category[] = ["mint", "cex", "dex", "lending", "bridge", "wallet"];
-  const groups = new Map<Category, GraphNode[]>();
-
-  for (const node of nodes) {
-    const group = groups.get(node.category) ?? [];
-    group.push(node);
-    groups.set(node.category, group);
-  }
-
-  const lanes = categoryOrder.filter((category) => groups.has(category));
-  const slots = new Map<string, { count: number; index: number; lane: number; laneCount: number }>();
-
-  lanes.forEach((category, lane) => {
-    const group = groups.get(category) ?? [];
-
-    group.forEach((node, index) => {
-      slots.set(node.id, {
-        count: group.length,
-        index,
-        lane,
-        laneCount: lanes.length,
-      });
-    });
-  });
-
-  return slots;
-}
-
 function getPartyNodeId(party: LiveTransferParty) {
   if (!party.isIdentified) {
     return unidentifiedWalletNodeId;
   }
 
-  return party.entityId !== null ? `entity:${party.entityId}` : `address:${party.address.toLowerCase()}`;
+  return party.entityId !== null
+    ? `entity:${party.entityId}`
+    : `address:${party.address.toLowerCase()}`;
 }
 
 function getTransferEdgeId(transfer: LiveTransferRow) {
@@ -1065,12 +1309,53 @@ function getTransferEdgeId(transfer: LiveTransferRow) {
   return `${fromId}->${toId}`;
 }
 
+function getGraphNodeCategory(category: string, kind: string): GraphNodeCategory {
+  if (kind === "network") {
+    return "network";
+  }
+
+  if (category in CATEGORY) {
+    return category as Category;
+  }
+
+  return "wallet";
+}
+
+function getGraphNodeGlyph(name: string, category: GraphNodeCategory, isNetwork: boolean) {
+  if (isNetwork) {
+    return getNameGlyph(name, "NW");
+  }
+
+  if (category === "network") {
+    return "NW";
+  }
+
+  return getNameGlyph(name, category.slice(0, 2).toUpperCase());
+}
+
+function getNameGlyph(name: string, fallback: string) {
+  const glyph = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.at(0)?.toUpperCase())
+    .join("");
+
+  return glyph || fallback;
+}
+
+function getGraphAmount(amount: { formatted: string }) {
+  const value = Number.parseFloat(amount.formatted.replaceAll(",", ""));
+
+  return Number.isFinite(value) ? value : 0;
+}
+
 function getNodeRadius(node: GraphNode, nodes: GraphNode[]) {
   const positiveTotals = nodes.map((candidate) => candidate.total).filter((total) => total > 0);
   const minTotal = Math.min(...positiveTotals);
   const maxTotal = Math.max(...positiveTotals);
-  const minRadius = node.isWallet ? 8 : 11;
-  const maxRadius = node.isWallet ? 24 : 32;
+  const minRadius = node.isWallet ? 8 : node.isNetwork ? 10 : 11;
+  const maxRadius = node.isWallet ? 24 : node.isNetwork ? 28 : 32;
 
   return scaleLog(node.total, minTotal, maxTotal, minRadius, maxRadius);
 }
@@ -1079,7 +1364,7 @@ function getEdgeWidth(edge: GraphEdge, edges: GraphEdge[]) {
   const minAmount = Math.min(...edges.map((candidate) => candidate.amount));
   const maxAmount = Math.max(...edges.map((candidate) => candidate.amount));
 
-  return scaleLog(edge.amount, minAmount, maxAmount, 1.4, 8.5);
+  return scaleLog(edge.amount, minAmount, maxAmount, 1.2, 6.8);
 }
 
 function getMagnitudeColor(amount: number) {
@@ -1094,16 +1379,16 @@ function getMagnitudeColor(amount: number) {
   return "var(--inflow)";
 }
 
+function getEdgeColor(edge: GraphEdge) {
+  if (edge.kind === "bridge") {
+    return "var(--cat-bridge)";
+  }
+
+  return getMagnitudeColor(edge.amount);
+}
+
 function getParticleRadius(amount: number) {
-  if (amount >= whaleThreshold) {
-    return 5.4;
-  }
-
-  if (amount >= largeTransferThreshold) {
-    return 3.8;
-  }
-
-  return 2.5;
+  return scaleLog(Math.max(1, amount), 1, 10_000_000, 2.2, 8.2);
 }
 
 function getAmountMagnitude(amount: number): "small" | "large" | "whale" {
@@ -1118,35 +1403,93 @@ function getAmountMagnitude(amount: number): "small" | "large" | "whale" {
   return "small";
 }
 
-function getNodeColor(category: Category) {
-  return `var(--cat-${category})`;
+function getNodeColor(node: GraphNode) {
+  if (node.isNetwork) {
+    return getNetworkColor(node.id);
+  }
+
+  return `var(--cat-${node.category})`;
 }
 
-function getCategoryXBias(category: Category) {
-  if (category === "mint" || category === "cex") {
-    return -0.35;
+function getNetworkColor(nodeId: string) {
+  const networkId = nodeId.startsWith("network:") ? nodeId.slice("network:".length) : "";
+
+  if (networkId in CHAIN) {
+    return CHAIN[networkId as Chain].color;
   }
 
-  if (category === "bridge") {
-    return 0.28;
+  return "var(--neutral-flow)";
+}
+
+function getNodeCategoryLabel(node: GraphNode) {
+  if (node.isNetwork) {
+    return node.ecosystem === null ? "Network" : `${formatCategoryLabel(node.ecosystem)} Network`;
   }
 
-  if (category === "lending") {
-    return 0.08;
+  return CATEGORY[node.category as Category].label;
+}
+
+function shouldRenderNodeCategoryLabel(node: GraphNode, nodes: GraphNode[]) {
+  if (node.isNetwork) {
+    return false;
   }
 
-  return 0;
+  const columnNodeCount = nodes.filter(
+    (candidateNode) => getLayoutColumn(candidateNode) === getLayoutColumn(node),
+  ).length;
+
+  return columnNodeCount < 8 || node.category === "bridge";
+}
+
+function getGraphCanvasHeight(nodes: GraphNode[]) {
+  if (nodes.length === 0) {
+    return 480;
+  }
+
+  const columns = new Map<number, GraphNode[]>();
+  const radii = new Map(nodes.map((node) => [node.id, getNodeRadius(node, nodes)] as const));
+
+  for (const node of nodes) {
+    const column = getLayoutColumn(node);
+    const columnNodes = columns.get(column) ?? [];
+
+    columnNodes.push(node);
+    columns.set(column, columnNodes);
+  }
+
+  const requiredColumnHeights = [...columns.values()].map((columnNodes) => {
+    const rowHeightTotal = columnNodes.reduce(
+      (total, node) =>
+        total + getNodeVerticalFootprint(node, radii.get(node.id) ?? 10, columnNodes),
+      0,
+    );
+
+    return rowHeightTotal + (columnNodes.length + 1) * graphMinimumRowGap;
+  });
+  const requiredHeight =
+    Math.max(...requiredColumnHeights, minGraphHeight - graphVerticalInset) + graphVerticalInset;
+
+  return Math.min(1040, Math.max(480, Math.ceil(requiredHeight)));
+}
+
+function getNodeVerticalFootprint(node: GraphNode, radius: number, columnNodes: GraphNode[]) {
+  const labelHeight = node.isWallet || !shouldRenderNodeCategoryLabel(node, columnNodes) ? 34 : 46;
+
+  return radius * 2 + labelHeight;
 }
 
 function getNodeTitle(node: GraphNode) {
-  return `${node.name}\nIn ${formatGraphUSD(node.inflow)}\nOut ${formatGraphUSD(node.outflow)}\n${node.transferCount} transfers`;
+  const countLabel = node.isNetwork ? "bridge events" : "transfers";
+
+  return `${node.name}\nIn ${formatGraphUSD(node.inflow)}\nOut ${formatGraphUSD(node.outflow)}\n${node.transferCount} ${countLabel}`;
 }
 
 function getEdgeTitle(edge: GraphEdge, nodesById: Map<string, GraphNode>) {
   const fromName = nodesById.get(edge.fromId)?.name ?? "Unknown";
   const toName = nodesById.get(edge.toId)?.name ?? "Unknown";
+  const countLabel = edge.kind === "bridge" ? "bridge events" : "transfers";
 
-  return `${fromName} -> ${toName}\n${formatGraphUSD(edge.amount)} across ${edge.count} transfers`;
+  return `${fromName} -> ${toName}\n${formatGraphUSD(edge.amount)} across ${edge.count} ${countLabel}`;
 }
 
 function formatGraphUSD(value: number) {
@@ -1168,8 +1511,57 @@ function formatGraphUSD(value: number) {
   return `${sign}${fmtUSD(amount)}`;
 }
 
+function formatWindowLabel(windowMinutes: LiveTransferGraphWindow) {
+  if (windowMinutes === "1440") {
+    return "24h";
+  }
+
+  if (windowMinutes === "60") {
+    return "1h";
+  }
+
+  return "5m";
+}
+
+function formatCategoryLabel(value: string) {
+  if (value === "evm") {
+    return "EVM";
+  }
+
+  if (value === "svm") {
+    return "SVM";
+  }
+
+  return value
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getNodeSignature(graph: TransferGraph) {
+  return graph.nodes
+    .map((node) => node.id)
+    .sort()
+    .join("|");
+}
+
+function hasNewGraphNodes(candidateGraph: TransferGraph, topologyGraph: TransferGraph) {
+  for (const node of candidateGraph.nodes) {
+    if (!topologyGraph.nodesById.has(node.id)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function compareNodes(a: Omit<GraphNode, "rank">, b: Omit<GraphNode, "rank">) {
   return b.total - a.total || b.transferCount - a.transferCount || a.name.localeCompare(b.name);
+}
+
+function compareNodesWithStableTie(a: GraphNode, b: GraphNode) {
+  return compareNodes(a, b) || a.id.localeCompare(b.id);
 }
 
 function compareEdges(a: Omit<GraphEdge, "rank">, b: Omit<GraphEdge, "rank">) {
@@ -1196,7 +1588,7 @@ function getPointOnQuadratic(a: Point, c: Point, b: Point, t: number): Point {
 }
 
 function easeInOutQuad(t: number) {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 }
 
 function truncateLabel(value: string, maxLength: number) {

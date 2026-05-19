@@ -1,92 +1,107 @@
 import type {
+  FlowGraphResponse,
   RecentTransfersResponse,
   TopEntityFlowsResponse,
-} from '@stableflow/shared';
-import { useState } from 'react';
-import type { ShouldRevalidateFunctionArgs } from 'react-router';
-import { useLoaderData } from 'react-router';
-import { AppHeader } from '../../components/header';
-import { AppSidebar } from '../../components/sidebar';
-import { getApiUrl } from '../../config/api.server';
-import { LiveTransfersGraph } from '../live-transfers/live-transfers-graph';
-import { LiveTransfersTable } from '../live-transfers/live-transfers-table';
+} from "@stableflow/shared";
+import { useState } from "react";
+import type { ShouldRevalidateFunctionArgs } from "react-router";
+import { useLoaderData } from "react-router";
+import { AppHeader } from "../../components/header";
+import { AppSidebar } from "../../components/sidebar";
+import { getApiUrl } from "../../config/api.server";
 import {
-  transferMatchesFilter,
-  type TransferFilter,
-} from '../live-transfers/live-transfers.utils';
-import { useLiveTransfers } from '../live-transfers/use-live-transfers';
-import { TopEntityFlows } from '../top-entity-flows/top-entity-flows';
+  appendLiveTransferGraphSearchParams,
+  defaultLiveTransferGraphWindow,
+} from "../live-transfers/live-transfer-graph.params";
+import { type TransferFilter, transferMatchesFilter } from "../live-transfers/live-transfers.utils";
+import { LiveTransfersGraph } from "../live-transfers/live-transfers-graph";
+import { LiveTransfersTable } from "../live-transfers/live-transfers-table";
+import { useLiveTransfers } from "../live-transfers/use-live-transfers";
+import { TopEntityFlows } from "../top-entity-flows/top-entity-flows";
 import {
   appendTopEntityFlowSearchParams,
   normalizeTopEntityFlowMode,
   normalizeTopEntityFlowWindow,
   topEntityFlowSearchParamNames,
-} from '../top-entity-flows/top-entity-flows.params';
+} from "../top-entity-flows/top-entity-flows.params";
 
 const maxVisibleTransferRows = 20;
 
 export function meta() {
   return [
-    { title: 'Stableflow' },
+    { title: "Stableflow" },
     {
-      content: 'USDC flow intelligence on Base.',
-      name: 'description',
+      content: "USDC flow intelligence on Base.",
+      name: "description",
     },
   ];
 }
 
 interface HomeLoaderData {
+  liveTransferGraph: FlowGraphResponse;
   topEntityFlows: TopEntityFlowsResponse;
   transfers: RecentTransfersResponse;
 }
 
-export async function loader({
-  request,
-}: {
-  request: Request;
-}): Promise<HomeLoaderData> {
+export async function loader({ request }: { request: Request }): Promise<HomeLoaderData> {
   const requestUrl = new URL(request.url);
-  const topEntityFlowsUrl = new URL(getApiUrl('/flows/top-entities'));
+  const liveTransferGraphUrl = new URL(getApiUrl("/flows/live-graph"));
+  const topEntityFlowsUrl = new URL(getApiUrl("/flows/top-entities"));
 
-  appendTopEntityFlowSearchParams(topEntityFlowsUrl, {
-    mode: normalizeTopEntityFlowMode(requestUrl.searchParams.get('mode')),
-    windowMinutes: normalizeTopEntityFlowWindow(
-      requestUrl.searchParams.get('windowMinutes'),
-    ),
+  appendLiveTransferGraphSearchParams(liveTransferGraphUrl, {
+    windowMinutes: defaultLiveTransferGraphWindow,
   });
 
-  const [transfersResponse, topEntityFlowsResponse] = await Promise.all([
-    fetch(getApiUrl('/transfers/recent?limit=20'), {
+  appendTopEntityFlowSearchParams(topEntityFlowsUrl, {
+    mode: normalizeTopEntityFlowMode(requestUrl.searchParams.get("mode")),
+    windowMinutes: normalizeTopEntityFlowWindow(requestUrl.searchParams.get("windowMinutes")),
+  });
+
+  const [transfersResponse, topEntityFlowsResponse, liveTransferGraphResponse] = await Promise.all([
+    fetch(getApiUrl("/transfers/recent?limit=20"), {
       headers: {
-        accept: 'application/json',
+        accept: "application/json",
       },
       signal: request.signal,
     }),
     fetch(topEntityFlowsUrl, {
       headers: {
-        accept: 'application/json',
+        accept: "application/json",
+      },
+      signal: request.signal,
+    }),
+    fetch(liveTransferGraphUrl, {
+      headers: {
+        accept: "application/json",
       },
       signal: request.signal,
     }),
   ]);
 
   if (!transfersResponse.ok) {
-    throw new Response('Unable to load recent transfers', {
+    throw new Response("Unable to load recent transfers", {
       status: transfersResponse.status,
       statusText: transfersResponse.statusText,
     });
   }
 
   if (!topEntityFlowsResponse.ok) {
-    throw new Response('Unable to load top entity flows', {
+    throw new Response("Unable to load top entity flows", {
       status: topEntityFlowsResponse.status,
       statusText: topEntityFlowsResponse.statusText,
     });
   }
 
+  if (!liveTransferGraphResponse.ok) {
+    throw new Response("Unable to load live transfer graph", {
+      status: liveTransferGraphResponse.status,
+      statusText: liveTransferGraphResponse.statusText,
+    });
+  }
+
   return {
-    topEntityFlows:
-      (await topEntityFlowsResponse.json()) as TopEntityFlowsResponse,
+    liveTransferGraph: (await liveTransferGraphResponse.json()) as FlowGraphResponse,
+    topEntityFlows: (await topEntityFlowsResponse.json()) as TopEntityFlowsResponse,
     transfers: (await transfersResponse.json()) as RecentTransfersResponse,
   };
 }
@@ -103,8 +118,7 @@ export function shouldRevalidate({
   const currentNonFlowSearch = getSearchWithoutTopEntityFlowParams(currentUrl);
   const nextNonFlowSearch = getSearchWithoutTopEntityFlowParams(nextUrl);
   const hasFlowSearchChange = topEntityFlowSearchParamNames.some(
-    (name) =>
-      currentUrl.searchParams.get(name) !== nextUrl.searchParams.get(name),
+    (name) => currentUrl.searchParams.get(name) !== nextUrl.searchParams.get(name),
   );
 
   if (hasFlowSearchChange && currentNonFlowSearch === nextNonFlowSearch) {
@@ -120,11 +134,9 @@ export default function Home() {
   const { freshTransferIds, transfers } = useLiveTransfers({
     initialTransfers,
   });
-  const [filter, setFilter] = useState<TransferFilter>('all');
+  const [filter, setFilter] = useState<TransferFilter>("all");
 
-  const matchingTransfers = transfers.filter((transfer) =>
-    transferMatchesFilter(transfer, filter),
-  );
+  const matchingTransfers = transfers.filter((transfer) => transferMatchesFilter(transfer, filter));
   const visibleTransfers = matchingTransfers.slice(0, maxVisibleTransferRows);
 
   return (
@@ -144,11 +156,9 @@ export default function Home() {
           <div className="flex min-w-0 flex-col gap-3.5">
             <LiveTransfersGraph
               bufferedCount={transfers.length}
-              filter={filter}
               freshTransferIds={freshTransferIds}
-              matchingCount={matchingTransfers.length}
-              onFilterChange={setFilter}
-              transfers={matchingTransfers}
+              initialGraph={loaderData.liveTransferGraph}
+              transfers={transfers}
             />
             <LiveTransfersTable
               bufferedCount={transfers.length}

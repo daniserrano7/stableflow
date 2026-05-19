@@ -158,13 +158,13 @@
   }
 }
 @keyframes sf-row-in {
-  from {
-    background: var(--accent-soft);
-    opacity: 0.4;
+  0% {
+    background-color: color-mix(in oklch, var(--accent) 10%, transparent);
+    box-shadow: inset 2px 0 0 color-mix(in oklch, var(--accent) 42%, transparent);
   }
-  to {
-    background: transparent;
-    opacity: 1;
+  100% {
+    background-color: transparent;
+    box-shadow: inset 2px 0 0 transparent;
   }
 }
 @keyframes sf-shimmer {

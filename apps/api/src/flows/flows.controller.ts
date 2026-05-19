@@ -18,9 +18,36 @@ const topEntityFlowsQuerySchema = z
   })
   .strict();
 
+const flowGraphQuerySchema = z
+  .object({
+    windowMinutes: integerQueryParam({ max: 24 * 60, min: 1 }),
+  })
+  .strict();
+
 @Controller("flows")
 export class FlowsController {
   constructor(private readonly flowsService: FlowsService) {}
+
+  @Get("live-graph")
+  listFlowGraph(@Query() query: Record<string, unknown>) {
+    const parsedQuery = flowGraphQuerySchema.safeParse(query);
+
+    if (!parsedQuery.success) {
+      throw new BadRequestException({
+        error: "Bad Request",
+        message: "Invalid flow graph query parameters",
+        issues: parsedQuery.error.issues.map((issue) => ({
+          code: issue.code,
+          message: issue.message,
+          path: issue.path.join("."),
+        })),
+      });
+    }
+
+    return this.flowsService.listFlowGraph({
+      windowMinutes: parsedQuery.data.windowMinutes,
+    });
+  }
 
   @Get("top-entities")
   listTopEntityFlows(@Query() query: Record<string, unknown>) {
