@@ -3,6 +3,7 @@ import {
   usdcBridgeFlowBuckets,
   usdcEntityFlowBuckets,
   usdcEntityPairFlowBuckets,
+  usdcTransferVolumeBuckets,
 } from "@stableflow/indexer/ponder-schema";
 import type {
   FlowGraphEdge,
@@ -10,11 +11,14 @@ import type {
   FlowGraphNode,
   FlowGraphNodeKind,
   FlowGraphResponse,
+  FlowKpiCard,
+  FlowKpiDelta,
+  FlowKpisResponse,
   TopEntityFlowMode,
   TopEntityFlowRow,
   TopEntityFlowsResponse,
 } from "@stableflow/shared";
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.service.js";
 import { toTokenAmount } from "../tokens/base-usdc.js";
 
@@ -22,6 +26,11 @@ const defaultLimit = 8;
 const defaultMode = "net" satisfies TopEntityFlowMode;
 const defaultWindowMinutes = 15;
 const defaultGraphWindowMinutes = 5;
+const flowKpiMaxSeriesPoints = 60;
+const flowKpiBridgeNetWindowMinutes = 24 * 60;
+const flowKpiTopNetMoverWindowMinutes = 15;
+const flowKpiTransferWindowMinutes = 60;
+const flowKpiVolumeWindowMinutes = 24 * 60;
 const graphCandidateBridgeEdgeLimit = 120;
 const graphCandidatePairEdgeLimit = 240;
 const graphMaxEdges = 30;
@@ -74,6 +83,32 @@ interface BridgeFlowAggregateRow {
   totalValue: string;
 }
 
+interface VolumeBucketAggregateRow {
+  bucketStart: string;
+  totalValue: string;
+  transferCount: string;
+}
+
+interface TopNetEntityAggregateRow {
+  category: string;
+  entityId: string;
+  entityName: string;
+  inflowValue: string;
+  outflowValue: string;
+}
+
+interface EntityNetBucketAggregateRow {
+  bucketStart: string;
+  inflowValue: string;
+  outflowValue: string;
+}
+
+interface BridgeNetBucketAggregateRow {
+  bucketStart: string;
+  inboundValue: string;
+  outboundValue: string;
+}
+
 interface GraphNodeDraft {
   category: string;
   ecosystem: string | null;
@@ -112,6 +147,32 @@ interface GraphWindow {
 @Injectable()
 export class FlowsService {
   constructor(private readonly databaseService: DatabaseService) {}
+
+  async listFlowKpis(): Promise<FlowKpisResponse> {
+    const [
+      latestVolumeBucketStartSeconds,
+      latestEntityBucketStartSeconds,
+      latestBridgeBucketStartSeconds,
+    ] = await Promise.all([
+      this.getLatestVolumeBucketStartSeconds(),
+      this.getLatestBucketStartSeconds(),
+      this.getLatestBridgeBucketStartSeconds(),
+    ]);
+
+    const [volumeCard, transfersCard, topNetMoverCard, bridgeNetFlowCard] = await Promise.all([
+      this.buildUsdcVolumeCard(latestVolumeBucketStartSeconds),
+      this.buildTransfersCard(latestVolumeBucketStartSeconds),
+      this.buildTopNetMoverCard(latestEntityBucketStartSeconds),
+      this.buildBridgeNetFlowCard(latestBridgeBucketStartSeconds),
+    ]);
+
+    return {
+      data: [volumeCard, transfersCard, topNetMoverCard, bridgeNetFlowCard],
+      meta: {
+        generatedAt: new Date().toISOString(),
+      },
+    };
+  }
 
   async listTopEntityFlows(options: TopEntityFlowOptions): Promise<TopEntityFlowsResponse> {
     const limit = normalizeLimit(options.limit);
@@ -193,6 +254,200 @@ export class FlowsService {
     const graph = buildFlowGraph(entityPairRows, bridgeRows);
 
     return toFlowGraphResponse(graph.nodes, graph.edges, window);
+  }
+
+  private async buildUsdcVolumeCard(latestBucketStartSeconds: number | null): Promise<FlowKpiCard> {
+    const window = getBucketWindow(flowKpiVolumeWindowMinutes, latestBucketStartSeconds);
+    const previousWindow = getPreviousBucketWindow(window);
+    const [currentRows, previousRows] =
+      latestBucketStartSeconds === null
+        ? [[], []]
+        : await Promise.all([
+            this.listVolumeBucketRows(window),
+            this.listVolumeBucketRows(previousWindow),
+          ]);
+    const currentValue = sumBigInt(currentRows, (row) => BigInt(row.totalValue));
+    const previousValue = sumBigInt(previousRows, (row) => BigInt(row.totalValue));
+
+    return {
+      delta:
+        latestBucketStartSeconds === null
+          ? null
+          : toPercentDelta(currentValue, previousValue, "vs previous 24h"),
+      id: "usdc-volume-24h",
+      label: "24H USDC VOLUME · BASE",
+      series: toKpiSeries(window, currentRows, {
+        getBucketStartSeconds: (row) => Number(BigInt(row.bucketStart)),
+        getValue: (row) => BigInt(row.totalValue),
+        valueFormatter: formatUsdcSeriesValue,
+      }),
+      tone: "accent",
+      value: toUsdcKpiValue(currentValue),
+      window: toKpiWindow(window),
+    };
+  }
+
+  private async buildTransfersCard(latestBucketStartSeconds: number | null): Promise<FlowKpiCard> {
+    const window = getBucketWindow(flowKpiTransferWindowMinutes, latestBucketStartSeconds);
+    const previousWindow = getPreviousBucketWindow(window);
+    const [currentRows, previousRows] =
+      latestBucketStartSeconds === null
+        ? [[], []]
+        : await Promise.all([
+            this.listVolumeBucketRows(window),
+            this.listVolumeBucketRows(previousWindow),
+          ]);
+    const currentValue = sumBigInt(currentRows, (row) => BigInt(row.transferCount));
+    const previousValue = sumBigInt(previousRows, (row) => BigInt(row.transferCount));
+
+    return {
+      delta:
+        latestBucketStartSeconds === null
+          ? null
+          : toPercentDelta(currentValue, previousValue, "vs previous 1h"),
+      id: "transfers-1h",
+      label: "TRANSFERS · 1H",
+      series: toKpiSeries(window, currentRows, {
+        getBucketStartSeconds: (row) => Number(BigInt(row.bucketStart)),
+        getValue: (row) => BigInt(row.transferCount),
+        valueFormatter: (value) => value.toString(),
+      }),
+      tone: "inflow",
+      value: toCountKpiValue(currentValue),
+      window: toKpiWindow(window),
+    };
+  }
+
+  private async buildTopNetMoverCard(
+    latestBucketStartSeconds: number | null,
+  ): Promise<FlowKpiCard> {
+    const window = getBucketWindow(flowKpiTopNetMoverWindowMinutes, latestBucketStartSeconds);
+
+    if (latestBucketStartSeconds === null) {
+      return {
+        delta: null,
+        id: "top-net-mover-15m",
+        label: "TOP NET MOVER · 15M",
+        series: [],
+        tone: "neutral",
+        value: toUsdcKpiValue(0n),
+        window: toKpiWindow(window),
+      };
+    }
+
+    const topMover = await this.getTopNetMover(window);
+
+    if (topMover === null) {
+      return {
+        delta: null,
+        id: "top-net-mover-15m",
+        label: "TOP NET MOVER · 15M",
+        series: [],
+        tone: "neutral",
+        value: toUsdcKpiValue(0n),
+        window: toKpiWindow(window),
+      };
+    }
+
+    const currentRows = await this.listEntityNetBucketRows(window, topMover.entityId);
+    const currentNetValue = topMover.netValue;
+
+    return {
+      delta: {
+        label: `${topMover.entityName} · ${toNetFlowLabel(currentNetValue)}`,
+        trend: toSignedTrend(currentNetValue),
+      },
+      id: "top-net-mover-15m",
+      label: "TOP NET MOVER · 15M",
+      series: toKpiSeries(window, currentRows, {
+        getBucketStartSeconds: (row) => Number(BigInt(row.bucketStart)),
+        getValue: toEntityNetValue,
+        valueFormatter: formatUsdcSeriesValue,
+      }),
+      tone: toSignedTone(currentNetValue),
+      value: toUsdcKpiValue(currentNetValue),
+      window: toKpiWindow(window),
+    };
+  }
+
+  private async buildBridgeNetFlowCard(
+    latestBucketStartSeconds: number | null,
+  ): Promise<FlowKpiCard> {
+    const window = getBucketWindow(flowKpiBridgeNetWindowMinutes, latestBucketStartSeconds);
+    const currentRows =
+      latestBucketStartSeconds === null ? [] : await this.listBridgeNetBucketRows(window);
+    const currentNetValue = sumBigInt(currentRows, toBridgeNetValue);
+    const trend = toSignedTrend(currentNetValue);
+
+    return {
+      delta:
+        latestBucketStartSeconds === null
+          ? null
+          : {
+              label: toNetFlowLabel(currentNetValue),
+              trend,
+            },
+      id: "bridge-net-flow-24h",
+      label: "BRIDGE NET FLOW → BASE · 24H",
+      series: toKpiSeries(window, currentRows, {
+        getBucketStartSeconds: (row) => Number(BigInt(row.bucketStart)),
+        getValue: toBridgeNetValue,
+        valueFormatter: formatUsdcSeriesValue,
+      }),
+      tone: toSignedTone(currentNetValue),
+      value: toUsdcKpiValue(currentNetValue),
+      window: toKpiWindow(window),
+    };
+  }
+
+  private async getTopNetMover(
+    window: GraphWindow,
+  ): Promise<(TopNetEntityAggregateRow & { netValue: bigint }) | null> {
+    const rows = await this.listTopNetEntityRows(window);
+    const topMover = rows
+      .map((row) => ({
+        ...row,
+        netValue: BigInt(row.inflowValue) - BigInt(row.outflowValue),
+      }))
+      .filter((row) => row.entityId !== "unidentified" && row.netValue !== 0n)
+      .sort((a, b) => compareBigIntDesc(abs(a.netValue), abs(b.netValue)))
+      .at(0);
+
+    return topMover ?? null;
+  }
+
+  private async getLatestVolumeBucketStartSeconds() {
+    const latestBuckets = await this.databaseService.db
+      .select({
+        bucketStart: sql<string | null>`max(${usdcTransferVolumeBuckets.bucketStart})::text`,
+      })
+      .from(usdcTransferVolumeBuckets)
+      .where(eq(usdcTransferVolumeBuckets.bucketSize, oneMinuteBucketSize));
+
+    const bucketStart = latestBuckets.at(0)?.bucketStart;
+
+    if (bucketStart === undefined || bucketStart === null) {
+      return null;
+    }
+
+    return Number(BigInt(bucketStart));
+  }
+
+  private async getLatestBridgeBucketStartSeconds() {
+    const latestBuckets = await this.databaseService.db
+      .select({
+        bucketStart: sql<string | null>`max(${usdcBridgeFlowBuckets.bucketStart})::text`,
+      })
+      .from(usdcBridgeFlowBuckets)
+      .where(eq(usdcBridgeFlowBuckets.bucketSize, oneMinuteBucketSize));
+
+    const bucketStart = latestBuckets.at(0)?.bucketStart;
+
+    if (bucketStart === undefined || bucketStart === null) {
+      return null;
+    }
+
+    return Number(BigInt(bucketStart));
   }
 
   private async getLatestBucketStartSeconds() {
@@ -305,7 +560,244 @@ export class FlowsService {
       .orderBy(desc(sql`sum(${usdcBridgeFlowBuckets.totalValue})`))
       .limit(graphCandidateBridgeEdgeLimit);
   }
+
+  private async listVolumeBucketRows(window: GraphWindow): Promise<VolumeBucketAggregateRow[]> {
+    return this.databaseService.db
+      .select({
+        bucketStart: sql<string>`${usdcTransferVolumeBuckets.bucketStart}::text`,
+        totalValue: sql<string>`sum(${usdcTransferVolumeBuckets.totalValue})::text`,
+        transferCount: sql<string>`sum(${usdcTransferVolumeBuckets.transferCount})::text`,
+      })
+      .from(usdcTransferVolumeBuckets)
+      .where(
+        and(
+          eq(usdcTransferVolumeBuckets.bucketSize, oneMinuteBucketSize),
+          gte(usdcTransferVolumeBuckets.bucketStart, BigInt(window.bucketStartSeconds)),
+          lt(usdcTransferVolumeBuckets.bucketStart, BigInt(window.bucketEndSeconds)),
+        ),
+      )
+      .groupBy(usdcTransferVolumeBuckets.bucketStart)
+      .orderBy(asc(usdcTransferVolumeBuckets.bucketStart));
+  }
+
+  private async listTopNetEntityRows(window: GraphWindow): Promise<TopNetEntityAggregateRow[]> {
+    return this.databaseService.db
+      .select({
+        category: usdcEntityFlowBuckets.category,
+        entityId: usdcEntityFlowBuckets.entityId,
+        entityName: usdcEntityFlowBuckets.entityName,
+        inflowValue: sql<string>`coalesce(sum(${usdcEntityFlowBuckets.totalValue}) filter (where ${usdcEntityFlowBuckets.direction} = 'in'), 0)::text`,
+        outflowValue: sql<string>`coalesce(sum(${usdcEntityFlowBuckets.totalValue}) filter (where ${usdcEntityFlowBuckets.direction} = 'out'), 0)::text`,
+      })
+      .from(usdcEntityFlowBuckets)
+      .where(
+        and(
+          eq(usdcEntityFlowBuckets.bucketSize, oneMinuteBucketSize),
+          gte(usdcEntityFlowBuckets.bucketStart, BigInt(window.bucketStartSeconds)),
+          lt(usdcEntityFlowBuckets.bucketStart, BigInt(window.bucketEndSeconds)),
+        ),
+      )
+      .groupBy(
+        usdcEntityFlowBuckets.entityId,
+        usdcEntityFlowBuckets.entityName,
+        usdcEntityFlowBuckets.category,
+      );
+  }
+
+  private async listEntityNetBucketRows(
+    window: GraphWindow,
+    entityId: string,
+  ): Promise<EntityNetBucketAggregateRow[]> {
+    return this.databaseService.db
+      .select({
+        bucketStart: sql<string>`${usdcEntityFlowBuckets.bucketStart}::text`,
+        inflowValue: sql<string>`coalesce(sum(${usdcEntityFlowBuckets.totalValue}) filter (where ${usdcEntityFlowBuckets.direction} = 'in'), 0)::text`,
+        outflowValue: sql<string>`coalesce(sum(${usdcEntityFlowBuckets.totalValue}) filter (where ${usdcEntityFlowBuckets.direction} = 'out'), 0)::text`,
+      })
+      .from(usdcEntityFlowBuckets)
+      .where(
+        and(
+          eq(usdcEntityFlowBuckets.bucketSize, oneMinuteBucketSize),
+          eq(usdcEntityFlowBuckets.entityId, entityId),
+          gte(usdcEntityFlowBuckets.bucketStart, BigInt(window.bucketStartSeconds)),
+          lt(usdcEntityFlowBuckets.bucketStart, BigInt(window.bucketEndSeconds)),
+        ),
+      )
+      .groupBy(usdcEntityFlowBuckets.bucketStart)
+      .orderBy(asc(usdcEntityFlowBuckets.bucketStart));
+  }
+
+  private async listBridgeNetBucketRows(
+    window: GraphWindow,
+  ): Promise<BridgeNetBucketAggregateRow[]> {
+    return this.databaseService.db
+      .select({
+        bucketStart: sql<string>`${usdcBridgeFlowBuckets.bucketStart}::text`,
+        inboundValue: sql<string>`coalesce(sum(${usdcBridgeFlowBuckets.totalValue}) filter (where ${usdcBridgeFlowBuckets.direction} = 'inbound'), 0)::text`,
+        outboundValue: sql<string>`coalesce(sum(${usdcBridgeFlowBuckets.totalValue}) filter (where ${usdcBridgeFlowBuckets.direction} = 'outbound'), 0)::text`,
+      })
+      .from(usdcBridgeFlowBuckets)
+      .where(
+        and(
+          eq(usdcBridgeFlowBuckets.bucketSize, oneMinuteBucketSize),
+          gte(usdcBridgeFlowBuckets.bucketStart, BigInt(window.bucketStartSeconds)),
+          lt(usdcBridgeFlowBuckets.bucketStart, BigInt(window.bucketEndSeconds)),
+        ),
+      )
+      .groupBy(usdcBridgeFlowBuckets.bucketStart)
+      .orderBy(asc(usdcBridgeFlowBuckets.bucketStart));
+  }
 }
+
+const toKpiWindow = (window: GraphWindow): FlowKpiCard["window"] => ({
+  bucketEnd: new Date(window.bucketEndSeconds * 1000).toISOString(),
+  bucketStart: new Date(window.bucketStartSeconds * 1000).toISOString(),
+  minutes: window.minutes,
+});
+
+const getPreviousBucketWindow = (window: GraphWindow): GraphWindow => {
+  const durationSeconds = window.minutes * 60;
+
+  return {
+    bucketEndSeconds: window.bucketStartSeconds,
+    bucketStartSeconds: window.bucketStartSeconds - durationSeconds,
+    minutes: window.minutes,
+  };
+};
+
+const toUsdcKpiValue = (value: bigint): FlowKpiCard["value"] => ({
+  formatted: toTokenAmount(value).formatted,
+  kind: "usdc",
+  raw: value.toString(),
+});
+
+const toCountKpiValue = (value: bigint): FlowKpiCard["value"] => ({
+  formatted: value.toString(),
+  kind: "count",
+  raw: value.toString(),
+});
+
+const toKpiSeries = <TRow>(
+  window: GraphWindow,
+  rows: TRow[],
+  {
+    getBucketStartSeconds,
+    getValue,
+    valueFormatter,
+  }: {
+    getBucketStartSeconds: (row: TRow) => number;
+    getValue: (row: TRow) => bigint;
+    valueFormatter: (value: bigint) => string;
+  },
+): FlowKpiCard["series"] => {
+  const valuesByBucketStart = new Map<number, bigint>();
+
+  for (const row of rows) {
+    const bucketStartSeconds = getBucketStartSeconds(row);
+    const currentValue = valuesByBucketStart.get(bucketStartSeconds) ?? 0n;
+    valuesByBucketStart.set(bucketStartSeconds, currentValue + getValue(row));
+  }
+
+  const bucketStepMinutes = Math.max(1, Math.ceil(window.minutes / flowKpiMaxSeriesPoints));
+  const points: FlowKpiCard["series"] = [];
+
+  for (let offsetMinutes = 0; offsetMinutes < window.minutes; offsetMinutes += bucketStepMinutes) {
+    let value = 0n;
+    const bucketEndOffsetMinutes = Math.min(offsetMinutes + bucketStepMinutes, window.minutes);
+
+    for (
+      let bucketOffsetMinutes = offsetMinutes;
+      bucketOffsetMinutes < bucketEndOffsetMinutes;
+      bucketOffsetMinutes += 1
+    ) {
+      const bucketStartSeconds = window.bucketStartSeconds + bucketOffsetMinutes * 60;
+      value += valuesByBucketStart.get(bucketStartSeconds) ?? 0n;
+    }
+
+    points.push({
+      timestamp: new Date((window.bucketStartSeconds + offsetMinutes * 60) * 1000).toISOString(),
+      value: valueFormatter(value),
+    });
+  }
+
+  return points;
+};
+
+const formatUsdcSeriesValue = (value: bigint) => toTokenAmount(value).formatted;
+
+const toPercentDelta = (
+  currentValue: bigint,
+  previousValue: bigint,
+  comparisonLabel: string,
+): FlowKpiDelta => ({
+  label: toPercentDeltaLabel(currentValue, previousValue, comparisonLabel),
+  trend: currentValue > previousValue ? "up" : currentValue < previousValue ? "down" : "flat",
+});
+
+const toPercentDeltaLabel = (
+  currentValue: bigint,
+  previousValue: bigint,
+  comparisonLabel: string,
+) => {
+  if (previousValue === 0n) {
+    return currentValue === 0n ? `0.0% ${comparisonLabel}` : `new ${comparisonLabel}`;
+  }
+
+  const percent = (Number(currentValue - previousValue) / Number(previousValue)) * 100;
+
+  if (!Number.isFinite(percent)) {
+    return `changed ${comparisonLabel}`;
+  }
+
+  const sign = percent > 0 ? "+" : "";
+
+  return `${sign}${percent.toFixed(1)}% ${comparisonLabel}`;
+};
+
+const toSignedTone = (value: bigint): FlowKpiCard["tone"] => {
+  if (value > 0n) {
+    return "inflow";
+  }
+
+  if (value < 0n) {
+    return "outflow";
+  }
+
+  return "neutral";
+};
+
+const toSignedTrend = (value: bigint): FlowKpiDelta["trend"] => {
+  if (value > 0n) {
+    return "up";
+  }
+
+  if (value < 0n) {
+    return "down";
+  }
+
+  return "flat";
+};
+
+const toNetFlowLabel = (value: bigint) => {
+  if (value < 0n) {
+    return "net outflow";
+  }
+
+  if (value > 0n) {
+    return "net inflow";
+  }
+
+  return "balanced flow";
+};
+
+const toEntityNetValue = (row: EntityNetBucketAggregateRow) =>
+  BigInt(row.inflowValue) - BigInt(row.outflowValue);
+
+const toBridgeNetValue = (row: BridgeNetBucketAggregateRow) =>
+  BigInt(row.inboundValue) - BigInt(row.outboundValue);
+
+const sumBigInt = <TRow>(rows: TRow[], getValue: (row: TRow) => bigint) =>
+  rows.reduce((total, row) => total + getValue(row), 0n);
 
 const buildFlowGraph = (
   entityPairRows: EntityPairFlowAggregateRow[],

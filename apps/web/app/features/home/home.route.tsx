@@ -1,5 +1,6 @@
 import type {
   FlowGraphResponse,
+  FlowKpisResponse,
   RecentTransfersResponse,
   TopEntityFlowsResponse,
 } from "@stableflow/shared";
@@ -9,6 +10,7 @@ import { useLoaderData } from "react-router";
 import { AppHeader } from "../../components/header";
 import { AppSidebar } from "../../components/sidebar";
 import { getApiUrl } from "../../config/api.server";
+import { FlowKpis } from "../flow-kpis/flow-kpis";
 import {
   appendLiveTransferGraphSearchParams,
   defaultLiveTransferGraphWindow,
@@ -38,6 +40,7 @@ export function meta() {
 }
 
 interface HomeLoaderData {
+  flowKpis: FlowKpisResponse;
   liveTransferGraph: FlowGraphResponse;
   topEntityFlows: TopEntityFlowsResponse;
   transfers: RecentTransfersResponse;
@@ -45,6 +48,7 @@ interface HomeLoaderData {
 
 export async function loader({ request }: { request: Request }): Promise<HomeLoaderData> {
   const requestUrl = new URL(request.url);
+  const flowKpisUrl = new URL(getApiUrl("/flows/kpis"));
   const liveTransferGraphUrl = new URL(getApiUrl("/flows/live-graph"));
   const topEntityFlowsUrl = new URL(getApiUrl("/flows/top-entities"));
 
@@ -57,26 +61,33 @@ export async function loader({ request }: { request: Request }): Promise<HomeLoa
     windowMinutes: normalizeTopEntityFlowWindow(requestUrl.searchParams.get("windowMinutes")),
   });
 
-  const [transfersResponse, topEntityFlowsResponse, liveTransferGraphResponse] = await Promise.all([
-    fetch(getApiUrl("/transfers/recent?limit=20"), {
-      headers: {
-        accept: "application/json",
-      },
-      signal: request.signal,
-    }),
-    fetch(topEntityFlowsUrl, {
-      headers: {
-        accept: "application/json",
-      },
-      signal: request.signal,
-    }),
-    fetch(liveTransferGraphUrl, {
-      headers: {
-        accept: "application/json",
-      },
-      signal: request.signal,
-    }),
-  ]);
+  const [transfersResponse, topEntityFlowsResponse, liveTransferGraphResponse, flowKpisResponse] =
+    await Promise.all([
+      fetch(getApiUrl("/transfers/recent?limit=20"), {
+        headers: {
+          accept: "application/json",
+        },
+        signal: request.signal,
+      }),
+      fetch(topEntityFlowsUrl, {
+        headers: {
+          accept: "application/json",
+        },
+        signal: request.signal,
+      }),
+      fetch(liveTransferGraphUrl, {
+        headers: {
+          accept: "application/json",
+        },
+        signal: request.signal,
+      }),
+      fetch(flowKpisUrl, {
+        headers: {
+          accept: "application/json",
+        },
+        signal: request.signal,
+      }),
+    ]);
 
   if (!transfersResponse.ok) {
     throw new Response("Unable to load recent transfers", {
@@ -99,7 +110,15 @@ export async function loader({ request }: { request: Request }): Promise<HomeLoa
     });
   }
 
+  if (!flowKpisResponse.ok) {
+    throw new Response("Unable to load flow KPI cards", {
+      status: flowKpisResponse.status,
+      statusText: flowKpisResponse.statusText,
+    });
+  }
+
   return {
+    flowKpis: (await flowKpisResponse.json()) as FlowKpisResponse,
     liveTransferGraph: (await liveTransferGraphResponse.json()) as FlowGraphResponse,
     topEntityFlows: (await topEntityFlowsResponse.json()) as TopEntityFlowsResponse,
     transfers: (await transfersResponse.json()) as RecentTransfersResponse,
@@ -151,6 +170,8 @@ export default function Home() {
         aria-labelledby="home-title"
       >
         <AppHeader />
+
+        <FlowKpis initialKpis={loaderData.flowKpis} />
 
         <div className="grid gap-3.5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(28rem,0.8fr)]">
           <div className="flex min-w-0 flex-col gap-3.5">

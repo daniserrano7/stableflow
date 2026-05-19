@@ -28,6 +28,11 @@ const flowGraphQuerySchema = z
 export class FlowsController {
   constructor(private readonly flowsService: FlowsService) {}
 
+  @Get("kpis")
+  listFlowKpis() {
+    return this.flowsService.listFlowKpis();
+  }
+
   @Get("live-graph")
   listFlowGraph(@Query() query: Record<string, unknown>) {
     const parsedQuery = flowGraphQuerySchema.safeParse(query);

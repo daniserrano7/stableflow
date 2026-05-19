@@ -142,6 +142,55 @@ export interface FlowGraphResponse {
   };
 }
 
+export type FlowKpiCardId =
+  | "usdc-volume-24h"
+  | "transfers-1h"
+  | "top-net-mover-15m"
+  | "bridge-net-flow-24h";
+
+export type FlowKpiTone = "accent" | "inflow" | "outflow" | "neutral";
+
+export type FlowKpiTrend = "down" | "flat" | "up";
+
+export type FlowKpiValueKind = "count" | "usdc";
+
+export interface FlowKpiValue {
+  formatted: string;
+  kind: FlowKpiValueKind;
+  raw: string;
+}
+
+export interface FlowKpiDelta {
+  label: string;
+  trend: FlowKpiTrend;
+}
+
+export interface FlowKpiSeriesPoint {
+  timestamp: string;
+  value: string;
+}
+
+export interface FlowKpiCard {
+  delta: FlowKpiDelta | null;
+  id: FlowKpiCardId;
+  label: string;
+  series: FlowKpiSeriesPoint[];
+  tone: FlowKpiTone;
+  value: FlowKpiValue;
+  window: {
+    bucketEnd: string;
+    bucketStart: string;
+    minutes: number;
+  };
+}
+
+export interface FlowKpisResponse {
+  data: FlowKpiCard[];
+  meta: {
+    generatedAt: string;
+  };
+}
+
 export type TopEntityFlowMode = "net" | "inflow" | "outflow";
 
 export interface TopEntityFlowAmount {
