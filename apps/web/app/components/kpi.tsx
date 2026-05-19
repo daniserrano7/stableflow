@@ -27,15 +27,15 @@ function KPI({
   return (
     <div
       className={cn(
-        'relative flex w-full items-end justify-between gap-1.5 overflow-hidden rounded-lg border border-border bg-glass px-4 py-3.5 [backdrop-filter:var(--blur-glass)] [-webkit-backdrop-filter:var(--blur-glass)]',
+        'relative w-full grid grid-cols-[auto_120px] gap-y-8 justify-between gap-1.5 overflow-hidden rounded-lg border border-border bg-glass px-4 py-3.5 [backdrop-filter:var(--blur-glass)] [-webkit-backdrop-filter:var(--blur-glass)]',
         className,
       )}
       {...props}
     >
-      <div>
-        <div className="flex flex-wrap items-center gap-1.5 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
-          {label}
-        </div>
+      <div className="flex flex-wrap col-span-2 items-center gap-1.5 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
+        {label}
+      </div>
+      <div className="flex flex-col items-start">
         <div className="mt-1.5 flex items-baseline gap-1.5 font-medium text-2xl tabular-nums tracking-normal">
           {value}
           {unit && (
