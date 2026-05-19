@@ -15,11 +15,19 @@ const deltaTrendClasses = {
   up: 'text-inflow',
 } satisfies Record<NonNullable<KPIProps['delta']>['trend'], string>;
 
-function KPI({ className, delta, label, spark, unit, value, ...props }: KPIProps) {
+function KPI({
+  className,
+  delta,
+  label,
+  spark,
+  unit,
+  value,
+  ...props
+}: KPIProps) {
   return (
     <div
       className={cn(
-        'relative flex w-full items-center justify-between gap-1.5 overflow-hidden rounded-lg border border-border bg-glass px-4 py-3.5 [backdrop-filter:var(--blur-glass)] [-webkit-backdrop-filter:var(--blur-glass)]',
+        'relative flex w-full items-end justify-between gap-1.5 overflow-hidden rounded-lg border border-border bg-glass px-4 py-3.5 [backdrop-filter:var(--blur-glass)] [-webkit-backdrop-filter:var(--blur-glass)]',
         className,
       )}
       {...props}
@@ -30,7 +38,11 @@ function KPI({ className, delta, label, spark, unit, value, ...props }: KPIProps
         </div>
         <div className="mt-1.5 flex items-baseline gap-1.5 font-medium text-2xl tabular-nums tracking-normal">
           {value}
-          {unit && <span className="font-normal text-muted-foreground text-sm">{unit}</span>}
+          {unit && (
+            <span className="font-normal text-muted-foreground text-sm">
+              {unit}
+            </span>
+          )}
         </div>
         {delta && (
           <div
@@ -45,7 +57,7 @@ function KPI({ className, delta, label, spark, unit, value, ...props }: KPIProps
           </div>
         )}
       </div>
-      {spark && <div className="pointer-events-none w-full flex-1">{spark}</div>}
+      {spark && <div className="pointer-events-none">{spark}</div>}
     </div>
   );
 }
@@ -53,9 +65,9 @@ function KPI({ className, delta, label, spark, unit, value, ...props }: KPIProps
 function Sparkline({
   color = 'var(--accent)',
   data,
-  height = 36,
+  height = 56,
   strokeWidth = 1.4,
-  width = 84,
+  width = 120,
 }: {
   data: number[];
   color?: string;
