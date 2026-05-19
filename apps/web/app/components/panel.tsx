@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { Card, CardContent, CardTitle } from "~/components/ui/card";
 import { cn } from "~/utils/cn";
 
@@ -9,10 +9,9 @@ export interface PanelProps extends React.ComponentPropsWithoutRef<typeof Card> 
 const panelGlassClasses =
   "[backdrop-filter:var(--blur-glass)] [-webkit-backdrop-filter:var(--blur-glass)]";
 
-const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
-  ({ className, noBlur, ...props }, ref) => (
+function Panel({ className, noBlur, ...props }: PanelProps) {
+  return (
     <Card
-      ref={ref}
       className={cn(
         "relative overflow-hidden rounded-lg border-border bg-glass shadow-sm",
         !noBlur && panelGlassClasses,
@@ -20,32 +19,28 @@ const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
       )}
       {...props}
     />
-  ),
-);
-Panel.displayName = "Panel";
+  );
+}
 
-const PanelHead = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+function PanelHead({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
     <div
-      ref={ref}
       className={cn(
         "flex items-center justify-between border-border border-b px-3.5 py-3",
         className,
       )}
       {...props}
     />
-  ),
-);
-PanelHead.displayName = "PanelHead";
+  );
+}
 
 export interface PanelTitleProps extends React.ComponentPropsWithoutRef<typeof CardTitle> {
   live?: boolean;
 }
 
-const PanelTitle = React.forwardRef<HTMLDivElement, PanelTitleProps>(
-  ({ children, className, live, ...props }, ref) => (
+function PanelTitle({ children, className, live, ...props }: PanelTitleProps) {
+  return (
     <CardTitle
-      ref={ref}
       className={cn(
         "flex items-center gap-2 font-mono text-muted-foreground text-sm uppercase tracking-[0.06em]",
         className,
@@ -60,22 +55,15 @@ const PanelTitle = React.forwardRef<HTMLDivElement, PanelTitleProps>(
       )}
       {children}
     </CardTitle>
-  ),
-);
-PanelTitle.displayName = "PanelTitle";
+  );
+}
 
-const PanelActions = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex gap-1.5", className)} {...props} />
-  ),
-);
-PanelActions.displayName = "PanelActions";
+function PanelActions({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("flex gap-1.5", className)} {...props} />;
+}
 
-const PanelBody = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof CardContent>>(
-  ({ className, ...props }, ref) => (
-    <CardContent ref={ref} className={cn("p-4", className)} {...props} />
-  ),
-);
-PanelBody.displayName = "PanelBody";
+function PanelBody({ className, ...props }: React.ComponentPropsWithoutRef<typeof CardContent>) {
+  return <CardContent className={cn("p-4", className)} {...props} />;
+}
 
 export { Panel, PanelActions, PanelBody, PanelHead, PanelTitle };

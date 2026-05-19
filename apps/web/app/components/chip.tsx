@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Badge, type BadgeProps } from "~/components/ui/badge";
 import { cn } from "~/utils/cn";
 
@@ -10,10 +9,9 @@ export interface ChipProps extends BadgeProps {
 const chipClasses =
   "inline-flex items-center gap-[7px] rounded-full border border-border bg-surface-2 px-2.5 py-1.5 font-mono text-muted-foreground text-xs tracking-[0.02em]";
 
-const Chip = React.forwardRef<HTMLSpanElement, ChipProps>(
-  ({ children, className, dotColor, pulse = true, ...props }, ref) => (
+function Chip({ children, className, dotColor, pulse = true, ...props }: ChipProps) {
+  return (
     <Badge
-      ref={ref}
       className={cn(chipClasses, className)}
       size="unstyled"
       variant="unstyled"
@@ -36,8 +34,7 @@ const Chip = React.forwardRef<HTMLSpanElement, ChipProps>(
       />
       {children}
     </Badge>
-  ),
-);
-Chip.displayName = "Chip";
+  );
+}
 
 export { Chip };

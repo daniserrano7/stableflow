@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { cn } from "~/utils/cn";
 
 export interface FlowBarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -17,10 +17,9 @@ const flowFillClasses = {
     "bg-[linear-gradient(90deg,color-mix(in_oklch,var(--outflow)_35%,transparent),var(--outflow))]",
 } satisfies Record<FlowBarProps["trend"], string>;
 
-const FlowBar = React.forwardRef<HTMLDivElement, FlowBarProps>(
-  ({ className, trend, value, ...props }, ref) => (
+function FlowBar({ className, trend, value, ...props }: FlowBarProps) {
+  return (
     <div
-      ref={ref}
       className={cn("relative h-2 overflow-hidden rounded-full bg-surface-2", className)}
       {...props}
     >
@@ -33,8 +32,7 @@ const FlowBar = React.forwardRef<HTMLDivElement, FlowBarProps>(
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
-  ),
-);
-FlowBar.displayName = "FlowBar";
+  );
+}
 
 export { FlowBar };

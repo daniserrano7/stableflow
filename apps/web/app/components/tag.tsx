@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Badge, type BadgeProps } from "~/components/ui/badge";
 import type { Category } from "~/styles/tokens";
 import { cn } from "~/utils/cn";
@@ -25,10 +24,9 @@ const tagCategoryClasses: Record<Category, string> = {
   wallet: "text-cat-wallet",
 };
 
-const Tag = React.forwardRef<HTMLSpanElement, TagProps>(
-  ({ category, children, className, ...props }, ref) => (
+function Tag({ category, children, className, ...props }: TagProps) {
+  return (
     <Badge
-      ref={ref}
       className={cn(
         "rounded-full border border-border bg-surface-2 px-[7px] py-[3px] font-mono text-[9px] text-muted-foreground uppercase tracking-[0.04em]",
         category && tagCategoryClasses[category],
@@ -41,8 +39,7 @@ const Tag = React.forwardRef<HTMLSpanElement, TagProps>(
     >
       {children ?? (category ? label[category] : null)}
     </Badge>
-  ),
-);
-Tag.displayName = "Tag";
+  );
+}
 
 export { Tag };

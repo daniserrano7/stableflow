@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { cn } from "~/utils/cn";
 
 export type AnomalyKind = "whale" | "spike" | "drain";
@@ -16,13 +16,17 @@ const anomalyKindClasses = {
   whale: "border-whale/40 bg-whale-soft text-whale",
 } satisfies Record<AnomalyKind, string>;
 
-const AnomalyItem = React.forwardRef<HTMLDivElement, AnomalyItemProps>(
-  ({ children, className, kind, meta, time, verb, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn("border-border border-b px-3.5 py-3 animate-slide-in", className)}
-      {...props}
-    >
+function AnomalyItem({
+  children,
+  className,
+  kind,
+  meta,
+  time,
+  verb,
+  ...props
+}: AnomalyItemProps) {
+  return (
+    <div className={cn("border-border border-b px-3.5 py-3 animate-slide-in", className)} {...props}>
       <div className="mb-1.5 flex items-center gap-2">
         <span
           className={cn(
@@ -40,8 +44,7 @@ const AnomalyItem = React.forwardRef<HTMLDivElement, AnomalyItemProps>(
         <div className="mt-1.5 flex gap-2.5 font-mono text-2xs text-muted-foreground">{meta}</div>
       )}
     </div>
-  ),
-);
-AnomalyItem.displayName = "AnomalyItem";
+  );
+}
 
 export { AnomalyItem };

@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { classifyAmount } from "~/styles/tokens";
 import { cn } from "~/utils/cn";
 import { fmtUSDC } from "~/utils/format";
@@ -21,29 +21,25 @@ const trendClasses = {
   up: "text-inflow",
 } satisfies Record<NonNullable<AmountProps["trend"]>, string>;
 
-const Amount = React.forwardRef<HTMLSpanElement, AmountProps>(
-  ({ className, magnitude, trend, unit = "USDC", value, ...props }, ref) => {
-    const mag = magnitude ?? classifyAmount(Math.abs(value));
+function Amount({ className, magnitude, trend, unit = "USDC", value, ...props }: AmountProps) {
+  const mag = magnitude ?? classifyAmount(Math.abs(value));
 
-    return (
-      <span
-        ref={ref}
-        className={cn(
-          "inline-flex items-baseline gap-1 font-mono font-medium tabular-nums",
-          magnitudeClasses[mag],
-          trend && trendClasses[trend],
-          className,
-        )}
-        data-magnitude={mag}
-        data-trend={trend}
-        {...props}
-      >
-        {fmtUSDC(value)}
-        {unit && <span className="text-2xs text-muted-foreground">{unit}</span>}
-      </span>
-    );
-  },
-);
-Amount.displayName = "Amount";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-baseline gap-1 font-mono font-medium tabular-nums",
+        magnitudeClasses[mag],
+        trend && trendClasses[trend],
+        className,
+      )}
+      data-magnitude={mag}
+      data-trend={trend}
+      {...props}
+    >
+      {fmtUSDC(value)}
+      {unit && <span className="text-2xs text-muted-foreground">{unit}</span>}
+    </span>
+  );
+}
 
 export { Amount };

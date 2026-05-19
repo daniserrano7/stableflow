@@ -1,4 +1,4 @@
-import * as React from 'react';
+import type * as React from 'react';
 import { cn } from '~/utils/cn';
 
 export interface KPIProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -15,10 +15,9 @@ const deltaTrendClasses = {
   up: 'text-inflow',
 } satisfies Record<NonNullable<KPIProps['delta']>['trend'], string>;
 
-const KPI = React.forwardRef<HTMLDivElement, KPIProps>(
-  ({ className, delta, label, spark, unit, value, ...props }, ref) => (
+function KPI({ className, delta, label, spark, unit, value, ...props }: KPIProps) {
+  return (
     <div
-      ref={ref}
       className={cn(
         'relative flex w-full items-center justify-between gap-1.5 overflow-hidden rounded-lg border border-border bg-glass px-4 py-3.5 [backdrop-filter:var(--blur-glass)] [-webkit-backdrop-filter:var(--blur-glass)]',
         className,
@@ -48,9 +47,8 @@ const KPI = React.forwardRef<HTMLDivElement, KPIProps>(
       </div>
       {spark && <div className="pointer-events-none w-full flex-1">{spark}</div>}
     </div>
-  ),
-);
-KPI.displayName = 'KPI';
+  );
+}
 
 function Sparkline({
   color = 'var(--accent)',
