@@ -32,7 +32,7 @@ function KPI({
       )}
       {...props}
     >
-      <div className="flex flex-wrap col-span-2 items-center gap-1.5 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
+      <div className="flex flex-wrap col-span-2 items-center justify-between gap-1.5 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
         {label}
       </div>
       <div className="flex flex-col items-start">
@@ -57,7 +57,9 @@ function KPI({
           </div>
         )}
       </div>
-      {spark && <div className="pointer-events-none">{spark}</div>}
+      {spark && (
+        <div className="pointer-events-none flex items-end">{spark}</div>
+      )}
     </div>
   );
 }

@@ -137,7 +137,12 @@ export default function Entities() {
             {entities.data.map((entity) => (
               <tr key={entity.entityId}>
                 <td className="min-w-0 border-border border-b bg-glass p-3.5 text-left align-top">
-                  <strong>{entity.entityName}</strong>
+                  <Link
+                    className="font-semibold text-foreground no-underline hover:text-accent"
+                    to={`/entities/${entity.entityId}`}
+                  >
+                    {entity.entityName}
+                  </Link>
                   <small className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">
                     {entity.entityId}
                   </small>

@@ -1,11 +1,11 @@
 import { BarChart3, Blocks, Coins, Link2, Network, Settings } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Link, useLocation } from "react-router";
 import { cn } from "../utils/cn";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 const sidebarItems = [
-  { href: "/", icon: Network, isActive: true, label: "Flow" },
+  { href: "/", icon: Network, label: "Flow" },
   { href: "/entities", icon: Blocks, label: "Entities" },
   { href: "/", icon: Coins, label: "Assets" },
   { href: "/", icon: Link2, label: "Chains" },
@@ -13,6 +13,8 @@ const sidebarItems = [
 ];
 
 export function AppSidebar() {
+  const { pathname } = useLocation();
+
   return (
     <aside
       className="sticky top-0 z-10 flex h-screen flex-col items-center border-border border-r bg-glass py-3.5 backdrop-blur-xl backdrop-saturate-150"
@@ -34,7 +36,7 @@ export function AppSidebar() {
             <SidebarItem
               hasBadge={item.hasBadge}
               icon={<Icon size={16} strokeWidth={1.6} />}
-              isActive={item.isActive}
+              isActive={isSidebarItemActive(pathname, item.href, item.label)}
               key={item.label}
               label={item.label}
               to={item.href}
@@ -52,6 +54,14 @@ export function AppSidebar() {
       />
     </aside>
   );
+}
+
+function isSidebarItemActive(pathname: string, href: string, label: string) {
+  if (href === "/") {
+    return label === "Flow" && pathname === "/";
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function SidebarItem({

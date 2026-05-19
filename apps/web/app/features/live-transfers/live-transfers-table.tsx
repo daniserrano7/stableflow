@@ -1,5 +1,6 @@
 import type { LiveTransferParty, LiveTransferRow } from "@stableflow/shared";
 import { ArrowRight, CircleDollarSign } from "lucide-react";
+import { Link } from "react-router";
 import { Amount, Entity, Panel, PanelActions, PanelHead, PanelTitle, Tag } from "~/components";
 import {
   Table,
@@ -17,8 +18,8 @@ import {
   getTransferCategory,
   getTransferMagnitude,
   isTransferFilter,
-  transferFilterOptions,
   type TransferFilter,
+  transferFilterOptions,
 } from "./live-transfers.utils";
 
 interface LiveTransfersTableProps {
@@ -138,13 +139,25 @@ export function LiveTransfersTable({
 
 function TransferEntity({ party }: { party: LiveTransferParty }) {
   const category = getPartyCategory(party);
-
-  return (
+  const entity = (
     <Entity
       category={category}
       glyph={getEntityGlyph(party, category)}
       isWallet={!party.isIdentified}
       name={party.displayName}
     />
+  );
+
+  if (party.entityId === null) {
+    return entity;
+  }
+
+  return (
+    <Link
+      className="text-foreground no-underline hover:text-accent"
+      to={`/entities/${party.entityId}`}
+    >
+      {entity}
+    </Link>
   );
 }
