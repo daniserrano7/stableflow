@@ -18,7 +18,7 @@
     "check": "pnpm typecheck",
     "check:env": "tsc -p tsconfig.env.json && node --env-file-if-exists=.env --env-file-if-exists=.env.local dist/env-check/src/env/check-env.js",
     "codegen": "PONDER_TELEMETRY_DISABLED=1 ponder codegen",
-    "dev-dangerously": "DATABASE_SCHEMA=${DATABASE_SCHEMA:-public} PONDER_TELEMETRY_DISABLED=1 ponder dev",
+    "dev": "DATABASE_SCHEMA=${DATABASE_SCHEMA:-public} PONDER_TELEMETRY_DISABLED=1 ponder dev",
     "inspect:build": "tsc -p tsconfig.inspection.json",
     "inspect:flows": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/flows.js",
     "inspect:reconcile": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/reconcile.js",

@@ -45,6 +45,83 @@ export interface EntityListResponse {
   };
 }
 
+export interface EntityDetailWindow {
+  bucketEnd: string;
+  bucketStart: string;
+  minutes: number;
+}
+
+export interface EntityDetailAmount {
+  currency: StablecoinSymbol;
+  formatted: string;
+  raw: string;
+}
+
+export interface EntityAddressLabel {
+  address: string;
+  attributionGroup: string;
+  category: EntityCategory;
+  confidence: string;
+  countingPolicy: string;
+  entityId: string;
+  entityName: string;
+  firstSeenBlock: string | null;
+  label: string | null;
+  logIndex: number | null;
+  poolKind: string | null;
+  role: string;
+  sourceAddress: string | null;
+  sourceEvent: string;
+  sourceType: string;
+  token0: string | null;
+  token1: string | null;
+  transactionHash: string | null;
+}
+
+export interface EntityFlowSummary {
+  inflow: EntityDetailAmount;
+  inflowTransferCount: number;
+  net: EntityDetailAmount;
+  outflow: EntityDetailAmount;
+  outflowTransferCount: number;
+  transferCount: number;
+  window: EntityDetailWindow;
+}
+
+export interface EntityCounterpartyFlow {
+  category: EntityCategory;
+  entityId: string;
+  entityName: string;
+  inflow: EntityDetailAmount;
+  net: EntityDetailAmount;
+  outflow: EntityDetailAmount;
+  rank: number;
+  relativeShare: number;
+  transferCount: number;
+}
+
+export interface EntityDetailSummary extends EntitySummary {
+  attributionGroups: string[];
+}
+
+export interface EntityDetailResponse {
+  data: {
+    addressLabels: EntityAddressLabel[];
+    counterparties: EntityCounterpartyFlow[];
+    entity: EntityDetailSummary;
+    flow: EntityFlowSummary;
+    recentTransfers: LiveTransferRow[];
+  };
+  meta: {
+    generatedAt: string;
+    limits: {
+      counterparties: number;
+      recentTransfers: number;
+    };
+    window: EntityDetailWindow;
+  };
+}
+
 export interface LiveTransferParty {
   address: string;
   category: EntityCategory;

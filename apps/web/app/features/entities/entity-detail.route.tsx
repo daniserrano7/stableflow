@@ -1,8 +1,19 @@
-import type { EntityCategory } from "@stableflow/shared";
+import type {
+  EntityAddressLabel,
+  EntityCounterpartyFlow,
+  EntityDetailAmount,
+  EntityDetailResponse,
+  EntityDetailSummary,
+  EntityFlowSummary,
+  LiveTransferParty,
+  LiveTransferRow,
+} from "@stableflow/shared";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Blocks,
+  CircleDotDashed,
   CircleHelp,
   Copy,
   Database,
@@ -11,8 +22,14 @@ import {
   Network,
   ShieldCheck,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import {
+  Link,
+  type ShouldRevalidateFunctionArgs,
+  useLoaderData,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import {
   Amount,
   Entity,
@@ -37,103 +54,27 @@ import {
 } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
+import { getApiUrl } from "~/config/api.server";
 import { CATEGORY, type Category } from "~/styles/tokens";
 import { cn } from "~/utils/cn";
 import { shortAddr } from "~/utils/format";
+import {
+  appendEntityDetailSearchParams,
+  type EntityDetailWindow,
+  entityDetailSearchParamNames,
+  entityDetailWindowOptions,
+  normalizeEntityDetailWindow,
+} from "./entity-detail.params";
+import {
+  entityDetailQueryKey,
+  entityDetailRefreshIntervalMs,
+  fetchEntityDetail,
+  getMatchingInitialEntityDetail,
+} from "./entity-detail.query";
 
-type FlowMode = "net" | "inflow" | "outflow";
-type WindowMinutes = "5" | "60" | "1440";
-type Confidence = "candidate" | "high" | "medium";
-type CountingPolicy = "boundary" | "discovery_source" | "ignore" | "internal";
-type SourceType = "factory_event" | "onchain_state";
+type FlowMode = "net";
 
-interface EntityProfile {
-  addressLabels: AddressLabelRow[];
-  attributionGroups: string[];
-  category: EntityCategory;
-  counterparties: CounterpartyRow[];
-  entityId: string;
-  entityName: string;
-  firstSeenBlock: string;
-  flowWindows: Record<WindowMinutes, FlowWindow>;
-  labelCount: number;
-  latestLabelBlock: string;
-  recentTransfers: RecentEntityTransfer[];
-  roles: string[];
-  sourceTypes: SourceType[];
-}
-
-interface FlowWindow {
-  bucketEnd: string;
-  bucketStart: string;
-  inflow: number;
-  inflowTransferCount: number;
-  outflow: number;
-  outflowTransferCount: number;
-}
-
-interface CounterpartyRow {
-  category: EntityCategory;
-  entityId: string;
-  entityName: string;
-  inflow: number;
-  outflow: number;
-  transferCount: number;
-}
-
-interface AddressLabelRow {
-  address: string;
-  attributionGroup: string;
-  confidence: Confidence;
-  countingPolicy: CountingPolicy;
-  firstSeenBlock: string;
-  logIndex: number;
-  role: string;
-  sourceAddress: string;
-  sourceEvent: string;
-  sourceType: SourceType;
-  transactionHash: string;
-}
-
-interface RecentEntityTransfer {
-  amount: number;
-  blockNumber: string;
-  blockTimestamp: string;
-  from: TransferParty;
-  logIndex: number;
-  to: TransferParty;
-  transactionHash: string;
-}
-
-interface TransferParty {
-  address: string;
-  category: EntityCategory;
-  displayName: string;
-  entityId: string | null;
-  isIdentified: boolean;
-}
-
-const windowOptions: { label: string; value: WindowMinutes }[] = [
-  { label: "5m", value: "5" },
-  { label: "1h", value: "60" },
-  { label: "24h", value: "1440" },
-];
-
-const knownEntities = {
-  "aave-v3": { category: "lending", entityName: "Aave V3" },
-  across: { category: "bridge", entityName: "Across" },
-  aerodrome: { category: "dex", entityName: "Aerodrome" },
-  "base-native-bridge": {
-    category: "bridge",
-    entityName: "Base Native Bridge",
-  },
-  circle: { category: "stablecoin_issuer", entityName: "Circle" },
-  "circle-cctp": { category: "bridge", entityName: "Circle CCTP" },
-  "compound-v3": { category: "lending", entityName: "Compound V3" },
-  "morpho-blue": { category: "lending", entityName: "Morpho Blue" },
-  "pancakeswap-v3": { category: "dex", entityName: "PancakeSwap V3" },
-  "uniswap-v3": { category: "dex", entityName: "Uniswap V3" },
-} satisfies Record<string, { category: EntityCategory; entityName: string }>;
+const entityTransferFreshDurationMs = 900;
 
 export function meta() {
   return [
@@ -145,15 +86,108 @@ export function meta() {
   ];
 }
 
+export async function loader({
+  params,
+  request,
+}: {
+  params: { entityId?: string };
+  request: Request;
+}): Promise<EntityDetailResponse> {
+  const entityId = params.entityId;
+
+  if (entityId === undefined) {
+    throw new Response("Entity not found", { status: 404 });
+  }
+
+  const requestUrl = new URL(request.url);
+  const apiUrl = new URL(getApiUrl(`/entities/${encodeURIComponent(entityId)}`));
+
+  appendEntityDetailSearchParams(apiUrl, {
+    windowMinutes: normalizeEntityDetailWindow(requestUrl.searchParams.get("windowMinutes")),
+  });
+
+  const response = await fetch(apiUrl, {
+    headers: {
+      accept: "application/json",
+    },
+    signal: request.signal,
+  });
+
+  if (!response.ok) {
+    throw new Response(response.status === 404 ? "Entity not found" : "Unable to load entity", {
+      status: response.status,
+      statusText: response.statusText,
+    });
+  }
+
+  return response.json() as Promise<EntityDetailResponse>;
+}
+
+export function shouldRevalidate({
+  currentUrl,
+  defaultShouldRevalidate,
+  nextUrl,
+}: ShouldRevalidateFunctionArgs) {
+  if (currentUrl.pathname !== nextUrl.pathname) {
+    return defaultShouldRevalidate;
+  }
+
+  const currentNonEntityDetailSearch = getSearchWithoutEntityDetailParams(currentUrl);
+  const nextNonEntityDetailSearch = getSearchWithoutEntityDetailParams(nextUrl);
+  const hasEntityDetailSearchChange = entityDetailSearchParamNames.some(
+    (name) => currentUrl.searchParams.get(name) !== nextUrl.searchParams.get(name),
+  );
+
+  if (hasEntityDetailSearchChange && currentNonEntityDetailSearch === nextNonEntityDetailSearch) {
+    return false;
+  }
+
+  return defaultShouldRevalidate;
+}
+
 export default function EntityDetail() {
+  const initialDetail = useLoaderData<typeof loader>();
   const params = useParams();
-  const entityId = params.entityId ?? "aerodrome";
-  const profile = useMemo(() => buildEntityProfile(entityId), [entityId]);
-  const [windowMinutes, setWindowMinutes] = useState<WindowMinutes>("60");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const entityId = params.entityId ?? initialDetail.data.entity.entityId;
+  const windowMinutes = normalizeEntityDetailWindow(
+    searchParams.get("windowMinutes") ?? initialDetail.meta.window.minutes.toString(),
+  );
+  const initialData = getMatchingInitialEntityDetail(initialDetail, {
+    entityId,
+    windowMinutes,
+  });
+  const detailQuery = useQuery({
+    initialData,
+    initialDataUpdatedAt:
+      initialData === undefined ? undefined : Date.parse(initialData.meta.generatedAt),
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => fetchEntityDetail({ entityId, signal, windowMinutes }),
+    queryKey: entityDetailQueryKey({ entityId, windowMinutes }),
+    refetchInterval: entityDetailRefreshIntervalMs,
+    retry: 2,
+    staleTime: 10_000,
+  });
+  const detail = detailQuery.data ?? initialDetail;
+  const entity = detail.data.entity;
+  const flow = detail.data.flow;
   const mode: FlowMode = "net";
-  const flow = profile.flowWindows[windowMinutes];
-  const net = flow.inflow - flow.outflow;
-  const transferCount = flow.inflowTransferCount + flow.outflowTransferCount;
+  const freshTransferIds = useFreshEntityTransferIds({
+    resetKey: `${entityId}:${windowMinutes}`,
+    transfers: detail.data.recentTransfers,
+  });
+
+  const updateWindow = (nextWindow: EntityDetailWindow) => {
+    setSearchParams(
+      (currentSearchParams) => {
+        const nextSearchParams = new URLSearchParams(currentSearchParams);
+        nextSearchParams.set("windowMinutes", nextWindow);
+
+        return nextSearchParams;
+      },
+      { preventScrollReset: true },
+    );
+  };
 
   return (
     <main className="grid min-h-screen grid-cols-[3.5rem_minmax(0,1fr)] bg-background text-foreground">
@@ -173,39 +207,44 @@ export default function EntityDetail() {
           title="Stableflow"
         />
 
-        <EntityHero profile={profile} />
+        <EntityHero entity={entity} />
 
-        <EntityKpiBand
-          flow={flow}
-          net={net}
-          onWindowChange={setWindowMinutes}
-          transferCount={transferCount}
-          windowMinutes={windowMinutes}
-        />
+        <div className="flex flex-col gap-3.5">
+          <EntityKpiBand flow={flow} onWindowChange={updateWindow} windowMinutes={windowMinutes} />
 
-        <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.65fr)]">
-          <EntityFlowGraph
-            mode={mode}
-            onWindowChange={setWindowMinutes}
-            profile={profile}
-            windowFlow={flow}
-            windowMinutes={windowMinutes}
-          />
+          <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.65fr)]">
+            <EntityFlowGraph
+              counterparties={detail.data.counterparties}
+              entity={entity}
+              flow={flow}
+              mode={mode}
+              onWindowChange={updateWindow}
+              windowMinutes={windowMinutes}
+            />
 
-          <div className="flex min-w-0 flex-col gap-3.5 xl:h-full">
-            <CounterpartiesPanel counterparties={profile.counterparties} mode={mode} />
-            <EvidencePanel className="xl:flex-1" labels={profile.addressLabels} profile={profile} />
+            <div className="flex min-w-0 flex-col gap-3.5 xl:h-full">
+              <CounterpartiesPanel counterparties={detail.data.counterparties} mode={mode} />
+              <EvidencePanel
+                className="xl:flex-1"
+                labels={detail.data.addressLabels}
+                entity={entity}
+              />
+            </div>
           </div>
+
+          <RecentTransfersPanel
+            freshTransferIds={freshTransferIds}
+            transfers={detail.data.recentTransfers}
+          />
         </div>
 
-        <RecentTransfersPanel transfers={profile.recentTransfers} />
-        <AddressLabelsPanel labels={profile.addressLabels} />
+        <AddressLabelsPanel labels={detail.data.addressLabels} />
 
         <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
           <span>Stableflow · v0.1.0</span>
           <span>Scope: Base + USDC</span>
           <span>
-            {profile.labelCount} labels · {profile.counterparties.length} counterparties
+            {entity.labelCount} labels · {detail.data.counterparties.length} counterparties
           </span>
         </footer>
       </section>
@@ -213,13 +252,80 @@ export default function EntityDetail() {
   );
 }
 
-function EntityHero({ profile }: { profile: EntityProfile }) {
+function useFreshEntityTransferIds({
+  resetKey,
+  transfers,
+}: {
+  resetKey: string;
+  transfers: LiveTransferRow[];
+}) {
+  const [freshTransferIds, setFreshTransferIds] = useState<ReadonlySet<string>>(() => new Set());
+  const resetKeyRef = useRef(resetKey);
+  const transferIdsRef = useRef(getTransferIds(transfers));
+  const freshTransferTimeoutsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    return () => {
+      for (const timeout of freshTransferTimeoutsRef.current) {
+        window.clearTimeout(timeout);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (resetKeyRef.current !== resetKey) {
+      resetKeyRef.current = resetKey;
+      transferIdsRef.current = getTransferIds(transfers);
+      setFreshTransferIds(new Set());
+
+      for (const timeout of freshTransferTimeoutsRef.current) {
+        window.clearTimeout(timeout);
+      }
+
+      freshTransferTimeoutsRef.current.clear();
+      return;
+    }
+
+    const nextFreshTransferIds = transfers
+      .filter((transfer) => !transferIdsRef.current.has(transfer.id))
+      .map((transfer) => transfer.id);
+
+    transferIdsRef.current = getTransferIds(transfers);
+
+    if (nextFreshTransferIds.length === 0) {
+      return;
+    }
+
+    setFreshTransferIds((currentFreshIds) => {
+      return new Set([...currentFreshIds, ...nextFreshTransferIds]);
+    });
+
+    const timeout = window.setTimeout(() => {
+      freshTransferTimeoutsRef.current.delete(timeout);
+      setFreshTransferIds((currentFreshIds) => {
+        const nextFreshIds = new Set(currentFreshIds);
+
+        for (const transferId of nextFreshTransferIds) {
+          nextFreshIds.delete(transferId);
+        }
+
+        return nextFreshIds;
+      });
+    }, entityTransferFreshDurationMs);
+
+    freshTransferTimeoutsRef.current.add(timeout);
+  }, [resetKey, transfers]);
+
+  return freshTransferIds;
+}
+
+function EntityHero({ entity }: { entity: EntityDetailSummary }) {
   const [copied, setCopied] = useState(false);
-  const category = getKnownCategory(profile.category);
-  const glyph = getEntityGlyph(profile.entityName);
+  const category = getKnownCategory(entity.category);
+  const glyph = getEntityGlyph(entity.entityName);
 
   const copyEntityId = async () => {
-    await navigator.clipboard?.writeText(profile.entityId);
+    await navigator.clipboard?.writeText(entity.entityId);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
   };
@@ -238,40 +344,34 @@ function EntityHero({ profile }: { profile: EntityProfile }) {
         <div className="flex flex-wrap items-center gap-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
           <span>Entity registry</span>
           <span className="text-muted-foreground/50">/</span>
-          <Tag category={category}>{formatCategory(profile.category)}</Tag>
+          <Tag category={category}>{formatCategory(entity.category)}</Tag>
         </div>
 
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
           <h1 id="entity-title" className="m-0 text-2xl font-medium leading-tight tracking-normal">
-            {profile.entityName}
+            {entity.entityName}
           </h1>
           <span className="inline-flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface-2 px-2.5 py-1 font-mono text-xs text-muted-foreground">
             <Hash size={12} />
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-              {profile.entityId}
+              {entity.entityId}
             </span>
           </span>
         </div>
 
         <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <HeroMetric label="Labels" value={formatInteger(profile.labelCount)} />
-          <HeroMetric label="Addresses" value={formatInteger(profile.addressLabels.length)} />
-          <HeroMetric
-            label="First label block"
-            value={formatIntegerString(profile.firstSeenBlock)}
-          />
-          <HeroMetric
-            label="Latest label block"
-            value={formatIntegerString(profile.latestLabelBlock)}
-          />
+          <HeroMetric label="Labels" value={formatInteger(entity.labelCount)} />
+          <HeroMetric label="Addresses" value={formatInteger(entity.addressCount)} />
+          <HeroMetric label="First label block" value={formatBlock(entity.firstSeenBlock)} />
+          <HeroMetric label="Latest label block" value={formatBlock(entity.latestSeenBlock)} />
           <HeroMetric
             label="Attribution groups"
-            value={formatInteger(profile.attributionGroups.length)}
+            value={formatInteger(entity.attributionGroups.length)}
           />
         </dl>
 
         <div className="mt-4 flex flex-wrap gap-1.5">
-          {profile.roles.slice(0, 6).map((role) => (
+          {entity.roles.slice(0, 6).map((role) => (
             <span
               className="rounded-sm border border-border bg-surface-3 px-2 py-1 font-mono text-2xs text-muted-foreground uppercase tracking-[0.04em]"
               key={role}
@@ -321,39 +421,26 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 
 function EntityKpiBand({
   flow,
-  net,
   onWindowChange,
-  transferCount,
   windowMinutes,
 }: {
-  flow: FlowWindow;
-  net: number;
-  onWindowChange: (windowMinutes: WindowMinutes) => void;
-  transferCount: number;
-  windowMinutes: WindowMinutes;
+  flow: EntityFlowSummary;
+  onWindowChange: (windowMinutes: EntityDetailWindow) => void;
+  windowMinutes: EntityDetailWindow;
 }) {
+  const netValue = amountToNumber(flow.net);
+
   return (
     <section
       className="overflow-hidden rounded-lg border border-border bg-glass backdrop-blur-xl backdrop-saturate-150"
       aria-label="Entity flow summary"
     >
-      <div className="flex items-center justify-end border-border border-b bg-card px-3.5 py-2.5">
-        <ToggleGroup
-          aria-label="Flow summary window"
-          type="single"
-          value={windowMinutes}
-          onValueChange={(nextWindow) => {
-            if (isWindowMinutes(nextWindow)) {
-              onWindowChange(nextWindow);
-            }
-          }}
-        >
-          {windowOptions.map((option) => (
-            <ToggleGroupItem key={option.value} value={option.value}>
-              {option.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+      <div className="flex items-center justify-start border-border border-b bg-card px-3.5 py-2.5">
+        <WindowToggle
+          ariaLabel="Flow summary window"
+          onWindowChange={onWindowChange}
+          windowMinutes={windowMinutes}
+        />
       </div>
 
       <div className="grid md:grid-cols-4">
@@ -361,29 +448,29 @@ function EntityKpiBand({
           label="Inflow"
           sub={`${formatInteger(flow.inflowTransferCount)} transfers`}
           tone="inflow"
-          value={flow.inflow}
+          value={amountToNumber(flow.inflow)}
         />
         <KpiCell
           label="Outflow"
           sub={`${formatInteger(flow.outflowTransferCount)} transfers`}
           tone="outflow"
-          value={flow.outflow}
+          value={amountToNumber(flow.outflow)}
         />
         <KpiCell
           label="Net"
           sub="Inflow minus outflow"
-          tone={net >= 0 ? "inflow" : "outflow"}
-          value={net}
+          tone={netValue >= 0 ? "inflow" : "outflow"}
+          value={netValue}
         />
         <div className="border-border border-t p-4 md:border-t-0 md:border-l">
           <p className="m-0 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
             Transfer count
           </p>
           <p className="m-0 mt-1 font-mono text-2xl font-medium tabular-nums">
-            {formatInteger(transferCount)}
+            {formatInteger(flow.transferCount)}
           </p>
           <p className="m-0 mt-1 font-mono text-2xs text-muted-foreground">
-            {formatWindowLabel(windowMinutes)} bucket window
+            {formatWindowLabel(flow.window.minutes)} bucket window
           </p>
         </div>
       </div>
@@ -421,21 +508,23 @@ function KpiCell({
 }
 
 function EntityFlowGraph({
+  counterparties,
+  entity,
+  flow,
   mode,
   onWindowChange,
-  profile,
-  windowFlow,
   windowMinutes,
 }: {
+  counterparties: EntityCounterpartyFlow[];
+  entity: EntityDetailSummary;
+  flow: EntityFlowSummary;
   mode: FlowMode;
-  onWindowChange: (windowMinutes: WindowMinutes) => void;
-  profile: EntityProfile;
-  windowFlow: FlowWindow;
-  windowMinutes: WindowMinutes;
+  onWindowChange: (windowMinutes: EntityDetailWindow) => void;
+  windowMinutes: EntityDetailWindow;
 }) {
-  const graphEdges = buildGraphEdges(profile.counterparties, mode);
+  const graphEdges = buildGraphEdges(counterparties, mode);
   const maxEdge = Math.max(...graphEdges.map((edge) => Math.abs(edge.value)), 1);
-  const category = getKnownCategory(profile.category);
+  const category = getKnownCategory(entity.category);
 
   return (
     <Panel className="flex min-h-[34rem] flex-col">
@@ -445,172 +534,170 @@ function EntityFlowGraph({
           Entity Flow Graph
         </PanelTitle>
         <PanelActions className="flex-wrap">
-          <ToggleGroup
-            aria-label="Entity graph window"
-            type="single"
-            value={windowMinutes}
-            onValueChange={(nextWindow) => {
-              if (isWindowMinutes(nextWindow)) {
-                onWindowChange(nextWindow);
-              }
-            }}
-          >
-            {windowOptions.map((option) => (
-              <ToggleGroupItem key={option.value} value={option.value}>
-                {option.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          <WindowToggle
+            ariaLabel="Entity graph window"
+            onWindowChange={onWindowChange}
+            windowMinutes={windowMinutes}
+          />
         </PanelActions>
       </PanelHead>
 
       <div className="relative min-h-[28rem] flex-1 overflow-hidden">
-        <svg
-          className="absolute inset-0 size-full"
-          role="img"
-          viewBox="0 0 820 440"
-          aria-label={`${profile.entityName} counterparty flow graph`}
-        >
-          <defs>
-            <marker
-              id="entity-arrow-inflow"
-              markerHeight="8"
-              markerWidth="8"
-              orient="auto"
-              refX="7"
-              refY="4"
-            >
-              <path d="M0,0 L8,4 L0,8 z" fill="var(--inflow)" />
-            </marker>
-            <marker
-              id="entity-arrow-outflow"
-              markerHeight="8"
-              markerWidth="8"
-              orient="auto"
-              refX="7"
-              refY="4"
-            >
-              <path d="M0,0 L8,4 L0,8 z" fill="var(--outflow)" />
-            </marker>
-          </defs>
+        {graphEdges.length === 0 ? (
+          <div className="flex h-full min-h-[28rem] items-center justify-center gap-2 font-mono text-muted-foreground text-xs">
+            <CircleDotDashed size={14} />
+            No counterparty flow for this window yet.
+          </div>
+        ) : (
+          <svg
+            className="absolute inset-0 size-full"
+            role="img"
+            viewBox="0 0 820 440"
+            aria-label={`${entity.entityName} counterparty flow graph`}
+          >
+            <defs>
+              <marker
+                id="entity-arrow-inflow"
+                markerHeight="8"
+                markerWidth="8"
+                orient="auto"
+                refX="7"
+                refY="4"
+              >
+                <path d="M0,0 L8,4 L0,8 z" fill="var(--inflow)" />
+              </marker>
+              <marker
+                id="entity-arrow-outflow"
+                markerHeight="8"
+                markerWidth="8"
+                orient="auto"
+                refX="7"
+                refY="4"
+              >
+                <path d="M0,0 L8,4 L0,8 z" fill="var(--outflow)" />
+              </marker>
+            </defs>
 
-          {graphEdges.map((edge) => {
-            const width = 1.5 + (Math.abs(edge.value) / maxEdge) * 5;
-            const stroke = edge.direction === "in" ? "var(--inflow)" : "var(--outflow)";
-            const marker =
-              edge.direction === "in" ? "url(#entity-arrow-inflow)" : "url(#entity-arrow-outflow)";
-            const start = edge.direction === "in" ? edge.point : centerPoint;
-            const end = edge.direction === "in" ? centerPoint : edge.point;
-            const midX = (start.x + end.x) / 2;
-            const midY = (start.y + end.y) / 2;
+            {graphEdges.map((edge) => {
+              const width = 1.5 + (Math.abs(edge.value) / maxEdge) * 5;
+              const stroke = edge.direction === "in" ? "var(--inflow)" : "var(--outflow)";
+              const marker =
+                edge.direction === "in"
+                  ? "url(#entity-arrow-inflow)"
+                  : "url(#entity-arrow-outflow)";
+              const start = edge.direction === "in" ? edge.point : centerPoint;
+              const end = edge.direction === "in" ? centerPoint : edge.point;
+              const midX = (start.x + end.x) / 2;
+              const midY = (start.y + end.y) / 2;
 
-            return (
-              <g key={edge.entityId}>
-                <path
-                  d={`M ${start.x} ${start.y} Q ${midX} ${midY - 32} ${end.x} ${end.y}`}
-                  fill="none"
-                  markerEnd={marker}
-                  opacity="0.78"
-                  stroke={stroke}
-                  strokeLinecap="round"
-                  strokeWidth={width}
-                />
-                <text
-                  className="fill-muted-foreground font-mono text-[10px]"
-                  textAnchor="middle"
-                  x={midX}
-                  y={midY - 38}
-                >
-                  {formatCompact(edge.value)}
-                </text>
-              </g>
-            );
-          })}
-
-          <g>
-            <circle
-              cx={centerPoint.x}
-              cy={centerPoint.y}
-              fill={`var(--cat-${category ?? "wallet"}-soft)`}
-              r="68"
-              stroke={`var(--cat-${category ?? "wallet"})`}
-              strokeWidth="2"
-            />
-            <circle
-              cx={centerPoint.x}
-              cy={centerPoint.y}
-              fill={`var(--cat-${category ?? "wallet"})`}
-              r="30"
-            />
-            <text
-              className="fill-background font-mono text-[15px] font-semibold"
-              textAnchor="middle"
-              x={centerPoint.x}
-              y={centerPoint.y + 5}
-            >
-              {getEntityGlyph(profile.entityName)}
-            </text>
-            <text
-              className="fill-foreground font-mono text-[13px] font-medium"
-              textAnchor="middle"
-              x={centerPoint.x}
-              y={centerPoint.y + 58}
-            >
-              {truncate(profile.entityName, 18)}
-            </text>
-            <text
-              className="fill-muted-foreground font-mono text-[9px] uppercase tracking-[0.1em]"
-              textAnchor="middle"
-              x={centerPoint.x}
-              y={centerPoint.y + 74}
-            >
-              {formatCategory(profile.category)}
-            </text>
-          </g>
-
-          {graphEdges.map((edge) => {
-            const edgeCategory = getKnownCategory(edge.category);
-
-            return (
-              <a href={`/entities/${edge.entityId}`} key={edge.entityId}>
-                <g className="cursor-pointer">
-                  <circle
-                    cx={edge.point.x}
-                    cy={edge.point.y}
-                    fill={`var(--cat-${edgeCategory ?? "wallet"})`}
-                    r="22"
+              return (
+                <g key={edge.entityId}>
+                  <path
+                    d={`M ${start.x} ${start.y} Q ${midX} ${midY - 32} ${end.x} ${end.y}`}
+                    fill="none"
+                    markerEnd={marker}
+                    opacity="0.78"
+                    stroke={stroke}
+                    strokeLinecap="round"
+                    strokeWidth={width}
                   />
                   <text
-                    className="fill-background font-mono text-[10px] font-semibold"
+                    className="fill-muted-foreground font-mono text-[10px]"
                     textAnchor="middle"
-                    x={edge.point.x}
-                    y={edge.point.y + 4}
+                    x={midX}
+                    y={midY - 38}
                   >
-                    {getEntityGlyph(edge.entityName)}
-                  </text>
-                  <text
-                    className="fill-foreground font-mono text-[11px] font-medium"
-                    textAnchor="middle"
-                    x={edge.point.x}
-                    y={edge.point.y + 38}
-                  >
-                    {truncate(edge.entityName, 16)}
-                  </text>
-                  <text
-                    className="fill-muted-foreground font-mono text-[8px] uppercase tracking-[0.1em]"
-                    textAnchor="middle"
-                    x={edge.point.x}
-                    y={edge.point.y + 52}
-                  >
-                    {formatCategory(edge.category)}
+                    {formatCompact(edge.value)}
                   </text>
                 </g>
-              </a>
-            );
-          })}
-        </svg>
+              );
+            })}
 
-        <div className="absolute left-3.5 bottom-3.5 flex gap-3 rounded-md border border-border bg-card px-3 py-2 font-mono text-2xs text-muted-foreground">
+            <g>
+              <circle
+                cx={centerPoint.x}
+                cy={centerPoint.y}
+                fill={`var(--cat-${category ?? "wallet"}-soft)`}
+                r="68"
+                stroke={`var(--cat-${category ?? "wallet"})`}
+                strokeWidth="2"
+              />
+              <circle
+                cx={centerPoint.x}
+                cy={centerPoint.y}
+                fill={`var(--cat-${category ?? "wallet"})`}
+                r="30"
+              />
+              <text
+                className="fill-background font-mono text-[15px] font-semibold"
+                textAnchor="middle"
+                x={centerPoint.x}
+                y={centerPoint.y + 5}
+              >
+                {getEntityGlyph(entity.entityName)}
+              </text>
+              <text
+                className="fill-foreground font-mono text-[13px] font-medium"
+                textAnchor="middle"
+                x={centerPoint.x}
+                y={centerPoint.y + 58}
+              >
+                {truncate(entity.entityName, 18)}
+              </text>
+              <text
+                className="fill-muted-foreground font-mono text-[9px] uppercase tracking-[0.1em]"
+                textAnchor="middle"
+                x={centerPoint.x}
+                y={centerPoint.y + 74}
+              >
+                {formatCategory(entity.category)}
+              </text>
+            </g>
+
+            {graphEdges.map((edge) => {
+              const edgeCategory = getKnownCategory(edge.category);
+
+              return (
+                <a href={`/entities/${edge.entityId}`} key={edge.entityId}>
+                  <g className="cursor-pointer">
+                    <circle
+                      cx={edge.point.x}
+                      cy={edge.point.y}
+                      fill={`var(--cat-${edgeCategory ?? "wallet"})`}
+                      r="22"
+                    />
+                    <text
+                      className="fill-background font-mono text-[10px] font-semibold"
+                      textAnchor="middle"
+                      x={edge.point.x}
+                      y={edge.point.y + 4}
+                    >
+                      {getEntityGlyph(edge.entityName)}
+                    </text>
+                    <text
+                      className="fill-foreground font-mono text-[11px] font-medium"
+                      textAnchor="middle"
+                      x={edge.point.x}
+                      y={edge.point.y + 38}
+                    >
+                      {truncate(edge.entityName, 16)}
+                    </text>
+                    <text
+                      className="fill-muted-foreground font-mono text-[8px] uppercase tracking-[0.1em]"
+                      textAnchor="middle"
+                      x={edge.point.x}
+                      y={edge.point.y + 52}
+                    >
+                      {formatCategory(edge.category)}
+                    </text>
+                  </g>
+                </a>
+              );
+            })}
+          </svg>
+        )}
+
+        <div className="absolute bottom-3.5 left-3.5 flex gap-3 rounded-md border border-border bg-card px-3 py-2 font-mono text-2xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-inflow" />
             Inflow
@@ -623,11 +710,11 @@ function EntityFlowGraph({
 
         <div className="absolute top-3.5 right-3.5 rounded-md border border-border bg-card px-3 py-2 text-right font-mono text-2xs text-muted-foreground">
           <div>
-            <span className="text-foreground">{graphEdges.length}</span> counterparties
+            <span className="text-foreground">{counterparties.length}</span> counterparties
           </div>
           <div>
             <span className="text-foreground">
-              {formatCompact(windowFlow.inflow + windowFlow.outflow)}
+              {formatCompact(amountToNumber(flow.inflow) + amountToNumber(flow.outflow))}
             </span>{" "}
             USDC moved
           </div>
@@ -641,19 +728,9 @@ function CounterpartiesPanel({
   counterparties,
   mode,
 }: {
-  counterparties: CounterpartyRow[];
+  counterparties: EntityCounterpartyFlow[];
   mode: FlowMode;
 }) {
-  const ranked = [...counterparties]
-    .sort(
-      (a, b) => Math.abs(getCounterpartyValue(b, mode)) - Math.abs(getCounterpartyValue(a, mode)),
-    )
-    .slice(0, 6);
-  const maxValue = Math.max(
-    ...ranked.map((counterparty) => Math.abs(getCounterpartyValue(counterparty, mode))),
-    1,
-  );
-
   return (
     <Panel>
       <PanelHead>
@@ -664,11 +741,10 @@ function CounterpartiesPanel({
       </PanelHead>
 
       <div className="divide-y divide-border">
-        {ranked.map((counterparty, index) => {
+        {counterparties.map((counterparty) => {
           const category = getKnownCategory(counterparty.category);
-          const value = getCounterpartyValue(counterparty, mode);
-          const trend = getCounterpartyTrend(counterparty, mode);
-          const share = (Math.abs(value) / maxValue) * 100;
+          const value = amountToNumber(counterparty.net);
+          const trend = value >= 0 ? "net-pos" : "net-neg";
 
           return (
             <Link
@@ -677,7 +753,7 @@ function CounterpartiesPanel({
               to={`/entities/${counterparty.entityId}`}
             >
               <span className="font-mono text-sm text-muted-foreground">
-                {(index + 1).toString().padStart(2, "0")}
+                {counterparty.rank.toString().padStart(2, "0")}
               </span>
               <div className="min-w-0">
                 <Entity
@@ -690,34 +766,41 @@ function CounterpartiesPanel({
                   <span className="size-1 rounded-full bg-muted-foreground/50" />
                   <span>{formatCategory(counterparty.category)}</span>
                 </div>
-                <FlowBar className="mt-2" trend={trend} value={share} />
+                <FlowBar className="mt-2" trend={trend} value={counterparty.relativeShare} />
               </div>
               <div className="text-right">
                 <Amount
-                  className={
-                    trend === "inflow" || trend === "net-pos" ? "text-inflow" : "text-outflow"
-                  }
+                  className={trend === "net-pos" ? "text-inflow" : "text-outflow"}
                   magnitude="small"
                   value={value}
                 />
                 <div className="mt-1 flex items-center justify-end gap-1 font-mono text-2xs text-muted-foreground">
-                  {trend === "inflow" || trend === "net-pos" ? (
-                    <ArrowDownLeft size={12} />
-                  ) : (
-                    <ArrowUpRight size={12} />
-                  )}
+                  {trend === "net-pos" ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
                   {mode}
                 </div>
               </div>
             </Link>
           );
         })}
+
+        {counterparties.length === 0 && (
+          <div className="flex h-40 items-center justify-center gap-2 font-mono text-xs text-muted-foreground">
+            <CircleDotDashed size={14} />
+            No counterparty flow for this window yet.
+          </div>
+        )}
       </div>
     </Panel>
   );
 }
 
-function RecentTransfersPanel({ transfers }: { transfers: RecentEntityTransfer[] }) {
+function RecentTransfersPanel({
+  freshTransferIds,
+  transfers,
+}: {
+  freshTransferIds: ReadonlySet<string>;
+  transfers: LiveTransferRow[];
+}) {
   return (
     <Panel>
       <PanelHead>
@@ -726,23 +809,27 @@ function RecentTransfersPanel({ transfers }: { transfers: RecentEntityTransfer[]
 
       <div className="divide-y divide-border lg:hidden">
         {transfers.map((transfer) => (
-          <div className="px-4 py-3" key={`${transfer.transactionHash}-${transfer.logIndex}`}>
+          <div
+            className="px-4 py-3 data-[fresh=true]:animate-[sf-row-in_0.9s_ease-out] motion-reduce:data-[fresh=true]:animate-none"
+            data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
+            key={transfer.id}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="grid min-w-0 flex-1 gap-2">
                 <TransferPartyLine label="From" party={transfer.from} />
                 <TransferPartyLine label="To" party={transfer.to} />
               </div>
-              <Amount className="shrink-0 text-right" value={transfer.amount} />
+              <Amount className="shrink-0 text-right" value={amountToNumber(transfer.amount)} />
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-border border-t pt-3 font-mono text-xs text-muted-foreground">
               <span>
-                Block {formatIntegerString(transfer.blockNumber)} ·{" "}
-                {formatUtcTime(transfer.blockTimestamp)}
+                Block {formatBlock(transfer.blockNumber)} · {formatUtcTime(transfer.blockTimestamp)}
               </span>
               <ExternalHashLink hash={transfer.transactionHash} />
             </div>
           </div>
         ))}
+        {transfers.length === 0 && <EmptyPanelRow>No recent boundary transfers.</EmptyPanelRow>}
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
@@ -768,7 +855,10 @@ function RecentTransfersPanel({ transfers }: { transfers: RecentEntityTransfer[]
           </TableHeader>
           <TableBody>
             {transfers.map((transfer) => (
-              <TableRow key={`${transfer.transactionHash}-${transfer.logIndex}`}>
+              <TableRow
+                data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
+                key={transfer.id}
+              >
                 <TableCell className="min-w-0">
                   <TransferPartyCell party={transfer.from} />
                 </TableCell>
@@ -776,10 +866,10 @@ function RecentTransfersPanel({ transfers }: { transfers: RecentEntityTransfer[]
                   <TransferPartyCell party={transfer.to} />
                 </TableCell>
                 <TableCell className="text-right">
-                  <Amount value={transfer.amount} />
+                  <Amount value={amountToNumber(transfer.amount)} />
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {formatIntegerString(transfer.blockNumber)}
+                  {formatBlock(transfer.blockNumber)}
                   <div className="mt-1 font-mono text-2xs text-muted-foreground">
                     {formatUtcTime(transfer.blockTimestamp)}
                   </div>
@@ -789,6 +879,13 @@ function RecentTransfersPanel({ transfers }: { transfers: RecentEntityTransfer[]
                 </TableCell>
               </TableRow>
             ))}
+            {transfers.length === 0 && (
+              <TableRow>
+                <TableCell className="h-32 text-center text-muted-foreground" colSpan={5}>
+                  No recent boundary transfers.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -796,7 +893,7 @@ function RecentTransfersPanel({ transfers }: { transfers: RecentEntityTransfer[]
   );
 }
 
-function TransferPartyLine({ label, party }: { label: "From" | "To"; party: TransferParty }) {
+function TransferPartyLine({ label, party }: { label: "From" | "To"; party: LiveTransferParty }) {
   return (
     <div className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] items-center gap-2">
       <span className="font-mono text-2xs text-muted-foreground uppercase tracking-[0.06em]">
@@ -807,7 +904,7 @@ function TransferPartyLine({ label, party }: { label: "From" | "To"; party: Tran
   );
 }
 
-function TransferPartyCell({ party }: { party: TransferParty }) {
+function TransferPartyCell({ party }: { party: LiveTransferParty }) {
   const category = getKnownCategory(party.category);
   const entity = (
     <Entity
@@ -836,11 +933,11 @@ function TransferPartyCell({ party }: { party: TransferParty }) {
 function EvidencePanel({
   className,
   labels,
-  profile,
+  entity,
 }: {
   className?: string;
-  labels: AddressLabelRow[];
-  profile: EntityProfile;
+  labels: EntityAddressLabel[];
+  entity: EntityDetailSummary;
 }) {
   const confidence = countBy(labels, (label) => label.confidence);
   const sourceTypes = countBy(labels, (label) => label.sourceType);
@@ -858,26 +955,19 @@ function EvidencePanel({
         <EvidenceStack
           label="Confidence"
           segments={[
-            {
-              color: "var(--inflow)",
-              label: "High",
-              value: confidence.high ?? 0,
-            },
-            {
-              color: "var(--accent)",
-              label: "Medium",
-              value: confidence.medium ?? 0,
-            },
-            {
-              color: "var(--outflow)",
-              label: "Candidate",
-              value: confidence.candidate ?? 0,
-            },
+            { color: "var(--inflow)", label: "High", value: confidence.high ?? 0 },
+            { color: "var(--accent)", label: "Medium", value: confidence.medium ?? 0 },
+            { color: "var(--outflow)", label: "Candidate", value: confidence.candidate ?? 0 },
           ]}
         />
         <EvidenceStack
           label="Source type"
           segments={[
+            {
+              color: "var(--muted-foreground)",
+              label: "Static config",
+              value: sourceTypes.static_config ?? 0,
+            },
             {
               color: "var(--inflow)",
               label: "Factory event",
@@ -893,32 +983,20 @@ function EvidencePanel({
         <EvidenceStack
           label="Counting policy"
           segments={[
-            {
-              color: "var(--accent)",
-              label: "Boundary",
-              value: policies.boundary ?? 0,
-            },
+            { color: "var(--accent)", label: "Boundary", value: policies.boundary ?? 0 },
             {
               color: "var(--inflow)",
               label: "Discovery source",
               value: policies.discovery_source ?? 0,
             },
-            {
-              color: "var(--muted-foreground)",
-              label: "Internal",
-              value: policies.internal ?? 0,
-            },
-            {
-              color: "var(--outflow)",
-              label: "Ignore",
-              value: policies.ignore ?? 0,
-            },
+            { color: "var(--muted-foreground)", label: "Internal", value: policies.internal ?? 0 },
+            { color: "var(--outflow)", label: "Ignore", value: policies.ignore ?? 0 },
           ]}
         />
         <div className="grid grid-cols-2 gap-3 border-border border-t pt-4 font-mono text-2xs">
           <EvidenceMetric
             label="Attribution groups"
-            value={formatInteger(profile.attributionGroups.length)}
+            value={formatInteger(entity.attributionGroups.length)}
           />
           <EvidenceMetric
             label="Source events"
@@ -981,7 +1059,7 @@ function EvidenceMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AddressLabelsPanel({ labels }: { labels: AddressLabelRow[] }) {
+function AddressLabelsPanel({ labels }: { labels: EntityAddressLabel[] }) {
   return (
     <Panel id="addresses">
       <PanelHead>
@@ -1093,17 +1171,66 @@ function AddressLabelsPanel({ labels }: { labels: AddressLabelRow[] }) {
                   />
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                  {formatIntegerString(label.firstSeenBlock)}
+                  {formatBlock(label.firstSeenBlock)}
                 </TableCell>
                 <TableCell className="text-right">
-                  <ExternalHashLink hash={label.transactionHash} />
+                  {label.transactionHash === null ? (
+                    <span className="font-mono text-sm text-muted-foreground">Static</span>
+                  ) : (
+                    <ExternalHashLink hash={label.transactionHash} />
+                  )}
                 </TableCell>
               </TableRow>
             ))}
+            {labels.length === 0 && (
+              <TableRow>
+                <TableCell className="h-32 text-center text-muted-foreground" colSpan={8}>
+                  No address labels for this entity.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
     </Panel>
+  );
+}
+
+function WindowToggle({
+  ariaLabel,
+  onWindowChange,
+  windowMinutes,
+}: {
+  ariaLabel: string;
+  onWindowChange: (windowMinutes: EntityDetailWindow) => void;
+  windowMinutes: EntityDetailWindow;
+}) {
+  return (
+    <ToggleGroup
+      aria-label={ariaLabel}
+      type="single"
+      value={windowMinutes}
+      onValueChange={(nextWindow) => {
+        if (isEntityDetailWindow(nextWindow) && nextWindow !== windowMinutes) {
+          onWindowChange(nextWindow);
+        }
+      }}
+    >
+      {entityDetailWindowOptions.map((option) => (
+        <ToggleGroupItem key={option.value} value={option.value}>
+          {option.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
+function EmptyPanelRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-32 items-center justify-center gap-2 font-mono text-muted-foreground text-xs">
+      <CircleDotDashed size={14} />
+      {children}
+    </div>
   );
 }
 
@@ -1168,7 +1295,7 @@ function DefinitionValue({
   );
 }
 
-function ConfidencePill({ confidence }: { confidence: Confidence }) {
+function ConfidencePill({ confidence }: { confidence: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -1178,6 +1305,8 @@ function ConfidencePill({ confidence }: { confidence: Confidence }) {
             confidence === "high" && "border-inflow/35 bg-inflow-soft text-inflow",
             confidence === "medium" && "border-accent/35 bg-accent-soft text-accent",
             confidence === "candidate" && "border-outflow/35 bg-outflow-soft text-outflow",
+            !["candidate", "high", "medium"].includes(confidence) &&
+              "border-border bg-surface-2 text-muted-foreground",
           )}
           type="button"
         >
@@ -1231,10 +1360,9 @@ const graphPoints = [
 ];
 const fallbackGraphPoint = { x: 150, y: 95 };
 
-function buildGraphEdges(counterparties: CounterpartyRow[], mode: FlowMode) {
+function buildGraphEdges(counterparties: EntityCounterpartyFlow[], _mode: FlowMode) {
   return counterparties.slice(0, 6).flatMap((counterparty, index) => {
-    const net = counterparty.inflow - counterparty.outflow;
-    const value = getCounterpartyValue(counterparty, mode);
+    const value = amountToNumber(counterparty.net);
 
     if (value === 0) {
       return [];
@@ -1243,8 +1371,7 @@ function buildGraphEdges(counterparties: CounterpartyRow[], mode: FlowMode) {
     return [
       {
         ...counterparty,
-        direction:
-          mode === "inflow" || (mode === "net" && net >= 0) ? ("in" as const) : ("out" as const),
+        direction: value >= 0 ? ("in" as const) : ("out" as const),
         point: graphPoints[index] ?? fallbackGraphPoint,
         value,
       },
@@ -1252,468 +1379,36 @@ function buildGraphEdges(counterparties: CounterpartyRow[], mode: FlowMode) {
   });
 }
 
-function buildEntityProfile(entityId: string): EntityProfile {
-  const catalogEntry = knownEntities[entityId as keyof typeof knownEntities] ?? {
-    category: "wallet",
-    entityName: formatEntityId(entityId),
-  };
-  const selected = {
-    category: catalogEntry.category,
-    entityId,
-    entityName: catalogEntry.entityName,
-  };
-  const counterparties = buildCounterparties(selected.entityId);
-  const addressLabels = buildAddressLabels(selected.entityId);
-  const sourceTypes = [...new Set(addressLabels.map((label) => label.sourceType))];
-  const roles = [...new Set(addressLabels.map((label) => label.role))];
-  const attributionGroups = [...new Set(addressLabels.map((label) => label.attributionGroup))];
+function amountToNumber(amount: Pick<EntityDetailAmount, "formatted">) {
+  const value = Number(amount.formatted);
 
-  return {
-    addressLabels,
-    attributionGroups,
-    category: selected.category,
-    counterparties,
-    entityId: selected.entityId,
-    entityName: selected.entityName,
-    firstSeenBlock: minBlock(addressLabels.map((label) => label.firstSeenBlock)),
-    flowWindows: buildFlowWindows(seedFromText(entityId)),
-    labelCount: addressLabels.length,
-    latestLabelBlock: maxBlock(addressLabels.map((label) => label.firstSeenBlock)),
-    recentTransfers: buildRecentTransfers(selected, counterparties),
-    roles,
-    sourceTypes,
-  };
+  return Number.isFinite(value) ? value : 0;
 }
 
-function buildFlowWindows(seed: number): Record<WindowMinutes, FlowWindow> {
-  const hourInflow = 12_400_000 + seed * 310_000;
-  const hourOutflow = 9_850_000 + seed * 190_000;
-
-  return {
-    "5": {
-      bucketEnd: "2026-05-20T15:00:00.000Z",
-      bucketStart: "2026-05-20T14:55:00.000Z",
-      inflow: hourInflow * 0.12,
-      inflowTransferCount: 42 + seed,
-      outflow: hourOutflow * 0.1,
-      outflowTransferCount: 36 + seed,
-    },
-    "60": {
-      bucketEnd: "2026-05-20T15:00:00.000Z",
-      bucketStart: "2026-05-20T14:00:00.000Z",
-      inflow: hourInflow,
-      inflowTransferCount: 438 + seed * 5,
-      outflow: hourOutflow,
-      outflowTransferCount: 389 + seed * 4,
-    },
-    "1440": {
-      bucketEnd: "2026-05-20T15:00:00.000Z",
-      bucketStart: "2026-05-19T15:00:00.000Z",
-      inflow: hourInflow * 18.5,
-      inflowTransferCount: 7_920 + seed * 31,
-      outflow: hourOutflow * 17.2,
-      outflowTransferCount: 7_104 + seed * 28,
-    },
-  };
-}
-
-function buildCounterparties(entityId: string): CounterpartyRow[] {
-  const baseCounterparties = [
-    {
-      category: "cex",
-      entityId: "coinbase",
-      entityName: "Coinbase",
-      inflow: 4_860_000,
-      outflow: 3_210_000,
-      transferCount: 186,
-    },
-    {
-      category: "lending",
-      entityId: "aave-v3",
-      entityName: "Aave V3",
-      inflow: 2_440_000,
-      outflow: 3_760_000,
-      transferCount: 143,
-    },
-    {
-      category: "bridge",
-      entityId: "circle-cctp",
-      entityName: "Circle CCTP",
-      inflow: 1_980_000,
-      outflow: 1_120_000,
-      transferCount: 94,
-    },
-    {
-      category: "dex",
-      entityId: "uniswap-v3",
-      entityName: "Uniswap V3",
-      inflow: 1_540_000,
-      outflow: 1_310_000,
-      transferCount: 118,
-    },
-    {
-      category: "lending",
-      entityId: "morpho-blue",
-      entityName: "Morpho Blue",
-      inflow: 890_000,
-      outflow: 1_620_000,
-      transferCount: 74,
-    },
-    {
-      category: "wallet",
-      entityId: "wallet-cluster-0x7c",
-      entityName: "0x7c...aa11",
-      inflow: 620_000,
-      outflow: 420_000,
-      transferCount: 49,
-    },
-  ] satisfies CounterpartyRow[];
-
-  if (entityId !== "aerodrome") {
-    return [
-      {
-        category: "dex",
-        entityId: "aerodrome",
-        entityName: "Aerodrome",
-        inflow: 3_180_000,
-        outflow: 2_260_000,
-        transferCount: 151,
-      },
-      ...baseCounterparties
-        .filter((counterparty) => counterparty.entityId !== entityId)
-        .slice(0, 5),
-    ];
-  }
-
-  return baseCounterparties;
-}
-
-function buildAddressLabels(entityId: string): AddressLabelRow[] {
-  const labelSets: Record<string, AddressLabelRow[]> = {
-    "aave-v3": [
-      buildLabel(
-        "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
-        "pool",
-        "high",
-        "boundary",
-        "onchain_state",
-        "getReserveData(USDC)",
-        "aave-v3",
-        "26851402",
-      ),
-      buildLabel(
-        "0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB",
-        "a_token",
-        "high",
-        "boundary",
-        "onchain_state",
-        "getReserveData(USDC)",
-        "aave-v3",
-        "26851402",
-      ),
-      buildLabel(
-        "0x59dca05b6c26dbd64b5381374aAaC5CD05644C28",
-        "variable_debt_token",
-        "high",
-        "internal",
-        "onchain_state",
-        "getReserveData(USDC)",
-        "aave-v3",
-        "26851402",
-      ),
-    ],
-    aerodrome: [
-      buildLabel(
-        "0x4e962BB3889Bf030368F56810A9c96B83CB3E778",
-        "pool_instance",
-        "high",
-        "boundary",
-        "factory_event",
-        "PoolCreated",
-        "aerodrome",
-        "26684712",
-      ),
-      buildLabel(
-        "0xb2cc224c1c9feE385f8ad6a55b4d94E92359DC59",
-        "pool_instance",
-        "high",
-        "boundary",
-        "factory_event",
-        "PoolCreated",
-        "aerodrome",
-        "26685893",
-      ),
-      buildLabel(
-        "0x3FE04a59eBd38cF06080a6f60A98D124eB59392A",
-        "pool_instance",
-        "medium",
-        "boundary",
-        "factory_event",
-        "PoolCreated",
-        "aerodrome",
-        "26687420",
-      ),
-      buildLabel(
-        "0x67c0d1F2a5B2B8d70b4aC0f746c10Ea765F7b2d4",
-        "pool_instance",
-        "high",
-        "boundary",
-        "factory_event",
-        "PoolCreated",
-        "aerodrome",
-        "26710284",
-      ),
-      buildLabel(
-        "0x90f3D1c7d52c80c8B6086a9BAf079B6c9D3412dA",
-        "pool_instance",
-        "high",
-        "boundary",
-        "factory_event",
-        "PoolCreated",
-        "aerodrome",
-        "26738841",
-      ),
-      buildLabel(
-        "0x5C3F18F06CC09CA1910767A34a20F771039E37C0",
-        "factory_registry",
-        "high",
-        "discovery_source",
-        "onchain_state",
-        "factoryRegistry()",
-        "aerodrome",
-        "26598011",
-      ),
-      buildLabel(
-        "0x16613524e02ad97eDfeF371bC883F2F5d6C480A5",
-        "voter",
-        "high",
-        "internal",
-        "onchain_state",
-        "voter()",
-        "aerodrome",
-        "26598011",
-      ),
-    ],
-    "circle-cctp": [
-      buildLabel(
-        "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
-        "token_messenger",
-        "high",
-        "boundary",
-        "onchain_state",
-        "DepositForBurn",
-        "circle-cctp",
-        "26290410",
-      ),
-      buildLabel(
-        "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64",
-        "message_transmitter",
-        "high",
-        "internal",
-        "onchain_state",
-        "MessageReceived",
-        "circle-cctp",
-        "26290410",
-      ),
-    ],
-    "morpho-blue": [
-      buildLabel(
-        "0xBAa5cc21fd487B8Fcc2F632f3F4E8D3726C3c43a",
-        "core",
-        "medium",
-        "boundary",
-        "onchain_state",
-        "marketParams()",
-        "morpho-blue",
-        "26611290",
-      ),
-      buildLabel(
-        "0x2d012EdbAdc37eDc2BC62791B666f919E95E3F5f",
-        "vault",
-        "high",
-        "boundary",
-        "factory_event",
-        "CreateMetaMorpho",
-        "morpho-blue",
-        "26700471",
-      ),
-      buildLabel(
-        "0x8462f82a72001988702eB3B39C922dEcA4C8d9CE",
-        "vault",
-        "high",
-        "boundary",
-        "factory_event",
-        "CreateMetaMorpho",
-        "morpho-blue",
-        "26760429",
-      ),
-    ],
-    "uniswap-v3": [
-      buildLabel(
-        "0xd0b53D9277642d899DF5C87A3966A349A798F224",
-        "pool_instance",
-        "high",
-        "boundary",
-        "factory_event",
-        "PoolCreated",
-        "uniswap-v3",
-        "26591015",
-      ),
-      buildLabel(
-        "0x88A43bbDF9D098eEC7bCE2D6D2BfF2B1aF52aD10",
-        "pool_instance",
-        "high",
-        "boundary",
-        "factory_event",
-        "PoolCreated",
-        "uniswap-v3",
-        "26644218",
-      ),
-      buildLabel(
-        "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
-        "factory",
-        "high",
-        "discovery_source",
-        "onchain_state",
-        "factory()",
-        "uniswap-v3",
-        "26590000",
-      ),
-    ],
-  };
-
-  return (
-    labelSets[entityId] ?? [
-      buildLabel(
-        "0x61040e143a77f165ba44543af4a079f2c809d14b",
-        "counterparty",
-        "medium",
-        "boundary",
-        "factory_event",
-        "USDC Transfer counterparty pattern",
-        entityId,
-        "26790114",
-      ),
-      buildLabel(
-        "0xcf7603eb05d36b54935fecb6c5f79e6d1198f1c3",
-        "counterparty",
-        "candidate",
-        "boundary",
-        "factory_event",
-        "top_unidentified_usdc_counterparty",
-        entityId,
-        "26798220",
-      ),
-    ]
-  );
-}
-
-function buildLabel(
-  address: string,
-  role: string,
-  confidence: Confidence,
-  countingPolicy: CountingPolicy,
-  sourceType: SourceType,
-  sourceEvent: string,
-  attributionGroup: string,
-  firstSeenBlock: string,
-): AddressLabelRow {
-  return {
-    address,
-    attributionGroup,
-    confidence,
-    countingPolicy,
-    firstSeenBlock,
-    logIndex: Number(firstSeenBlock.slice(-2)),
-    role,
-    sourceAddress: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
-    sourceEvent,
-    sourceType,
-    transactionHash: `0x${firstSeenBlock.padEnd(64, "0")}`,
-  };
-}
-
-function buildRecentTransfers(
-  selected: { category: EntityCategory; entityId: string; entityName: string },
-  counterparties: CounterpartyRow[],
-): RecentEntityTransfer[] {
-  const selectedParty = toTransferParty(selected);
-
-  return counterparties.slice(0, 6).map((counterparty, index) => {
-    const counterpartyParty = toTransferParty(counterparty);
-    const isInflow = index % 2 === 0;
-
-    return {
-      amount: isInflow ? counterparty.inflow * 0.12 : counterparty.outflow * 0.1,
-      blockNumber: (28_894_200 - index * 42).toString(),
-      blockTimestamp: new Date(Date.UTC(2026, 4, 20, 14, 58 - index * 4)).toISOString(),
-      from: isInflow ? counterpartyParty : selectedParty,
-      logIndex: index + 8,
-      to: isInflow ? selectedParty : counterpartyParty,
-      transactionHash: `0x${(counterparty.entityId + selected.entityId).replaceAll("-", "").padEnd(64, "a").slice(0, 64)}`,
-    };
-  });
-}
-
-function toTransferParty(entity: {
-  category: EntityCategory;
-  entityId: string;
-  entityName: string;
-}): TransferParty {
-  const isWallet = entity.category === "wallet";
-
-  return {
-    address: isWallet
-      ? "0x7c62b91f8446fd38a78ee186b7d01fe38fb4aa11"
-      : "0x0000000000000000000000000000000000000000",
-    category: entity.category,
-    displayName: entity.entityName,
-    entityId: isWallet ? null : entity.entityId,
-    isIdentified: !isWallet,
-  };
-}
-
-function getCounterpartyValue(counterparty: CounterpartyRow, mode: FlowMode) {
-  if (mode === "inflow") {
-    return counterparty.inflow;
-  }
-
-  if (mode === "outflow") {
-    return counterparty.outflow;
-  }
-
-  return counterparty.inflow - counterparty.outflow;
-}
-
-function getCounterpartyTrend(counterparty: CounterpartyRow, mode: FlowMode) {
-  if (mode === "inflow") {
-    return "inflow";
-  }
-
-  if (mode === "outflow") {
-    return "outflow";
-  }
-
-  return getCounterpartyValue(counterparty, mode) >= 0 ? "net-pos" : "net-neg";
-}
+const getTransferIds = (transfers: LiveTransferRow[]) =>
+  new Set(transfers.map((transfer) => transfer.id));
 
 function getAttributionGroupDescription(group: string) {
   return `${formatToken(group)} is the attribution namespace that tied this address to the selected entity.`;
 }
 
-function getConfidenceDescription(confidence: Confidence) {
+function getConfidenceDescription(confidence: string) {
   if (confidence === "high") {
-    return "High confidence means the label came from strong deterministic evidence, such as an emitted factory event or verified protocol state.";
+    return "High confidence means the label came from strong deterministic evidence, such as an emitted factory event, static protocol config, or verified protocol state.";
   }
 
   if (confidence === "medium") {
     return "Medium confidence means the label is supported by useful evidence but may need additional corroboration before it is treated as fully deterministic.";
   }
 
-  return "Candidate means the address is useful to review, but the attribution should not be treated as final without more evidence.";
+  if (confidence === "candidate") {
+    return "Candidate means the address is useful to review, but the attribution should not be treated as final without more evidence.";
+  }
+
+  return `${formatToken(confidence)} is the confidence value attached to this label.`;
 }
 
-function getCountingPolicyDescription(policy: CountingPolicy) {
+function getCountingPolicyDescription(policy: string) {
   if (policy === "boundary") {
     return "Boundary addresses are counted as entity edges where USDC enters or exits the entity.";
   }
@@ -1726,20 +1421,35 @@ function getCountingPolicyDescription(policy: CountingPolicy) {
     return "Internal addresses belong to the entity but are usually excluded from external flow boundaries.";
   }
 
-  return "Ignored addresses are known but intentionally excluded from flow accounting because they are noisy, helper-like, or not useful as entity boundaries.";
+  if (policy === "ignore") {
+    return "Ignored addresses are known but intentionally excluded from flow accounting because they are noisy, helper-like, or not useful as entity boundaries.";
+  }
+
+  return `${formatToken(policy)} is the flow accounting policy attached to this label.`;
 }
 
 function getRoleDescription(role: string) {
   const descriptions: Record<string, string> = {
     a_token: "Aave interest-bearing token contract representing supplied USDC.",
+    bridge: "Bridge contract where USDC enters or leaves Base.",
     core: "Core protocol contract for the entity.",
     counterparty:
-      "An address currently represented as a counterparty label rather than a protocol-specific role.",
+      "An address represented as a counterparty label rather than a protocol-specific role.",
     factory: "Contract that creates or registers protocol instances.",
     factory_registry: "Registry contract used to discover factories or related protocol addresses.",
+    message_passer: "System contract that records messages leaving Base.",
     message_transmitter: "Circle CCTP contract that receives or verifies cross-chain messages.",
+    messenger: "Bridge messaging contract used to relay cross-chain instructions.",
+    permit: "Approval helper contract used by routers or protocol flows.",
     pool: "Protocol pool contract where USDC activity is observed.",
     pool_instance: "Liquidity pool contract created by a protocol factory.",
+    position_manager: "Contract used to manage concentrated liquidity positions.",
+    predeploy: "Base system predeploy contract.",
+    quoter: "Read-only quote helper, usually excluded from flow accounting.",
+    router:
+      "Protocol router contract that users or contracts call to move USDC through the protocol.",
+    stable_debt_token: "Aave debt token contract representing stable-rate borrowed USDC.",
+    token: "Token contract for the asset itself.",
     token_messenger: "Circle CCTP contract that initiates bridge burns and messages.",
     variable_debt_token: "Aave debt token contract representing variable-rate borrowed USDC.",
     vault: "Protocol vault contract where users deposit, withdraw, or route USDC.",
@@ -1761,6 +1471,7 @@ function getSourceEventDescription(sourceEvent: string) {
     PoolCreated: "A DEX factory event indicating a new liquidity pool was created.",
     "USDC Transfer counterparty pattern":
       "A derived signal from repeated USDC transfer activity involving this address.",
+    "base-address-labels": "A static protocol label bundled with Stableflow's indexer.",
     factory: "A protocol state call used to identify a factory contract.",
     "factory()": "A protocol state call used to identify a factory contract.",
     "factoryRegistry()": "A protocol state call used to identify the factory registry contract.",
@@ -1777,15 +1488,23 @@ function getSourceEventDescription(sourceEvent: string) {
   );
 }
 
-function getSourceTypeDescription(sourceType: SourceType) {
+function getSourceTypeDescription(sourceType: string) {
+  if (sourceType === "static_config") {
+    return "Static config means the label is a maintained protocol address included with Stableflow's indexer.";
+  }
+
   if (sourceType === "factory_event") {
     return "Factory event means the label came from an indexed contract event emitted by a protocol factory.";
   }
 
-  return "On-chain state means the label came from reading protocol contract state or a deterministic protocol method.";
+  if (sourceType === "onchain_state") {
+    return "On-chain state means the label came from reading protocol contract state or a deterministic protocol method.";
+  }
+
+  return `${formatToken(sourceType)} is the evidence source type attached to this label.`;
 }
 
-function getKnownCategory(category: EntityCategory): Category | undefined {
+function getKnownCategory(category: string): Category | undefined {
   if (category === "stablecoin_issuer") {
     return "mint";
   }
@@ -1801,15 +1520,7 @@ function getEntityGlyph(name: string) {
   return `${first}${second ?? ""}`.toUpperCase();
 }
 
-function formatEntityId(entityId: string) {
-  return entityId
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatCategory(category: EntityCategory) {
+function formatCategory(category: string) {
   if (category === "cex") {
     return "CEX";
   }
@@ -1833,23 +1544,26 @@ function formatToken(value: string) {
     .join(" ");
 }
 
-function formatWindowLabel(windowMinutes: WindowMinutes) {
-  if (windowMinutes === "1440") {
+function formatWindowLabel(windowMinutes: number | string) {
+  if (windowMinutes.toString() === "1440") {
     return "24h";
   }
 
-  if (windowMinutes === "60") {
+  if (windowMinutes.toString() === "60") {
     return "1h";
   }
 
   return `${windowMinutes}m`;
 }
 
-function isWindowMinutes(value: string): value is WindowMinutes {
+function isEntityDetailWindow(value: string): value is EntityDetailWindow {
   return value === "5" || value === "60" || value === "1440";
 }
 
-function countBy<T extends string>(items: AddressLabelRow[], getKey: (item: AddressLabelRow) => T) {
+function countBy<T extends string>(
+  items: EntityAddressLabel[],
+  getKey: (item: EntityAddressLabel) => T,
+) {
   return items.reduce<Record<T, number>>(
     (counts, item) => {
       const key = getKey(item);
@@ -1864,6 +1578,10 @@ function countBy<T extends string>(items: AddressLabelRow[], getKey: (item: Addr
 function formatCompact(value: number) {
   const sign = value < 0 ? "-" : "";
   const absolute = Math.abs(value);
+
+  if (absolute >= 1_000_000_000) {
+    return `${sign}${(absolute / 1_000_000_000).toFixed(1)}B`;
+  }
 
   if (absolute >= 1_000_000) {
     return `${sign}${(absolute / 1_000_000).toFixed(1)}M`;
@@ -1880,7 +1598,11 @@ function formatInteger(value: number) {
   return Math.trunc(value).toLocaleString("en-US");
 }
 
-function formatIntegerString(value: string) {
+function formatBlock(value: string | null) {
+  if (value === null) {
+    return "-";
+  }
+
   const numeric = Number(value);
 
   return Number.isFinite(numeric) ? numeric.toLocaleString("en-US") : value;
@@ -1907,20 +1629,14 @@ function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
 }
 
-function minBlock(blocks: string[]) {
-  return blocks.reduce(
-    (min, block) => (BigInt(block) < BigInt(min) ? block : min),
-    blocks[0] ?? "0",
-  );
-}
+const getSearchWithoutEntityDetailParams = (url: URL) => {
+  const params = new URLSearchParams(url.search);
 
-function maxBlock(blocks: string[]) {
-  return blocks.reduce(
-    (max, block) => (BigInt(block) > BigInt(max) ? block : max),
-    blocks[0] ?? "0",
-  );
-}
+  for (const name of entityDetailSearchParamNames) {
+    params.delete(name);
+  }
 
-function seedFromText(value: string) {
-  return Array.from(value).reduce((total, char) => total + char.charCodeAt(0), 0) % 9;
-}
+  params.sort();
+
+  return params.toString();
+};
