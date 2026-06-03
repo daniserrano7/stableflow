@@ -222,7 +222,7 @@ export default function EntityDetail() {
               windowMinutes={windowMinutes}
             />
 
-            <div className="flex min-w-0 flex-col gap-3.5 xl:h-full">
+            <div className="grid min-w-0 gap-3.5 md:grid-cols-2 xl:h-full xl:grid-cols-1">
               <CounterpartiesPanel counterparties={detail.data.counterparties} mode={mode} />
               <EvidencePanel
                 className="xl:flex-1"
