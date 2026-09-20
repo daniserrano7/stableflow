@@ -1,11 +1,8 @@
-import type {
-  TopEntityFlowMode,
-  TopEntityFlowsResponse,
-} from "@stableflow/shared";
+import type { TopEntityFlowMode, TopEntityFlowsResponse } from "@stableflow/shared";
 import {
   appendTopEntityFlowSearchParams,
-  topEntityFlowLimit,
   type TopEntityFlowWindow,
+  topEntityFlowLimit,
 } from "./top-entity-flows.params";
 
 export const topEntityFlowRefreshIntervalMs = 2_000;

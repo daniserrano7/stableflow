@@ -1,15 +1,7 @@
-import type {
-  FlowKpiCard,
-  FlowKpisResponse,
-  FlowKpiTone,
-} from '@stableflow/shared';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { KPI, Sparkline } from '~/components';
-import {
-  fetchFlowKpis,
-  flowKpisQueryKey,
-  flowKpisRefreshIntervalMs,
-} from './flow-kpis.query';
+import type { FlowKpiCard, FlowKpisResponse, FlowKpiTone } from "@stableflow/shared";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { KPI, Sparkline } from "~/components";
+import { fetchFlowKpis, flowKpisQueryKey, flowKpisRefreshIntervalMs } from "./flow-kpis.query";
 
 interface FlowKpisProps {
   initialKpis: FlowKpisResponse;
@@ -29,10 +21,7 @@ export function FlowKpis({ initialKpis }: FlowKpisProps) {
   const kpis = kpisQuery.data ?? initialKpis;
 
   return (
-    <section
-      aria-label="Flow summary"
-      className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4"
-    >
+    <section aria-label="Flow summary" className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
       {kpis.data.map((card) => (
         <FlowKpiCardView key={card.id} card={card} />
       ))}
@@ -47,11 +36,7 @@ function FlowKpiCardView({ card }: { card: FlowKpiCard }) {
   return (
     <KPI
       className="min-h-28"
-      delta={
-        card.delta
-          ? { trend: card.delta.trend, value: card.delta.label }
-          : undefined
-      }
+      delta={card.delta ? { trend: card.delta.trend, value: card.delta.label } : undefined}
       label={card.label}
       spark={
         sparklineData.length >= 2 ? (
@@ -65,28 +50,26 @@ function FlowKpiCardView({ card }: { card: FlowKpiCard }) {
 }
 
 const getSparklineData = (card: FlowKpiCard) =>
-  card.series
-    .map((point) => Number(point.value))
-    .filter((value) => Number.isFinite(value));
+  card.series.map((point) => Number(point.value)).filter((value) => Number.isFinite(value));
 
 const getToneColor = (tone: FlowKpiTone) => {
-  if (tone === 'inflow') {
-    return 'var(--inflow)';
+  if (tone === "inflow") {
+    return "var(--inflow)";
   }
 
-  if (tone === 'outflow') {
-    return 'var(--outflow)';
+  if (tone === "outflow") {
+    return "var(--outflow)";
   }
 
-  if (tone === 'neutral') {
-    return 'var(--neutral-flow)';
+  if (tone === "neutral") {
+    return "var(--neutral-flow)";
   }
 
-  return 'var(--accent)';
+  return "var(--accent)";
 };
 
 const formatCardValue = (card: FlowKpiCard) => {
-  if (card.value.kind === 'count') {
+  if (card.value.kind === "count") {
     return {
       unit: null,
       value: formatIntegerString(card.value.formatted),
@@ -97,7 +80,7 @@ const formatCardValue = (card: FlowKpiCard) => {
 };
 
 const shouldShowSign = (card: FlowKpiCard) =>
-  card.id === 'top-net-mover-15m' || card.id === 'bridge-net-flow-24h';
+  card.id === "top-net-mover-15m" || card.id === "bridge-net-flow-24h";
 
 const formatCompactUsdc = (formattedAmount: string, signed: boolean) => {
   const value = Number(formattedAmount);
@@ -105,30 +88,30 @@ const formatCompactUsdc = (formattedAmount: string, signed: boolean) => {
   if (!Number.isFinite(value)) {
     return {
       unit: null,
-      value: '$0',
+      value: "$0",
     };
   }
 
-  const sign = value < 0 ? '-' : signed && value > 0 ? '+' : '';
+  const sign = value < 0 ? "-" : signed && value > 0 ? "+" : "";
   const absoluteValue = Math.abs(value);
 
   if (absoluteValue >= 1_000_000_000) {
     return {
-      unit: 'B',
+      unit: "B",
       value: `${sign}$${(absoluteValue / 1_000_000_000).toFixed(2)}`,
     };
   }
 
   if (absoluteValue >= 1_000_000) {
     return {
-      unit: 'M',
+      unit: "M",
       value: `${sign}$${(absoluteValue / 1_000_000).toFixed(2)}`,
     };
   }
 
   if (absoluteValue >= 1_000) {
     return {
-      unit: 'K',
+      unit: "K",
       value: `${sign}$${(absoluteValue / 1_000).toFixed(1)}`,
     };
   }
@@ -139,5 +122,4 @@ const formatCompactUsdc = (formattedAmount: string, signed: boolean) => {
   };
 };
 
-const formatIntegerString = (value: string) =>
-  value.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const formatIntegerString = (value: string) => value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");

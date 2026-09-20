@@ -1,5 +1,5 @@
-import { Slot as SlotPrimitive } from "radix-ui";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Slot as SlotPrimitive } from "radix-ui";
 import * as React from "react";
 import { cn } from "~/utils/cn";
 
@@ -8,7 +8,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:brightness-110 shadow-[var(--shadow-sm)]",
+        default:
+          "bg-primary text-primary-foreground hover:brightness-110 shadow-[var(--shadow-sm)]",
         secondary: "bg-surface-2 text-foreground border border-border hover:bg-surface-3",
         ghost: "bg-transparent text-muted-foreground hover:bg-surface-2 hover:text-foreground",
         outline: "border border-border bg-transparent text-foreground hover:bg-surface-2",

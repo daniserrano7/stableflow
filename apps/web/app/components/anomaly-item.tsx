@@ -16,17 +16,12 @@ const anomalyKindClasses = {
   whale: "border-whale/40 bg-whale-soft text-whale",
 } satisfies Record<AnomalyKind, string>;
 
-function AnomalyItem({
-  children,
-  className,
-  kind,
-  meta,
-  time,
-  verb,
-  ...props
-}: AnomalyItemProps) {
+function AnomalyItem({ children, className, kind, meta, time, verb, ...props }: AnomalyItemProps) {
   return (
-    <div className={cn("border-border border-b px-3.5 py-3 animate-slide-in", className)} {...props}>
+    <div
+      className={cn("border-border border-b px-3.5 py-3 animate-slide-in", className)}
+      {...props}
+    >
       <div className="mb-1.5 flex items-center gap-2">
         <span
           className={cn(

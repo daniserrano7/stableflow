@@ -20,7 +20,11 @@ function Entity({ category, className, color, glyph, isWallet, name, ...props }:
       >
         {glyph}
       </span>
-      <span className={isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground"}>
+      <span
+        className={
+          isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground"
+        }
+      >
         {name}
       </span>
     </span>
