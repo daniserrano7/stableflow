@@ -11,12 +11,7 @@ const chipClasses =
 
 function Chip({ children, className, dotColor, pulse = true, ...props }: ChipProps) {
   return (
-    <Badge
-      className={cn(chipClasses, className)}
-      size="unstyled"
-      variant="unstyled"
-      {...props}
-    >
+    <Badge className={cn(chipClasses, className)} size="unstyled" variant="unstyled" {...props}>
       <span
         aria-hidden
         className={cn(

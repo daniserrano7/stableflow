@@ -39,6 +39,13 @@ function Entity({
           isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground"
         }
       >
+        {glyph}
+      </span>
+      <span
+        className={
+          isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground"
+        }
+      >
         {name}
       </span>
     </span>

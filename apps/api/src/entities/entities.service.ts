@@ -38,17 +38,18 @@ interface EntityDetailOptions {
   windowMinutes?: number;
 }
 
-interface EntitySummaryRow {
-  addressCount: number;
-  category: string;
-  entityId: string;
-  entityName: string;
-  firstSeenBlock: string | null;
-  labelCount: number;
-  latestSeenBlock: string | null;
-  roles: string[];
-  sourceTypes: string[];
-}
+type EntityRegistryLabel = Pick<
+  EntityAddressLabel,
+  | "address"
+  | "attributionGroup"
+  | "category"
+  | "countingPolicy"
+  | "entityId"
+  | "entityName"
+  | "firstSeenBlock"
+  | "role"
+  | "sourceType"
+>;
 
 interface DiscoveredAddressLabelRow {
   address: string;
@@ -133,31 +134,70 @@ export class EntitiesService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async listEntities(): Promise<EntityListResponse> {
-    const rows = await this.databaseService.db
-      .select({
-        addressCount: sql<number>`count(distinct ${discoveredAddressLabels.address})::int`,
-        category: discoveredAddressLabels.category,
-        entityId: discoveredAddressLabels.entityId,
-        entityName: discoveredAddressLabels.entityName,
-        firstSeenBlock: sql<string | null>`min(${discoveredAddressLabels.firstSeenBlock})::text`,
-        labelCount: sql<number>`count(*)::int`,
-        latestSeenBlock: sql<string | null>`max(${discoveredAddressLabels.firstSeenBlock})::text`,
-        roles: sql<
-          string[]
-        >`array_agg(distinct ${discoveredAddressLabels.role} order by ${discoveredAddressLabels.role})`,
-        sourceTypes: sql<
-          string[]
-        >`array_agg(distinct ${discoveredAddressLabels.sourceType} order by ${discoveredAddressLabels.sourceType})`,
-      })
-      .from(discoveredAddressLabels)
-      .groupBy(
-        discoveredAddressLabels.entityId,
-        discoveredAddressLabels.entityName,
-        discoveredAddressLabels.category,
-      )
-      .orderBy(desc(sql`count(*)`));
+    const [discoveredLabels, flowIdentities] = await Promise.all([
+      this.databaseService.db
+        .select({
+          address: discoveredAddressLabels.address,
+          attributionGroup: discoveredAddressLabels.attributionGroup,
+          category: discoveredAddressLabels.category,
+          countingPolicy: discoveredAddressLabels.countingPolicy,
+          entityId: discoveredAddressLabels.entityId,
+          entityName: discoveredAddressLabels.entityName,
+          firstSeenBlock: sql<string>`${discoveredAddressLabels.firstSeenBlock}::text`,
+          role: discoveredAddressLabels.role,
+          sourceType: discoveredAddressLabels.sourceType,
+        })
+        .from(discoveredAddressLabels)
+        .orderBy(asc(discoveredAddressLabels.firstSeenBlock), asc(discoveredAddressLabels.id)),
+      this.databaseService.db
+        .selectDistinctOn([usdcEntityFlowBuckets.entityId], {
+          category: usdcEntityFlowBuckets.category,
+          entityId: usdcEntityFlowBuckets.entityId,
+          entityName: usdcEntityFlowBuckets.entityName,
+        })
+        .from(usdcEntityFlowBuckets)
+        .orderBy(asc(usdcEntityFlowBuckets.entityId), desc(usdcEntityFlowBuckets.bucketStart)),
+    ]);
+    const labelsByEntity = new Map<string, Map<string, EntityRegistryLabel>>();
 
-    const entities = rows.map((row) => this.toEntitySummary(row));
+    // Match detail pages: discovered labels replace static labels at the same address.
+    for (const label of [
+      ...baseAddressLabels.map(toStaticEntityAddressLabel),
+      ...discoveredLabels,
+    ]) {
+      const labels = labelsByEntity.get(label.entityId) ?? new Map<string, EntityRegistryLabel>();
+      labels.set(label.address.toLowerCase(), label);
+      labelsByEntity.set(label.entityId, labels);
+    }
+
+    const identitiesByEntity = new Map(
+      flowIdentities.map((identity) => [identity.entityId, identity]),
+    );
+    const entityIds = new Set([...labelsByEntity.keys(), ...identitiesByEntity.keys()]);
+    const entities: EntitySummary[] = [];
+
+    for (const entityId of entityIds) {
+      const labels = [...(labelsByEntity.get(entityId)?.values() ?? [])].sort(
+        compareEntityAddressLabels,
+      );
+      const summary = this.toEntityDetailSummary(
+        entityId,
+        labels,
+        identitiesByEntity.get(entityId) ?? null,
+      );
+
+      if (summary !== null) {
+        const { attributionGroups: _, ...entity } = summary;
+        entities.push(entity);
+      }
+    }
+
+    entities.sort(
+      (a, b) =>
+        b.labelCount - a.labelCount ||
+        a.entityName.localeCompare(b.entityName) ||
+        a.entityId.localeCompare(b.entityId),
+    );
 
     return {
       data: entities,
@@ -268,7 +308,7 @@ export class EntitiesService {
 
   private toEntityDetailSummary(
     entityId: string,
-    labels: EntityAddressLabel[],
+    labels: EntityRegistryLabel[],
     flowIdentity: EntityIdentity | null,
   ): EntityDetailSummary | null {
     const labelIdentity = labels.at(0);
@@ -568,20 +608,6 @@ export class EntitiesService {
     };
   }
 
-  private toEntitySummary(row: EntitySummaryRow): EntitySummary {
-    return {
-      addressCount: row.addressCount,
-      category: row.category,
-      entityId: row.entityId,
-      entityName: row.entityName,
-      firstSeenBlock: row.firstSeenBlock,
-      labelCount: row.labelCount,
-      latestSeenBlock: row.latestSeenBlock,
-      roles: row.roles,
-      sourceTypes: row.sourceTypes,
-    };
-  }
-
   private summarizeCategories(entities: EntitySummary[]): EntityCategorySummary[] {
     const categorySummaries = new Map<string, EntityCategorySummary>();
 
@@ -655,7 +681,7 @@ const getStaticEntityIdentity = (entityId: string): EntityIdentity | null => {
   };
 };
 
-const compareEntityAddressLabels = (a: EntityAddressLabel, b: EntityAddressLabel) => {
+const compareEntityAddressLabels = (a: EntityRegistryLabel, b: EntityRegistryLabel) => {
   return (
     compareCountingPolicy(a.countingPolicy, b.countingPolicy) ||
     a.role.localeCompare(b.role) ||
