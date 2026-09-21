@@ -5,6 +5,7 @@ import { EntitiesService } from "./entities.service.js";
 
 @Module({
   controllers: [EntitiesController],
+  exports: [EntitiesService],
   imports: [DatabaseModule],
   providers: [EntitiesService],
 })

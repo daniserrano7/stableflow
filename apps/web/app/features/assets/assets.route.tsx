@@ -1,8 +1,8 @@
 import type { FlowKpisResponse } from "@stableflow/shared";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Coins, Search } from "lucide-react";
-import { useState } from "react";
-import { Link, useLoaderData } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useLoaderData, useSearchParams } from "react-router";
 import {
   Chip,
   KPI,
@@ -61,8 +61,13 @@ export async function loader({ request }: { request: Request }) {
 
 export default function Assets() {
   const { kpis: initialKpis } = useLoaderData<typeof loader>();
-  const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") ?? "";
+  const [query, setQuery] = useState(urlQuery);
   const [status, setStatus] = useState("all");
+
+  useEffect(() => setQuery(urlQuery), [urlQuery]);
+
   const kpisQuery = useQuery({
     queryKey: flowKpisQueryKey,
     queryFn: ({ signal }) => fetchFlowKpis({ signal }),

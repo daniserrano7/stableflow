@@ -15,6 +15,7 @@ export const usdcTransfers = onchainTable(
   }),
   (table) => ({
     blockNumberIndex: index("usdc_transfers_block_number_idx").on(table.blockNumber),
+    transactionHashIndex: index("usdc_transfers_transaction_hash_idx").on(table.transactionHash),
   }),
 );
 

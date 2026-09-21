@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Links, type LinksFunction, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { SearchDialogProvider } from "./features/search/search-dialog";
 import stylesHref from "./styles.css?url";
 
 export const links: LinksFunction = () => [
@@ -42,9 +43,11 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={150}>
-        <Outlet />
-      </TooltipProvider>
+      <SearchDialogProvider>
+        <TooltipProvider delayDuration={150}>
+          <Outlet />
+        </TooltipProvider>
+      </SearchDialogProvider>
     </QueryClientProvider>
   );
 }

@@ -163,6 +163,45 @@ export interface RecentTransfersResponse {
   };
 }
 
+export interface SearchEntityResult {
+  type: "entity";
+  entityId: string;
+  entityName: string;
+  category: EntityCategory;
+  addressCount: number;
+}
+
+export interface SearchAddressResult {
+  type: "address";
+  address: string;
+  category: EntityCategory;
+  entityId: string | null;
+  entityName: string | null;
+  label: string | null;
+  role: string | null;
+}
+
+export interface SearchTransactionResult {
+  type: "transaction";
+  transactionHash: string;
+  blockNumber: string;
+  blockTimestamp: string;
+  fromAddress: string;
+  toAddress: string;
+  amount: LiveTransferAmount;
+}
+
+export type SearchResult = SearchEntityResult | SearchAddressResult | SearchTransactionResult;
+
+export interface SearchResponse {
+  data: SearchResult[];
+  meta: {
+    generatedAt: string;
+    query: string;
+    total: number;
+  };
+}
+
 export interface LiveTransferBatchEvent {
   cursor: LiveTransferCursor | null;
   generatedAt: string;

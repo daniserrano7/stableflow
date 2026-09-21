@@ -7,6 +7,7 @@ export default [
   route("assets", "features/assets/assets.route.tsx"),
   route("entities/:entityId", "features/entities/entity-detail.route.tsx"),
   route("api/entities/:entityId", "features/entities/entity-detail.resource.ts"),
+  route("api/search", "features/search/search.resource.ts"),
   route("api/flows/kpis", "features/flow-kpis/flow-kpis.resource.ts"),
   route("api/flows/live-graph", "features/live-transfers/live-transfer-graph.resource.ts"),
   route("events/transfers", "features/live-transfers/transfers.stream.ts"),
