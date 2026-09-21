@@ -12,7 +12,7 @@ interface AppHeaderProps {
 
 export function AppHeader({
   context,
-  eyebrow = "Flow / Base · USDC · Live",
+  eyebrow = "Overview · USDC",
   headingId = "home-title",
   searchPlaceholder = "Search protocol, address, tx hash...",
   title = "Stableflow",

@@ -1,5 +1,6 @@
-import { Activity, BarChart3, Network, Radio, Search } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, Network, Radio, Search } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   Amount,
   AnomalyItem,
@@ -70,13 +71,21 @@ export default function DesignSystemRoute() {
 
       <div className="mx-auto grid w-full max-w-[1180px] gap-8 px-4 py-10">
         <header className="grid gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Chip>Base</Chip>
-            <Chip dotColor="var(--asset-usdc)">USDC</Chip>
-            <Chip pulse={false}>Tailwind v4</Chip>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/">
+                <ArrowLeft />
+                Back to overview
+              </Link>
+            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip>Base</Chip>
+              <Chip dotColor="var(--asset-usdc)">USDC</Chip>
+              <Chip pulse={false}>Tailwind v4</Chip>
+            </div>
           </div>
           <div>
-            <p className="eyebrow">Stableflow Design System</p>
+            <p className="eyebrow">Design System · USDC</p>
             <h1 className="mt-3 max-w-4xl text-4xl font-medium leading-none">
               Tokens and primitives for dense USDC flow intelligence.
             </h1>

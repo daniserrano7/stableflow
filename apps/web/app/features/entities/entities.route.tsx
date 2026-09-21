@@ -162,7 +162,7 @@ export default function Entities() {
         aria-labelledby="entities-title"
       >
         <AppHeader
-          eyebrow="Flow / Entities / Registry"
+          eyebrow="Entities / Registry · USDC"
           headingId="entities-app-title"
           searchPlaceholder="Search entity, address, tx hash..."
           title="Stableflow"

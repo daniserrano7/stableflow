@@ -203,7 +203,7 @@ export default function EntityDetail() {
         aria-labelledby="entity-title"
       >
         <AppHeader
-          eyebrow="Entities / Base · USDC"
+          eyebrow={`Entities / ${entity.entityName} · USDC`}
           headingId="entity-app-title"
           searchPlaceholder="Search entity, address, tx hash..."
           title="Stableflow"

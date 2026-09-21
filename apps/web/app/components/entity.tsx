@@ -35,18 +35,20 @@ function Entity({
         style={{ background: color ?? `var(--cat-${category ?? "wallet"})` }}
       />
       <span
-        className={
-          isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground"
-        }
+        className={cn(
+          "inline-flex min-w-0 items-center gap-1.5",
+          isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground",
+        )}
       >
-        {glyph}
-      </span>
-      <span
-        className={
-          isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground"
-        }
-      >
-        {name}
+        {glyph && (
+          <>
+            <span className="shrink-0">{glyph}</span>
+            <span aria-hidden className="shrink-0 text-muted-foreground/50">
+              ·
+            </span>
+          </>
+        )}
+        <span className="min-w-0 truncate">{name}</span>
       </span>
     </span>
   );

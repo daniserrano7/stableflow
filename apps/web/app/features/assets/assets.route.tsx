@@ -95,7 +95,7 @@ export default function Assets() {
         aria-labelledby="assets-title"
       >
         <AppHeader
-          eyebrow="Flow / Assets / Base"
+          eyebrow="Assets / Base · USDC"
           headingId="assets-app-title"
           context={<Chip pulse={false}>BASE · MAINNET</Chip>}
         />

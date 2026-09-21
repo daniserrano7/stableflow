@@ -1,15 +1,13 @@
-import { BarChart3, Blocks, Coins, Link2, Network, Settings } from "lucide-react";
+import { Blocks, Coins, Network, Palette } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { cn } from "../utils/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 const sidebarItems = [
-  { href: "/", icon: Network, label: "Flow" },
+  { href: "/", icon: Network, label: "Overview" },
   { href: "/entities", icon: Blocks, label: "Entities" },
   { href: "/assets", icon: Coins, label: "Assets" },
-  { href: "/", icon: Link2, label: "Chains" },
-  { href: "/design-system", icon: BarChart3, hasBadge: true, label: "Stats" },
 ];
 
 export function AppSidebar() {
@@ -34,7 +32,6 @@ export function AppSidebar() {
 
           return (
             <SidebarItem
-              hasBadge={item.hasBadge}
               icon={<Icon size={16} strokeWidth={1.6} />}
               isActive={isSidebarItemActive(pathname, item.href, item.label)}
               key={item.label}
@@ -48,8 +45,9 @@ export function AppSidebar() {
       <div className="flex-1" />
       <div className="my-2 h-px w-6 bg-border" />
       <SidebarItem
-        icon={<Settings size={16} strokeWidth={1.6} />}
-        label="Settings"
+        icon={<Palette size={16} strokeWidth={1.6} />}
+        isActive={pathname === "/design-system"}
+        label="Design System"
         to="/design-system"
       />
     </aside>
@@ -58,20 +56,18 @@ export function AppSidebar() {
 
 function isSidebarItemActive(pathname: string, href: string, label: string) {
   if (href === "/") {
-    return label === "Flow" && pathname === "/";
+    return label === "Overview" && pathname === "/";
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function SidebarItem({
-  hasBadge,
   icon,
   isActive,
   label,
   to,
 }: {
-  hasBadge?: boolean;
   icon: ReactNode;
   isActive?: boolean;
   label: string;
@@ -90,9 +86,6 @@ function SidebarItem({
           to={to}
         >
           {icon}
-          {hasBadge && (
-            <span className="absolute top-1 right-1 size-1.5 rounded-full bg-anomaly ring-2 ring-background" />
-          )}
         </Link>
       </TooltipTrigger>
       <TooltipContent side="right">{label}</TooltipContent>
