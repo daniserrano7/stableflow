@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 const sidebarItems = [
   { href: "/", icon: Network, label: "Flow" },
   { href: "/entities", icon: Blocks, label: "Entities" },
-  { href: "/", icon: Coins, label: "Assets" },
+  { href: "/assets", icon: Coins, label: "Assets" },
   { href: "/", icon: Link2, label: "Chains" },
   { href: "/design-system", icon: BarChart3, hasBadge: true, label: "Stats" },
 ];

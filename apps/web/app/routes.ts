@@ -4,6 +4,7 @@ export default [
   index("features/home/home.route.tsx"),
   route("design-system", "features/design-system/design-system.route.tsx"),
   route("entities", "features/entities/entities.route.tsx"),
+  route("assets", "features/assets/assets.route.tsx"),
   route("entities/:entityId", "features/entities/entity-detail.route.tsx"),
   route("api/entities/:entityId", "features/entities/entity-detail.resource.ts"),
   route("api/flows/kpis", "features/flow-kpis/flow-kpis.resource.ts"),

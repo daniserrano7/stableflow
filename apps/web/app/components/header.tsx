@@ -1,7 +1,9 @@
 import { Search } from "lucide-react";
+import type { ReactNode } from "react";
 import { Chip } from "./chip";
 
 interface AppHeaderProps {
+  context?: ReactNode;
   eyebrow?: string;
   headingId?: string;
   searchPlaceholder?: string;
@@ -9,6 +11,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({
+  context,
   eyebrow = "Flow / Base · USDC · Live",
   headingId = "home-title",
   searchPlaceholder = "Search protocol, address, tx hash...",
@@ -38,8 +41,12 @@ export function AppHeader({
       </div>
 
       <div className="flex gap-2 lg:ml-auto">
-        <Chip>BASE · MAINNET</Chip>
-        <Chip dotColor="var(--asset-usdc)">USDC</Chip>
+        {context ?? (
+          <>
+            <Chip>BASE · MAINNET</Chip>
+            <Chip dotColor="var(--asset-usdc)">USDC</Chip>
+          </>
+        )}
       </div>
     </header>
   );

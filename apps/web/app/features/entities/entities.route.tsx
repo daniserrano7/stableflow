@@ -169,12 +169,12 @@ export default function Entities() {
         />
 
         <Panel>
-          <PanelBody className="grid gap-5 p-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:p-5">
-            <div className="flex size-14 items-center justify-center rounded-lg bg-accent text-background shadow-[var(--shadow-glow-accent)]">
+          <PanelBody className="flex flex-col items-start gap-5 p-5 sm:flex-row">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-accent text-background shadow-[var(--shadow-glow-accent)]">
               <Blocks size={25} strokeWidth={1.8} />
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="mb-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
                 Labeled entity registry · Base · USDC
               </p>

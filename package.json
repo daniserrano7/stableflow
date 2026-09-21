@@ -12,7 +12,7 @@
     "check": "biome check . && pnpm typecheck",
     "check:env": "pnpm --filter @stableflow/indexer check:env",
     "check:write": "biome check --write .",
-    "dev": "pnpm --parallel -r dev",
+    "dev": "pnpm --parallel -r --filter @stableflow/web --filter @stableflow/api --filter @stableflow/shared dev",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
