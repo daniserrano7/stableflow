@@ -40,6 +40,7 @@ import {
   PanelHead,
   PanelTitle,
   Tag,
+  VisualMark,
 } from "~/components";
 import { AppHeader } from "~/components/header";
 import { AppSidebar } from "~/components/sidebar";
@@ -55,6 +56,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 import { getApiUrl } from "~/config/api.server";
+import { getVisualIdentity } from "~/config/visuals";
 import { CATEGORY, type Category } from "~/styles/tokens";
 import { cn } from "~/utils/cn";
 import { shortAddr } from "~/utils/format";
@@ -323,6 +325,7 @@ function EntityHero({ entity }: { entity: EntityDetailSummary }) {
   const [copied, setCopied] = useState(false);
   const category = getKnownCategory(entity.category);
   const glyph = getEntityGlyph(entity.entityName);
+  const visual = getVisualIdentity("entity", entity.entityId);
 
   const copyEntityId = async () => {
     await navigator.clipboard?.writeText(entity.entityId);
@@ -332,13 +335,13 @@ function EntityHero({ entity }: { entity: EntityDetailSummary }) {
 
   return (
     <header className="grid gap-4 overflow-hidden rounded-lg border border-border bg-glass p-4 backdrop-blur-xl backdrop-saturate-150 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-start lg:p-5">
-      <div
-        className="flex size-14 items-center justify-center rounded-lg font-mono text-xl font-semibold text-background shadow-sm"
+      <VisualMark
+        className="size-14 rounded-lg font-mono text-xl font-semibold text-background shadow-sm"
+        fallback={glyph}
+        imageName={visual?.name}
+        imageUrl={visual?.imageUrl}
         style={{ background: `var(--cat-${category ?? "wallet"})` }}
-        aria-hidden
-      >
-        {glyph}
-      </div>
+      />
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
@@ -758,6 +761,7 @@ function CounterpartiesPanel({
               <div className="min-w-0">
                 <Entity
                   category={category}
+                  entityId={counterparty.entityId}
                   glyph={getEntityGlyph(counterparty.entityName)}
                   name={counterparty.entityName}
                 />
@@ -910,6 +914,7 @@ function TransferPartyCell({ party }: { party: LiveTransferParty }) {
     <Entity
       className="min-w-0 max-w-full [&>span:last-child]:min-w-0 [&>span:last-child]:truncate"
       category={category}
+      entityId={party.entityId}
       glyph={party.isIdentified ? getEntityGlyph(party.displayName) : "0x"}
       isWallet={!party.isIdentified}
       name={party.displayName}

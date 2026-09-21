@@ -142,6 +142,7 @@ function TransferEntity({ party }: { party: LiveTransferParty }) {
   const entity = (
     <Entity
       category={category}
+      entityId={party.entityId}
       glyph={getEntityGlyph(party, category)}
       isWallet={!party.isIdentified}
       name={party.displayName}

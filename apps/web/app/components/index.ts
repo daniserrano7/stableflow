@@ -7,3 +7,4 @@ export * from "./kpi";
 export * from "./panel";
 export * from "./rail";
 export * from "./tag";
+export * from "./visual-mark";

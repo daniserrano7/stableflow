@@ -151,6 +151,7 @@ function TopEntityFlowItem({ flow, mode }: { flow: TopEntityFlowRow; mode: TopEn
       >
         <Entity
           category={category}
+          entityId={flow.entityId}
           glyph={getEntityGlyph(flow)}
           name={flow.entityName}
           className="min-w-0"

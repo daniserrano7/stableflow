@@ -325,6 +325,7 @@ function EntityTable({ entities }: { entities: EnrichedEntity[] }) {
                   >
                     <Entity
                       category={getKnownCategory(entity.category)}
+                      entityId={entity.entityId}
                       glyph={getEntityGlyph(entity.entityName)}
                       name={entity.entityName}
                     />
@@ -397,6 +398,7 @@ function EntityCards({ entities }: { entities: EnrichedEntity[] }) {
             <div className="flex items-start justify-between gap-3">
               <Entity
                 category={getKnownCategory(entity.category)}
+                entityId={entity.entityId}
                 glyph={getEntityGlyph(entity.entityName)}
                 name={entity.entityName}
               />

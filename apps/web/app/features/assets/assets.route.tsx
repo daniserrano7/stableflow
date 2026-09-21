@@ -1,8 +1,8 @@
-import type { FlowKpisResponse } from '@stableflow/shared';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, Coins, Search } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useLoaderData } from 'react-router';
+import type { FlowKpisResponse } from "@stableflow/shared";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowUpRight, Coins, Search } from "lucide-react";
+import { useState } from "react";
+import { Link, useLoaderData } from "react-router";
 import {
   Chip,
   KPI,
@@ -11,10 +11,11 @@ import {
   PanelHead,
   PanelTitle,
   Sparkline,
-} from '~/components';
-import { AppHeader } from '~/components/header';
-import { AppSidebar } from '~/components/sidebar';
-import { Button } from '~/components/ui/button';
+  VisualMark,
+} from "~/components";
+import { AppHeader } from "~/components/header";
+import { AppSidebar } from "~/components/sidebar";
+import { Button } from "~/components/ui/button";
 import {
   Table,
   TableBody,
@@ -22,31 +23,32 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '~/components/ui/table';
-import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group';
-import { getApiUrl } from '~/config/api.server';
-import { fmtUSD, shortAddr } from '~/utils/format';
+} from "~/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { getApiUrl } from "~/config/api.server";
+import { getVisualIdentity } from "~/config/visuals";
+import { fmtUSD, shortAddr } from "~/utils/format";
 import {
   fetchFlowKpis,
   flowKpisQueryKey,
   flowKpisRefreshIntervalMs,
-} from '../flow-kpis/flow-kpis.query';
-import { selectedAssetChain as chain } from './assets.config';
+} from "../flow-kpis/flow-kpis.query";
+import { selectedAssetChain as chain } from "./assets.config";
 
 export function meta() {
   return [
-    { title: 'Assets | Stableflow' },
+    { title: "Assets | Stableflow" },
     {
-      name: 'description',
-      content: 'Explore assets and tracked stablecoin activity on Base.',
+      name: "description",
+      content: "Explore assets and tracked stablecoin activity on Base.",
     },
   ];
 }
 
 export async function loader({ request }: { request: Request }) {
   try {
-    const response = await fetch(getApiUrl('/flows/kpis'), {
-      headers: { accept: 'application/json' },
+    const response = await fetch(getApiUrl("/flows/kpis"), {
+      headers: { accept: "application/json" },
       signal: request.signal,
     });
     if (!response.ok) return { kpis: null };
@@ -59,36 +61,26 @@ export async function loader({ request }: { request: Request }) {
 
 export default function Assets() {
   const { kpis: initialKpis } = useLoaderData<typeof loader>();
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('all');
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
   const kpisQuery = useQuery({
     queryKey: flowKpisQueryKey,
     queryFn: ({ signal }) => fetchFlowKpis({ signal }),
     initialData: initialKpis ?? undefined,
-    initialDataUpdatedAt: initialKpis
-      ? Date.parse(initialKpis.meta.generatedAt)
-      : undefined,
+    initialDataUpdatedAt: initialKpis ? Date.parse(initialKpis.meta.generatedAt) : undefined,
     refetchInterval: flowKpisRefreshIntervalMs,
     staleTime: 10_000,
     retry: 2,
   });
-  const volume = kpisQuery.data?.data.find(
-    (card) => card.id === 'usdc-volume-24h',
-  );
-  const transfers = kpisQuery.data?.data.find(
-    (card) => card.id === 'transfers-1h',
-  );
-  const volumeValue = volume ? fmtUSD(Number(volume.value.formatted)) : '—';
-  const transferValue = transfers
-    ? Number(transfers.value.formatted).toLocaleString('en-US')
-    : '—';
-  const trackedCount = chain.assets.filter(
-    (asset) => asset.status === 'tracked',
-  ).length;
+  const volume = kpisQuery.data?.data.find((card) => card.id === "usdc-volume-24h");
+  const transfers = kpisQuery.data?.data.find((card) => card.id === "transfers-1h");
+  const volumeValue = volume ? fmtUSD(Number(volume.value.formatted)) : "—";
+  const transferValue = transfers ? Number(transfers.value.formatted).toLocaleString("en-US") : "—";
+  const trackedCount = chain.assets.filter((asset) => asset.status === "tracked").length;
   const visibleAssets = chain.assets.filter(
     (asset) =>
-      (status === 'all' || asset.status === status) &&
-      `${asset.symbol} ${asset.name} ${asset.contract ?? ''}`
+      (status === "all" || asset.status === status) &&
+      `${asset.symbol} ${asset.name} ${asset.contract ?? ""}`
         .toLowerCase()
         .includes(query.trim().toLowerCase()),
   );
@@ -116,10 +108,7 @@ export default function Assets() {
               <p className="mb-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
                 Assets / {chain.name}
               </p>
-              <h1
-                id="assets-title"
-                className="m-0 text-2xl font-medium leading-tight"
-              >
+              <h1 id="assets-title" className="m-0 text-2xl font-medium leading-tight">
                 Asset Explorer
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -137,41 +126,26 @@ export default function Assets() {
             value={trackedCount}
             unit={`/ ${chain.assets.length} listed`}
           />
-          <KPI
-            label="Preview assets"
-            value={chain.assets.length - trackedCount}
-          />
+          <KPI label="Preview assets" value={chain.assets.length - trackedCount} />
           <KPI
             label="USDC volume · 24h"
             value={volumeValue}
-            spark={
-              volume && (
-                <Sparkline
-                  data={volume.series.map((point) => Number(point.value))}
-                />
-              )
-            }
+            spark={volume && <Sparkline data={volume.series.map((point) => Number(point.value))} />}
           />
           <KPI
             label="USDC transfers · 1h"
             value={transferValue}
             spark={
-              transfers && (
-                <Sparkline
-                  data={transfers.series.map((point) => Number(point.value))}
-                />
-              )
+              transfers && <Sparkline data={transfers.series.map((point) => Number(point.value))} />
             }
           />
         </section>
         {(kpisQuery.isError || !kpisQuery.data) && (
           <p role="status" className="text-sm text-muted-foreground">
             {kpisQuery.isError
-              ? 'Activity metrics are temporarily unavailable. Retrying automatically.'
-              : 'Loading activity metrics…'}
-            {kpisQuery.isError && kpisQuery.data
-              ? ' Showing the last available values.'
-              : ''}
+              ? "Activity metrics are temporarily unavailable. Retrying automatically."
+              : "Loading activity metrics…"}
+            {kpisQuery.isError && kpisQuery.data ? " Showing the last available values." : ""}
           </p>
         )}
         <div className="grid min-w-0 gap-3.5 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -179,8 +153,7 @@ export default function Assets() {
             <PanelHead className="flex-wrap gap-3">
               <PanelTitle>{chain.name} assets</PanelTitle>
               <span className="font-mono text-2xs text-muted-foreground">
-                {visibleAssets.length}{' '}
-                {visibleAssets.length === 1 ? 'asset' : 'assets'}
+                {visibleAssets.length} {visibleAssets.length === 1 ? "asset" : "assets"}
               </span>
             </PanelHead>
             <PanelBody className="flex flex-col gap-3 border-b border-border p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -225,13 +198,7 @@ export default function Assets() {
                   <TableRow key={asset.symbol}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <span
-                          aria-hidden
-                          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border font-mono font-medium"
-                          style={{ color: asset.color }}
-                        >
-                          $
-                        </span>
+                        <AssetVisual color={asset.color} symbol={asset.symbol} />
                         <div>
                           <span className="font-medium">{asset.symbol}</span>
                           <span className="mt-1 block text-xs text-muted-foreground">
@@ -244,22 +211,20 @@ export default function Assets() {
                       <Chip
                         pulse={false}
                         dotColor={
-                          asset.status === 'tracked'
-                            ? 'var(--inflow)'
-                            : 'var(--muted-foreground)'
+                          asset.status === "tracked" ? "var(--inflow)" : "var(--muted-foreground)"
                         }
                       >
-                        {asset.status === 'tracked' ? 'Tracked' : 'Preview'}
+                        {asset.status === "tracked" ? "Tracked" : "Preview"}
                       </Chip>
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {asset.status === 'tracked' ? volumeValue : '—'}
+                      {asset.status === "tracked" ? volumeValue : "—"}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {asset.status === 'tracked' ? transferValue : '—'}
+                      {asset.status === "tracked" ? transferValue : "—"}
                     </TableCell>
                     <TableCell>
-                      {asset.status === 'tracked' ? (
+                      {asset.status === "tracked" ? (
                         <Button asChild variant="ghost" size="sm">
                           <Link to="/">
                             View flows
@@ -282,28 +247,46 @@ export default function Assets() {
               </p>
             )}
           </Panel>
-          <aside
-            aria-label="Chain coverage"
-            className="flex min-w-0 flex-col gap-3.5"
-          >
+          <aside aria-label="Chain coverage" className="flex min-w-0 flex-col gap-3.5">
             <Panel>
               <PanelHead>
-                <PanelTitle>Network overview</PanelTitle>
+                <PanelTitle>
+                  <ChainVisual />
+                  Network overview
+                </PanelTitle>
               </PanelHead>
               <PanelBody>
                 <dl className="space-y-3 font-mono text-xs">
                   <Detail label="Chain" value={chain.name} />
                   <Detail label="Network" value={chain.network} />
                   <Detail label="Chain ID" value={chain.id.toString()} />
-                  <Detail
-                    label="Indexed assets"
-                    value={trackedCount.toString()}
-                  />
+                  <Detail label="Indexed assets" value={trackedCount.toString()} />
                 </dl>
                 <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
-                  Activity totals cover tracked USDC transfers only. Preview
-                  assets are illustrative and have no indexed activity.
+                  Activity totals cover tracked USDC transfers only. Preview assets are illustrative
+                  and have no indexed activity.
                 </p>
+                <nav
+                  aria-label={`${chain.name} resources`}
+                  className="mt-4 grid gap-1.5 border-t border-border pt-4"
+                >
+                  {chain.resources.map((resource) => (
+                    <a
+                      className="group flex items-center justify-between gap-3 rounded-md px-2 py-2 text-sm text-muted-foreground no-underline transition-colors hover:bg-surface-2 hover:text-foreground"
+                      href={resource.href}
+                      key={resource.href}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {resource.label}
+                      <ArrowUpRight
+                        aria-hidden
+                        className="shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                        size={14}
+                      />
+                    </a>
+                  ))}
+                </nav>
               </PanelBody>
             </Panel>
             <Panel>
@@ -319,11 +302,22 @@ export default function Assets() {
                       className="flex items-center justify-between gap-2 font-mono text-xs"
                     >
                       <span>{asset.symbol}</span>
-                      <span
-                        title={asset.contract}
-                        className="text-muted-foreground"
-                      >
-                        {shortAddr(asset.contract ?? '')}
+                      <span className="flex items-center gap-1">
+                        <span title={asset.contract} className="text-muted-foreground">
+                          {shortAddr(asset.contract ?? "")}
+                        </span>
+                        {asset.contractExplorerUrl && (
+                          <Button asChild size="icon-sm" variant="ghost">
+                            <a
+                              aria-label={`View ${asset.symbol} contract on BaseScan`}
+                              href={asset.contractExplorerUrl}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              <ArrowUpRight />
+                            </a>
+                          </Button>
+                        )}
                       </span>
                     </div>
                   ))}
@@ -342,5 +336,32 @@ function Detail({ label, value }: { label: string; value: string }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd>{value}</dd>
     </div>
+  );
+}
+
+function AssetVisual({ color, symbol }: { color: string; symbol: string }) {
+  const visual = getVisualIdentity("asset", symbol);
+
+  return (
+    <VisualMark
+      className="size-9 rounded-full border border-border font-mono font-medium"
+      fallback="$"
+      imageName={visual?.name}
+      imageUrl={visual?.imageUrl}
+      style={{ color }}
+    />
+  );
+}
+
+function ChainVisual() {
+  const visual = getVisualIdentity("chain", chain.id);
+
+  return (
+    <VisualMark
+      className="size-5 rounded-full"
+      fallback={chain.name.slice(0, 1)}
+      imageName={visual?.name}
+      imageUrl={visual?.imageUrl}
+    />
   );
 }
