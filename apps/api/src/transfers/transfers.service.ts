@@ -6,9 +6,12 @@ import type {
   LiveTransferCursor,
   LiveTransferParty,
   LiveTransferRow,
+  MovementParams,
+  MovementsResponse,
   RecentTransfersResponse,
 } from "@stableflow/shared";
-import { and, asc, desc, eq, gt, inArray, or } from "drizzle-orm";
+import { movementsPageSize, movementThresholds } from "@stableflow/shared";
+import { and, asc, desc, eq, gt, gte, inArray, lt, or } from "drizzle-orm";
 import { concatMap, filter, from, interval, map, Observable, startWith } from "rxjs";
 import { DatabaseService } from "../database/database.service.js";
 import { toTokenAmount } from "../tokens/base-usdc.js";
@@ -47,6 +50,56 @@ export class TransfersService {
       meta: {
         generatedAt: new Date().toISOString(),
         limit: normalizedLimit,
+      },
+    };
+  }
+
+  async listMovements({ filter, cursor, direction }: MovementParams): Promise<MovementsResponse> {
+    const newer = direction === "newer";
+    const compare = newer ? gt : lt;
+    const order = newer ? asc : desc;
+    const records = await this.databaseService.db
+      .select({
+        blockNumber: usdcTransfers.blockNumber,
+        blockTimestamp: usdcTransfers.blockTimestamp,
+        fromAddress: usdcTransfers.fromAddress,
+        id: usdcTransfers.id,
+        logIndex: usdcTransfers.logIndex,
+        toAddress: usdcTransfers.toAddress,
+        transactionHash: usdcTransfers.transactionHash,
+        value: usdcTransfers.value,
+      })
+      .from(usdcTransfers)
+      .where(
+        and(
+          gte(usdcTransfers.value, BigInt(movementThresholds[filter]) * 1_000_000n),
+          cursor === null
+            ? undefined
+            : or(
+                compare(usdcTransfers.blockNumber, BigInt(cursor.blockNumber)),
+                and(
+                  eq(usdcTransfers.blockNumber, BigInt(cursor.blockNumber)),
+                  compare(usdcTransfers.logIndex, cursor.logIndex),
+                ),
+              ),
+        ),
+      )
+      .orderBy(order(usdcTransfers.blockNumber), order(usdcTransfers.logIndex))
+      .limit(movementsPageSize + 1);
+    const hasMore = records.length > movementsPageSize;
+    const page = records.slice(0, movementsPageSize);
+    if (newer) page.reverse();
+    const first = page.at(0);
+    const last = page.at(-1);
+    const toCursor = (record: TransferRecord) => `${record.blockNumber}:${record.logIndex}`;
+    return {
+      data: await this.toLiveTransferRows(page),
+      meta: {
+        generatedAt: new Date().toISOString(),
+        limit: movementsPageSize,
+        filter,
+        newerCursor: first && (newer ? hasMore : cursor !== null) ? toCursor(first) : null,
+        olderCursor: last && (newer ? cursor !== null : hasMore) ? toCursor(last) : null,
       },
     };
   }

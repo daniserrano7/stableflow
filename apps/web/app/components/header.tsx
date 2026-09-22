@@ -1,22 +1,30 @@
-import { Search } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { ArrowLeft, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { useSearchDialog } from "~/features/search/search-dialog-context";
-import { Chip } from "./chip";
+
+interface HeaderBreadcrumb {
+  label: string;
+  to?: string;
+}
+
+interface HeaderBackLink {
+  label: string;
+  to: string;
+}
 
 interface AppHeaderProps {
-  context?: ReactNode;
-  eyebrow?: string;
+  backLink?: HeaderBackLink;
+  breadcrumbs?: HeaderBreadcrumb[];
   headingId?: string;
   searchPlaceholder?: string;
-  title?: string;
 }
 
 export function AppHeader({
-  context,
-  eyebrow = "Overview · USDC",
+  backLink,
+  breadcrumbs = [{ label: "Overview" }],
   headingId = "home-title",
-  searchPlaceholder = "Search protocol, address, tx hash...",
-  title = "Stableflow",
+  searchPlaceholder = "Search entities...",
 }: AppHeaderProps) {
   const { openSearch } = useSearchDialog();
   const [shortcutLabel, setShortcutLabel] = useState("⌘K");
@@ -29,14 +37,48 @@ export function AppHeader({
 
   return (
     <header className="flex min-h-12 flex-col items-stretch gap-3.5 rounded-lg border border-border bg-glass px-3.5 py-2 backdrop-blur-xl backdrop-saturate-150 lg:flex-row lg:items-center">
-      <div className="min-w-0 lg:min-w-56">
-        <div>
+      <div className="flex min-w-0 items-center gap-2 lg:min-w-56">
+        {backLink && (
+          <Link
+            aria-label={backLink.label}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+            to={backLink.to}
+          >
+            <ArrowLeft size={15} />
+          </Link>
+        )}
+        <div className="min-w-0">
           <h1 id={headingId} className="m-0 text-md font-semibold leading-none tracking-normal">
-            {title}
+            Stableflow
           </h1>
-          <p className="mt-1 mb-0 font-mono text-2xs text-muted-foreground uppercase leading-none tracking-widest">
-            {eyebrow}
-          </p>
+          <nav
+            aria-label="Breadcrumb"
+            className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden font-mono text-xs leading-none text-muted-foreground"
+          >
+            {breadcrumbs.map((breadcrumb, index) => (
+              <span
+                className="flex min-w-0 items-center gap-1.5"
+                key={`${breadcrumb.to ?? "current"}-${breadcrumb.label}`}
+              >
+                {index > 0 && <span aria-hidden>/</span>}
+                {breadcrumb.to ? (
+                  <Link
+                    className="truncate transition-colors hover:text-foreground"
+                    to={breadcrumb.to}
+                  >
+                    {breadcrumb.label}
+                  </Link>
+                ) : (
+                  <span
+                    aria-current={index === breadcrumbs.length - 1 ? "page" : undefined}
+                    className="truncate"
+                  >
+                    {breadcrumb.label}
+                  </span>
+                )}
+              </span>
+            ))}
+          </nav>
         </div>
       </div>
 
@@ -55,15 +97,6 @@ export function AppHeader({
           {shortcutLabel}
         </kbd>
       </button>
-
-      <div className="flex gap-2 lg:ml-auto">
-        {context ?? (
-          <>
-            <Chip>BASE · MAINNET</Chip>
-            <Chip dotColor="var(--asset-usdc)">USDC</Chip>
-          </>
-        )}
-      </div>
     </header>
   );
 }

@@ -203,10 +203,10 @@ export default function EntityDetail() {
         aria-labelledby="entity-title"
       >
         <AppHeader
-          eyebrow={`Entities / ${entity.entityName} · USDC`}
+          backLink={{ label: "Back to Entities", to: "/entities" }}
+          breadcrumbs={[{ label: "Entities", to: "/entities" }, { label: entity.entityName }]}
           headingId="entity-app-title"
-          searchPlaceholder="Search entity, address, tx hash..."
-          title="Stableflow"
+          searchPlaceholder="Search entities..."
         />
 
         <EntityHero entity={entity} />
@@ -244,7 +244,9 @@ export default function EntityDetail() {
 
         <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
           <span>Stableflow · v0.1.0</span>
-          <span>Scope: Base + USDC</span>
+          <Link className="hover:text-accent" to="/methodology">
+            Methodology · Base / USDC coverage
+          </Link>
           <span>
             {entity.labelCount} labels · {detail.data.counterparties.length} counterparties
           </span>

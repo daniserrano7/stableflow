@@ -1,4 +1,4 @@
-import { Blocks, Coins, Network, Palette } from "lucide-react";
+import { ArrowLeftRight, Blocks, BookOpen, Coins, Network, Palette } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { cn } from "../utils/cn";
@@ -8,6 +8,8 @@ const sidebarItems = [
   { href: "/", icon: Network, label: "Overview" },
   { href: "/entities", icon: Blocks, label: "Entities" },
   { href: "/assets", icon: Coins, label: "Assets" },
+  { href: "/movements", icon: ArrowLeftRight, label: "Movements" },
+  { href: "/methodology", icon: BookOpen, label: "Methodology" },
 ];
 
 export function AppSidebar() {
@@ -78,6 +80,7 @@ function SidebarItem({
       <TooltipTrigger asChild>
         <Link
           aria-label={label}
+          aria-current={isActive ? "page" : undefined}
           className={cn(
             "relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-surface-2 hover:text-foreground",
             isActive &&

@@ -550,3 +550,27 @@ Built an end-to-end Web3 data product with EVM indexing, protocol-aware movement
 - Keep methodology transparent.
 - Optimize for a polished public demo.
 - Build the architecture for extension, but keep the initial scope small.
+
+
+## Public product pages
+
+- `/`: live native USDC transfers and flow analytics on Base.
+- `/entities` and `/entities/:entityId`: searchable registry and shared entity detail pages, including Aave and Morpho.
+- `/movements`: indexed transfer history with 50 rows per page, UTC timestamps, address/transaction explorer links, and URL-backed filters. Large includes transfers of at least 10,000 USDC; whale includes transfers of at least 1,000,000 USDC. Filters apply in the database before pagination.
+- `/methodology`: scope, counting rules, attribution, bridge semantics, and coverage limits, adapted from `docs/usdc-flow-attribution-strategy.md`. `/methodology/attribution` serves that source document directly.
+
+The header identifies Base mainnet / native USDC as the current scope and links to coverage details. The design system remains available at `/design-system` as a development reference.
+
+### Movement API and validation
+
+`GET /v1/transfers?filter=all|large|whale&cursor=<blockNumber>:<logIndex>&direction=older|newer`
+
+The initial request omits the cursor and direction. Responses include `olderCursor` and `newerCursor` (null at the corresponding end), with at most 50 rows in descending block/log order. Use the returned cursor with the matching direction. Changing filters starts a new page. Cursor pagination avoids offset shifts when newer transfers arrive; reorgs or historical reindexing can still change results. Invalid parameters return HTTP 400. Existing `/v1/transfers/recent` and `/v1/transfers/live` endpoints remain available.
+
+`pnpm test` includes movement parameter validation. To also run PostgreSQL pagination and amount-boundary integration tests, supply `TEST_DATABASE_URL` for a local test database:
+
+```bash
+TEST_DATABASE_URL=postgresql://localhost/stableflow_test pnpm --filter @stableflow/api test
+```
+
+The database test creates connection-local temporary tables and covers same-block ordering, forward/backward traversal, new inserts between pages, inclusive thresholds, and empty results.

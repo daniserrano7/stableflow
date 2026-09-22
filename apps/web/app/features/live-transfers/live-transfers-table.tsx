@@ -129,6 +129,9 @@ export function LiveTransfersTable({
         <span className="inline-flex items-center gap-1.5">
           <CircleDollarSign size={13} /> {transfers.length} shown
         </span>
+        <Link className="hover:text-accent" to={`/movements?filter=${filter}`}>
+          View all movements →
+        </Link>
         <span>
           {matchingCount} matching · {bufferedCount} buffered
         </span>
@@ -137,7 +140,7 @@ export function LiveTransfersTable({
   );
 }
 
-function TransferEntity({ party }: { party: LiveTransferParty }) {
+export function TransferEntity({ party }: { party: LiveTransferParty }) {
   const category = getPartyCategory(party);
   const entity = (
     <Entity

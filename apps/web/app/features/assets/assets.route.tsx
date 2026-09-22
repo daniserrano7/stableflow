@@ -99,11 +99,7 @@ export default function Assets() {
         className="flex min-h-screen min-w-0 flex-col gap-3.5 px-3 pt-4 pb-6 lg:px-6"
         aria-labelledby="assets-title"
       >
-        <AppHeader
-          eyebrow="Assets / Base · USDC"
-          headingId="assets-app-title"
-          context={<Chip pulse={false}>BASE · MAINNET</Chip>}
-        />
+        <AppHeader breadcrumbs={[{ label: "Assets" }]} headingId="assets-app-title" />
         <Panel>
           <PanelBody className="flex flex-col items-start gap-5 p-5 sm:flex-row">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-accent text-background shadow-[var(--shadow-glow-accent)]">

@@ -162,10 +162,9 @@ export default function Entities() {
         aria-labelledby="entities-title"
       >
         <AppHeader
-          eyebrow="Entities / Registry · USDC"
+          breadcrumbs={[{ label: "Entities" }]}
           headingId="entities-app-title"
-          searchPlaceholder="Search entity, address, tx hash..."
-          title="Stableflow"
+          searchPlaceholder="Search entities..."
         />
 
         <Panel>
@@ -273,7 +272,9 @@ export default function Entities() {
 
         <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
           <span>Stableflow · v0.1.0</span>
-          <span>Scope: Base + USDC</span>
+          <Link className="hover:text-accent" to="/methodology">
+            Methodology · Base / USDC coverage
+          </Link>
           <span>{entities.meta.totalLabels} labels · 24h flow context</span>
         </footer>
       </section>

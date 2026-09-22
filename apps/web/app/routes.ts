@@ -3,6 +3,9 @@ import { index, type RouteConfig, route } from "@react-router/dev/routes";
 export default [
   index("features/home/home.route.tsx"),
   route("design-system", "features/design-system/design-system.route.tsx"),
+  route("movements", "features/movements/movements.route.tsx"),
+  route("methodology/attribution", "features/methodology/attribution.resource.ts"),
+  route("methodology", "features/methodology/methodology.route.tsx"),
   route("entities", "features/entities/entities.route.tsx"),
   route("assets", "features/assets/assets.route.tsx"),
   route("entities/:entityId", "features/entities/entity-detail.route.tsx"),

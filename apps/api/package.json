@@ -10,7 +10,7 @@
     "start": "nest start",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
-    "test": "pnpm --filter @stableflow/indexer build && pnpm build && node --test dist/entities/*.test.js",
+    "test": "pnpm --filter @stableflow/api... build && node --test test/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

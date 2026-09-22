@@ -346,3 +346,17 @@ export interface TopEntityFlowsResponse {
     };
   };
 }
+
+export type { MovementFilter, MovementParams } from "./movements.js";
+export { movementsPageSize, movementThresholds, parseMovementParams } from "./movements.js";
+
+export interface MovementsResponse {
+  data: LiveTransferRow[];
+  meta: {
+    generatedAt: string;
+    limit: number;
+    filter: import("./movements.js").MovementFilter;
+    olderCursor: string | null;
+    newerCursor: string | null;
+  };
+}

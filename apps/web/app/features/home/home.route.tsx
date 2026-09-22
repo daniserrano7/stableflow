@@ -6,7 +6,7 @@ import type {
 } from "@stableflow/shared";
 import { useState } from "react";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { AppHeader } from "../../components/header";
 import { AppSidebar } from "../../components/sidebar";
 import { getApiUrl } from "../../config/api.server";
@@ -195,8 +195,10 @@ export default function Home() {
 
         <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
           <span>Stableflow · v0.1.0</span>
-          <span>Scope: Base + USDC</span>
-          <span>{initialTransfers.length} SSR rows · SSE live updates</span>
+          <Link className="hover:text-accent" to="/methodology">
+            Methodology · Base / USDC coverage
+          </Link>
+          <span>Live USDC transfers</span>
         </footer>
       </section>
     </main>
