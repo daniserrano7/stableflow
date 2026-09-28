@@ -1,4 +1,8 @@
-import { type MovementsResponse, parseMovementParams } from "@stableflow/shared";
+import {
+  type LiveTransferRow,
+  type MovementsResponse,
+  parseMovementParams,
+} from "@stableflow/shared";
 import { ArrowLeftRight, ArrowRight } from "lucide-react";
 import { Link, useLoaderData, useNavigation } from "react-router";
 import { Amount, KPI, Panel, PanelActions, PanelBody, PanelHead, PanelTitle } from "~/components";
@@ -16,6 +20,10 @@ import { getApiUrl } from "~/config/api.server";
 import { fmtUSDC } from "~/utils/format";
 import { getTransferAmount, getTransferMagnitude } from "../live-transfers/live-transfers.utils";
 import { TransferEntity } from "../live-transfers/live-transfers-table";
+import {
+  liveTransferConnectionLabels,
+  useLiveTransfers,
+} from "../live-transfers/use-live-transfers";
 
 export function meta() {
   return [
@@ -50,8 +58,21 @@ export async function loader({ request }: { request: Request }): Promise<Movemen
 }
 
 export default function Movements() {
-  const { data, meta } = useLoaderData<typeof loader>();
+  const { data: initialTransfers, meta } = useLoaderData<typeof loader>();
   const pending = useNavigation().state !== "idle";
+  // Only the latest page streams; older pages are a stable slice of history.
+  const isLatestPage = meta.newerCursor === null;
+  const {
+    connectionStatus,
+    freshTransferIds,
+    transfers: data,
+  } = useLiveTransfers({
+    enabled: isLatestPage,
+    filter: meta.filter,
+    initialTransfers,
+    maxBufferedRows: meta.limit,
+  });
+  const olderCursor = getOlderCursor({ data, initialTransfers, isLatestPage, meta });
   const amounts = data.map(getTransferAmount);
   const pageVolume = amounts.reduce((total, amount) => total + amount, 0);
   const averageMovement = data.length > 0 ? pageVolume / data.length : 0;
@@ -84,7 +105,7 @@ export default function Movements() {
       </section>
       <Panel aria-busy={pending}>
         <PanelHead className="flex-wrap gap-3">
-          <PanelTitle>Movements</PanelTitle>
+          <PanelTitle live={isLatestPage && connectionStatus === "live"}>Movements</PanelTitle>
           <PanelActions>
             <nav aria-label="Movement size">
               <ToggleGroup aria-label="Movement size" type="single" value={meta.filter}>
@@ -117,6 +138,7 @@ export default function Movements() {
               ? "Loading movements…"
               : `${data.length} movements · up to ${meta.limit} per page`}
           </span>
+          {isLatestPage && <span>{liveTransferConnectionLabels[connectionStatus]}</span>}
           {meta.newerCursor && (
             <Link className="hover:text-accent" to={`/movements?filter=${meta.filter}`}>
               Latest movements ↗
@@ -137,7 +159,10 @@ export default function Movements() {
             </TableHeader>
             <TableBody>
               {data.map((transfer) => (
-                <TableRow key={transfer.id}>
+                <TableRow
+                  data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
+                  key={transfer.id}
+                >
                   <TableCell className="font-mono text-xs">
                     <time dateTime={transfer.blockTimestamp}>
                       {transfer.blockTimestamp.replace("T", " ").replace(".000Z", "")}
@@ -225,8 +250,8 @@ export default function Movements() {
               ← Newer
             </span>
           )}
-          {meta.olderCursor ? (
-            <Link className="text-accent" to={pageLink(meta.olderCursor, "older")}>
+          {olderCursor ? (
+            <Link className="text-accent" to={pageLink(olderCursor, "older")}>
               Older →
             </Link>
           ) : (
@@ -238,4 +263,25 @@ export default function Movements() {
       </Panel>
     </PublicPage>
   );
+}
+
+// Live rows push older rows off the latest page, so page from the last visible row
+// instead of the loader's cursor to avoid skipping the evicted rows.
+function getOlderCursor({
+  data,
+  initialTransfers,
+  isLatestPage,
+  meta,
+}: {
+  data: LiveTransferRow[];
+  initialTransfers: LiveTransferRow[];
+  isLatestPage: boolean;
+  meta: MovementsResponse["meta"];
+}) {
+  const last = data.at(-1);
+  if (!isLatestPage || last === undefined) return meta.olderCursor;
+  const visibleIds = new Set(data.map((transfer) => transfer.id));
+  const hasEvictedRows = initialTransfers.some((transfer) => !visibleIds.has(transfer.id));
+  if (meta.olderCursor === null && !hasEvictedRows) return null;
+  return `${last.cursor.blockNumber}:${last.cursor.logIndex}`;
 }

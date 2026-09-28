@@ -5,6 +5,7 @@ import {
   getNewestTransferCursor,
   mergeTransfers,
 } from "./live-transfers.cursor";
+import { type TransferFilter, transferMatchesFilter } from "./live-transfers.utils";
 
 const defaultMaxBufferedLiveTransferRows = 250;
 const liveTransferFreshDurationMs = 500;
@@ -13,10 +14,20 @@ const heartbeatCheckIntervalMs = 5_000;
 
 export type LiveTransferConnectionStatus = "connecting" | "live" | "reconnecting";
 
+export const liveTransferConnectionLabels: Record<LiveTransferConnectionStatus, string> = {
+  connecting: "Connecting…",
+  live: "Connected",
+  reconnecting: "Reconnecting…",
+};
+
 export function useLiveTransfers({
+  enabled = true,
+  filter = "all",
   initialTransfers,
   maxBufferedRows = defaultMaxBufferedLiveTransferRows,
 }: {
+  enabled?: boolean;
+  filter?: TransferFilter;
   initialTransfers: LiveTransferRow[];
   maxBufferedRows?: number;
 }) {
@@ -39,17 +50,22 @@ export function useLiveTransfers({
     setTransfers(initialTransfers);
     setConnectionStatus("connecting");
 
+    if (!enabled) return;
+
     const onTransfers = (event: MessageEvent) => {
       const batch = JSON.parse(event.data) as LiveTransferBatchEvent;
       lastSignalAt = Date.now();
       setConnectionStatus("live");
-      const nextFreshTransferIds = batch.transfers
+      latestCursor = getNewestTransferCursor(latestCursor, batch.cursor);
+
+      const batchTransfers = batch.transfers.filter((transfer) =>
+        transferMatchesFilter(transfer, filter),
+      );
+      const nextFreshTransferIds = batchTransfers
         .filter((transfer) => !transferIdsRef.current.has(transfer.id))
         .map((transfer) => transfer.id);
 
-      latestCursor = getNewestTransferCursor(latestCursor, batch.cursor);
-
-      const nextTransfers = mergeTransfers(transfersRef.current, batch.transfers).slice(
+      const nextTransfers = mergeTransfers(transfersRef.current, batchTransfers).slice(
         0,
         maxBufferedRows,
       );
@@ -118,7 +134,7 @@ export function useLiveTransfers({
         window.clearTimeout(timeout);
       }
     };
-  }, [initialTransfers, maxBufferedRows]);
+  }, [enabled, filter, initialTransfers, maxBufferedRows]);
 
   return {
     connectionStatus,
