@@ -9,8 +9,10 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
   useRouteError,
 } from "react-router";
+import { McpConnectWidget } from "./components/mcp-connect-widget";
 import { PublicPage } from "./components/public-page";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { SearchDialogProvider } from "./features/search/search-dialog";
@@ -21,6 +23,13 @@ export const links: LinksFunction = () => [
   { href: "/brand-icon.svg", rel: "icon", type: "image/svg+xml" },
   { href: "/brand-icon.svg", rel: "apple-touch-icon" },
 ];
+
+export function loader() {
+  const configuredUrl = process.env.STABLEFLOW_MCP_PUBLIC_URL;
+  const mcpUrl =
+    configuredUrl || (process.env.NODE_ENV === "development" ? "http://localhost:3002/mcp" : null);
+  return { mcpUrl };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -41,6 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { mcpUrl } = useLoaderData<typeof loader>();
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -57,6 +67,7 @@ export default function App() {
       <SearchDialogProvider>
         <TooltipProvider delayDuration={150}>
           <Outlet />
+          <McpConnectWidget mcpUrl={mcpUrl} />
         </TooltipProvider>
       </SearchDialogProvider>
     </QueryClientProvider>

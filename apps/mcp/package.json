@@ -1,0 +1,26 @@
+{
+  "name": "@stableflow/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "pnpm typecheck",
+    "dev": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx --watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "pnpm build && node --test test/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/express": "^2.0.1",
+    "@modelcontextprotocol/node": "^2.1.0",
+    "@modelcontextprotocol/server": "^2.1.0",
+    "express": "^5.1.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.1.0",
+    "@types/express": "^5.0.0",
+    "tsx": "^4.20.0"
+  }
+}
