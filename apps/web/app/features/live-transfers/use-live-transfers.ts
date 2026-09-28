@@ -8,6 +8,10 @@ import {
 
 const defaultMaxBufferedLiveTransferRows = 250;
 const liveTransferFreshDurationMs = 500;
+const heartbeatTimeoutMs = 45_000;
+const heartbeatCheckIntervalMs = 5_000;
+
+export type LiveTransferConnectionStatus = "connecting" | "live" | "reconnecting";
 
 export function useLiveTransfers({
   initialTransfers,
@@ -18,28 +22,27 @@ export function useLiveTransfers({
 }) {
   const [transfers, setTransfers] = useState(initialTransfers);
   const [freshTransferIds, setFreshTransferIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [connectionStatus, setConnectionStatus] =
+    useState<LiveTransferConnectionStatus>("connecting");
   const transferIdsRef = useRef(getTransferIds(initialTransfers));
   const transfersRef = useRef(initialTransfers);
 
   useEffect(() => {
     let latestCursor = getLatestTransferCursor(initialTransfers);
+    let lastSignalAt = Date.now();
+    let events: EventSource | null = null;
     const freshTransferTimeouts = new Set<number>();
-    const streamUrl = new URL("/events/transfers", window.location.origin);
 
     transfersRef.current = initialTransfers;
     transferIdsRef.current = getTransferIds(initialTransfers);
     setFreshTransferIds(new Set());
     setTransfers(initialTransfers);
+    setConnectionStatus("connecting");
 
-    if (latestCursor !== null) {
-      streamUrl.searchParams.set("afterBlockNumber", latestCursor.blockNumber);
-      streamUrl.searchParams.set("afterLogIndex", latestCursor.logIndex.toString());
-    }
-
-    const events = new EventSource(streamUrl);
-
-    events.addEventListener("transfers", (event) => {
+    const onTransfers = (event: MessageEvent) => {
       const batch = JSON.parse(event.data) as LiveTransferBatchEvent;
+      lastSignalAt = Date.now();
+      setConnectionStatus("live");
       const nextFreshTransferIds = batch.transfers
         .filter((transfer) => !transferIdsRef.current.has(transfer.id))
         .map((transfer) => transfer.id);
@@ -76,10 +79,40 @@ export function useLiveTransfers({
       }
 
       setTransfers(nextTransfers);
-    });
+    };
+
+    const openStream = () => {
+      events?.close();
+      const streamUrl = new URL("/events/transfers", window.location.origin);
+      if (latestCursor !== null) {
+        streamUrl.searchParams.set("afterBlockNumber", latestCursor.blockNumber);
+        streamUrl.searchParams.set("afterLogIndex", latestCursor.logIndex.toString());
+      }
+
+      lastSignalAt = Date.now();
+      events = new EventSource(streamUrl);
+      events.addEventListener("open", () => {
+        lastSignalAt = Date.now();
+        setConnectionStatus("live");
+      });
+      events.addEventListener("error", () => setConnectionStatus("reconnecting"));
+      events.addEventListener("heartbeat", () => {
+        lastSignalAt = Date.now();
+        setConnectionStatus("live");
+      });
+      events.addEventListener("transfers", onTransfers);
+    };
+
+    openStream();
+    const heartbeatCheck = window.setInterval(() => {
+      if (Date.now() - lastSignalAt < heartbeatTimeoutMs) return;
+      setConnectionStatus("reconnecting");
+      openStream();
+    }, heartbeatCheckIntervalMs);
 
     return () => {
-      events.close();
+      events?.close();
+      window.clearInterval(heartbeatCheck);
 
       for (const timeout of freshTransferTimeouts) {
         window.clearTimeout(timeout);
@@ -88,6 +121,7 @@ export function useLiveTransfers({
   }, [initialTransfers, maxBufferedRows]);
 
   return {
+    connectionStatus,
     freshTransferIds,
     transfers,
   };

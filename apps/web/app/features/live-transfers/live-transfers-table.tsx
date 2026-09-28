@@ -21,9 +21,11 @@ import {
   type TransferFilter,
   transferFilterOptions,
 } from "./live-transfers.utils";
+import type { LiveTransferConnectionStatus } from "./use-live-transfers";
 
 interface LiveTransfersTableProps {
   bufferedCount: number;
+  connectionStatus: LiveTransferConnectionStatus;
   filter: TransferFilter;
   freshTransferIds: ReadonlySet<string>;
   matchingCount: number;
@@ -33,6 +35,7 @@ interface LiveTransfersTableProps {
 
 export function LiveTransfersTable({
   bufferedCount,
+  connectionStatus,
   filter,
   freshTransferIds,
   matchingCount,
@@ -41,9 +44,16 @@ export function LiveTransfersTable({
 }: LiveTransfersTableProps) {
   return (
     <Panel className="min-h-0 flex-1">
-      <PanelHead>
-        <PanelTitle live>Live Transfers</PanelTitle>
-        <PanelActions>
+      <PanelHead className="flex-wrap gap-2">
+        <PanelTitle live={connectionStatus === "live"}>Live Transfers</PanelTitle>
+        <PanelActions className="items-center">
+          <span role="status" className="font-mono text-2xs text-muted-foreground">
+            {connectionStatus === "live"
+              ? "Connected"
+              : connectionStatus === "connecting"
+                ? "Connecting…"
+                : "Reconnecting…"}
+          </span>
           <ToggleGroup
             aria-label="Transfer filter"
             type="single"

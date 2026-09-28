@@ -8,12 +8,14 @@ export async function loader({ request }: { request: Request }) {
     apiUrl.searchParams.set(key, value);
   }
 
+  const headers = new Headers({ accept: "text/event-stream" });
+  const lastEventId = request.headers.get("last-event-id");
+  if (lastEventId !== null) headers.set("last-event-id", lastEventId);
+
   let response: Response;
   try {
     response = await fetch(apiUrl, {
-      headers: {
-        accept: "text/event-stream",
-      },
+      headers,
       signal: request.signal,
     });
   } catch (error) {
@@ -30,6 +32,9 @@ export async function loader({ request }: { request: Request }) {
 
   const reader = response.body.getReader();
   const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(": stream ready\n\n"));
+    },
     async pull(controller) {
       try {
         const chunk = await reader.read();

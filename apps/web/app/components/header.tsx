@@ -1,4 +1,4 @@
-import { ArrowLeft, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useSearchDialog } from "~/features/search/search-dialog-context";
@@ -8,20 +8,13 @@ interface HeaderBreadcrumb {
   to?: string;
 }
 
-interface HeaderBackLink {
-  label: string;
-  to: string;
-}
-
 interface AppHeaderProps {
-  backLink?: HeaderBackLink;
   breadcrumbs?: HeaderBreadcrumb[];
   headingId?: string;
   searchPlaceholder?: string;
 }
 
 export function AppHeader({
-  backLink,
   breadcrumbs = [{ label: "Overview" }],
   headingId = "home-title",
   searchPlaceholder = "Search Stableflow...",
@@ -38,15 +31,6 @@ export function AppHeader({
   return (
     <header className="flex min-h-12 flex-col items-stretch gap-3.5 rounded-lg border border-border bg-glass px-3.5 py-2 backdrop-blur-xl backdrop-saturate-150 lg:flex-row lg:items-center">
       <div className="flex min-w-0 items-center gap-2 lg:min-w-56">
-        {backLink && (
-          <Link
-            aria-label={backLink.label}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-            to={backLink.to}
-          >
-            <ArrowLeft size={15} />
-          </Link>
-        )}
         <div className="min-w-0">
           <h1 id={headingId} className="m-0 text-md font-semibold leading-none tracking-normal">
             Stableflow

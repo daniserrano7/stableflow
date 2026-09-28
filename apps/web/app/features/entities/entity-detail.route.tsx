@@ -203,7 +203,6 @@ export default function EntityDetail() {
         aria-labelledby="entity-title"
       >
         <AppHeader
-          backLink={{ label: "Back to Entities", to: "/entities" }}
           breadcrumbs={[{ label: "Entities", to: "/entities" }, { label: entity.entityName }]}
           headingId="entity-app-title"
           searchPlaceholder="Search entities..."

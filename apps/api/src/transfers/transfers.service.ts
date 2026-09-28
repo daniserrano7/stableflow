@@ -12,12 +12,14 @@ import type {
 } from "@stableflow/shared";
 import { movementsPageSize, movementThresholds } from "@stableflow/shared";
 import { and, asc, desc, eq, gt, gte, inArray, lt, or } from "drizzle-orm";
-import { concatMap, filter, from, interval, map, Observable, startWith } from "rxjs";
+import { concatMap, filter, from, interval, map, merge, Observable, startWith } from "rxjs";
 import { DatabaseService } from "../database/database.service.js";
 import { toTokenAmount } from "../tokens/base-usdc.js";
+import { toLiveTransferEventId } from "./live-transfer-event-id.js";
 
 const defaultRecentTransfersLimit = 20;
 const liveTransfersPollIntervalMs = 1_000;
+const liveTransfersHeartbeatIntervalMs = 15_000;
 
 interface AddressLabel {
   address: string;
@@ -112,7 +114,7 @@ export class TransfersService {
   createLiveTransfersStream(cursor: LiveTransferCursor | null): Observable<MessageEvent> {
     let latestCursor = cursor;
 
-    return interval(liveTransfersPollIntervalMs).pipe(
+    const transfers = interval(liveTransfersPollIntervalMs).pipe(
       startWith(0),
       concatMap(() =>
         from(
@@ -125,9 +127,21 @@ export class TransfersService {
       filter((batch) => batch.transfers.length > 0),
       map((batch) => ({
         data: batch,
+        id: toLiveTransferEventId(batch.cursor),
         type: "transfers",
       })),
     );
+
+    const heartbeats = interval(liveTransfersHeartbeatIntervalMs).pipe(
+      startWith(0),
+      map(() => ({
+        data: { generatedAt: new Date().toISOString() },
+        id: toLiveTransferEventId(latestCursor),
+        type: "heartbeat",
+      })),
+    );
+
+    return merge(transfers, heartbeats);
   }
 
   private async getLiveTransferBatch(

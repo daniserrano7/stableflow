@@ -1,5 +1,6 @@
-import { BadRequestException, Controller, Get, Query, Sse } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Headers, Query, Sse } from "@nestjs/common";
 import { parseMovementParams } from "@stableflow/shared";
+import { parseLiveTransferEventId } from "./live-transfer-event-id.js";
 import { TransfersService } from "./transfers.service.js";
 
 @Controller("transfers")
@@ -36,14 +37,16 @@ export class TransfersController {
   streamLiveTransfers(
     @Query("afterBlockNumber") afterBlockNumber?: string,
     @Query("afterLogIndex") afterLogIndex?: string,
+    @Headers("last-event-id") lastEventId?: string,
   ) {
-    return this.transfersService.createLiveTransfersStream(
+    const resumedCursor = parseLiveTransferEventId(lastEventId);
+    const initialCursor =
       afterBlockNumber !== undefined && afterLogIndex !== undefined
-        ? {
-            blockNumber: afterBlockNumber,
-            logIndex: Number(afterLogIndex),
-          }
-        : null,
+        ? parseLiveTransferEventId(`${afterBlockNumber}:${afterLogIndex}`)
+        : undefined;
+
+    return this.transfersService.createLiveTransfersStream(
+      resumedCursor !== undefined ? resumedCursor : (initialCursor ?? null),
     );
   }
 }

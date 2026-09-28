@@ -150,7 +150,7 @@ export function shouldRevalidate({
 export default function Home() {
   const loaderData = useLoaderData<typeof loader>();
   const initialTransfers = loaderData.transfers.data;
-  const { freshTransferIds, transfers } = useLiveTransfers({
+  const { connectionStatus, freshTransferIds, transfers } = useLiveTransfers({
     initialTransfers,
   });
   const [filter, setFilter] = useState<TransferFilter>("all");
@@ -183,6 +183,7 @@ export default function Home() {
             />
             <LiveTransfersTable
               bufferedCount={transfers.length}
+              connectionStatus={connectionStatus}
               filter={filter}
               freshTransferIds={freshTransferIds}
               matchingCount={matchingTransfers.length}
