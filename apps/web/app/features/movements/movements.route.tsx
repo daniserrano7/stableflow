@@ -1,4 +1,5 @@
 import { type MovementsResponse, parseMovementParams } from "@stableflow/shared";
+import { ArrowLeftRight, ArrowRight } from "lucide-react";
 import { Link, useLoaderData, useNavigation } from "react-router";
 import { Amount, KPI, Panel, PanelActions, PanelBody, PanelHead, PanelTitle } from "~/components";
 import { PublicPage } from "~/components/public-page";
@@ -60,18 +61,16 @@ export default function Movements() {
   return (
     <PublicPage title="Movements">
       <Panel>
-        <PanelBody className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Browse indexed native USDC transfers on Base, newest first. Each row is one transfer
-            event; a transaction can contain several movements.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Large includes whale transfers. This raw feed includes internal transfers and mint/burn
-            events; it is not net entity flow.{" "}
-            <Link className="text-accent" to="/methodology#counting">
-              How counting works →
-            </Link>
-          </p>
+        <PanelBody className="flex flex-col items-start gap-5 p-5 sm:flex-row">
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-accent text-background shadow-[var(--shadow-glow-accent)]">
+            <ArrowLeftRight size={25} strokeWidth={1.8} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="mb-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
+              Onchain transfers · Base · USDC
+            </p>
+            <h1 className="m-0 text-2xl font-medium leading-tight">Movement History</h1>
+          </div>
         </PanelBody>
       </Panel>
       <section
@@ -110,7 +109,7 @@ export default function Movements() {
           </PanelActions>
         </PanelHead>
         <div
-          className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-3.5 text-xs text-muted-foreground"
+          className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3.5 py-2.5 font-mono text-2xs text-muted-foreground"
           role="status"
         >
           <span>
@@ -118,16 +117,19 @@ export default function Movements() {
               ? "Loading movements…"
               : `${data.length} movements · up to ${meta.limit} per page`}
           </span>
-          <Link className="hover:text-accent" to={`/movements?filter=${meta.filter}`}>
-            Latest movements ↗
-          </Link>
+          {meta.newerCursor && (
+            <Link className="hover:text-accent" to={`/movements?filter=${meta.filter}`}>
+              Latest movements ↗
+            </Link>
+          )}
         </div>
         <div className="overflow-x-auto">
-          <Table className="min-w-[1000px]">
+          <Table className="min-w-[1060px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Time (UTC)</TableHead>
                 <TableHead>From</TableHead>
+                <TableHead className="w-8" aria-label="Direction" />
                 <TableHead>To</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Transaction / log</TableHead>
@@ -155,6 +157,14 @@ export default function Movements() {
                     >
                       {transfer.from.address.slice(0, 8)}…{transfer.from.address.slice(-6)} ↗
                     </a>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className="inline-flex size-6 items-center justify-center text-muted-foreground"
+                      aria-hidden
+                    >
+                      <ArrowRight size={14} />
+                    </span>
                   </TableCell>
                   <TableCell>
                     <TransferEntity party={transfer.to} />
@@ -193,7 +203,7 @@ export default function Movements() {
               ))}
               {data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     No indexed movements match this page and filter. Try all movements or return to
                     the latest page.
                   </TableCell>
@@ -204,7 +214,7 @@ export default function Movements() {
         </div>
         <nav
           aria-label="Movement pagination"
-          className="flex justify-between gap-3 border-t border-border p-3.5 text-sm"
+          className="flex justify-between gap-3 border-t border-border px-3.5 py-2.5 font-mono text-xs"
         >
           {meta.newerCursor ? (
             <Link className="text-accent" to={pageLink(meta.newerCursor, "newer")}>

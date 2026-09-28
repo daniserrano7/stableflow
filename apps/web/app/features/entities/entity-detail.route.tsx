@@ -209,7 +209,7 @@ export default function EntityDetail() {
           searchPlaceholder="Search entities..."
         />
 
-        <EntityHero entity={entity} />
+        <EntityHero entity={entity} flow={flow} />
 
         <div className="flex flex-col gap-3.5">
           <EntityKpiBand flow={flow} onWindowChange={updateWindow} windowMinutes={windowMinutes} />
@@ -235,12 +235,16 @@ export default function EntityDetail() {
           </div>
 
           <RecentTransfersPanel
+            isUnidentified={entity.entityId === "unidentified"}
             freshTransferIds={freshTransferIds}
             transfers={detail.data.recentTransfers}
           />
         </div>
 
-        <AddressLabelsPanel labels={detail.data.addressLabels} />
+        <AddressLabelsPanel
+          isUnidentified={entity.entityId === "unidentified"}
+          labels={detail.data.addressLabels}
+        />
 
         <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
           <span>Stableflow · v0.1.0</span>
@@ -248,7 +252,9 @@ export default function EntityDetail() {
             Methodology · Base / USDC coverage
           </Link>
           <span>
-            {entity.labelCount} labels · {detail.data.counterparties.length} counterparties
+            {entity.entityId === "unidentified"
+              ? `Pooled wallets · ${detail.data.counterparties.length} counterparties shown`
+              : `${entity.labelCount} labels · ${detail.data.counterparties.length} counterparties`}
           </span>
         </footer>
       </section>
@@ -323,8 +329,9 @@ function useFreshEntityTransferIds({
   return freshTransferIds;
 }
 
-function EntityHero({ entity }: { entity: EntityDetailSummary }) {
+function EntityHero({ entity, flow }: { entity: EntityDetailSummary; flow: EntityFlowSummary }) {
   const [copied, setCopied] = useState(false);
+  const isUnidentified = entity.entityId === "unidentified";
   const category = getKnownCategory(entity.category);
   const glyph = getEntityGlyph(entity.entityName);
   const visual = getVisualIdentity("entity", entity.entityId);
@@ -347,7 +354,7 @@ function EntityHero({ entity }: { entity: EntityDetailSummary }) {
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
-          <span>Entity registry</span>
+          <span>{isUnidentified ? "Flow category" : "Entity registry"}</span>
           <span className="text-muted-foreground/50">/</span>
           <Tag category={category}>{formatCategory(entity.category)}</Tag>
         </div>
@@ -364,16 +371,37 @@ function EntityHero({ entity }: { entity: EntityDetailSummary }) {
           </span>
         </div>
 
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <HeroMetric label="Labels" value={formatInteger(entity.labelCount)} />
-          <HeroMetric label="Addresses" value={formatInteger(entity.addressCount)} />
-          <HeroMetric label="First label block" value={formatBlock(entity.firstSeenBlock)} />
-          <HeroMetric label="Latest label block" value={formatBlock(entity.latestSeenBlock)} />
-          <HeroMetric
-            label="Attribution groups"
-            value={formatInteger(entity.attributionGroups.length)}
-          />
-        </dl>
+        {isUnidentified ? (
+          <>
+            <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
+              A pooled view of USDC flow involving wallets without an applicable entity label. These
+              wallets are not one organization. Address counts and label blocks are unavailable
+              because the indexer does not register them as one entity.
+            </p>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+              <HeroMetric
+                label="Inflow transfers"
+                value={formatInteger(flow.inflowTransferCount)}
+              />
+              <HeroMetric
+                label="Outflow transfers"
+                value={formatInteger(flow.outflowTransferCount)}
+              />
+              <HeroMetric label="Indexed window" value={formatWindowLabel(flow.window.minutes)} />
+            </dl>
+          </>
+        ) : (
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <HeroMetric label="Labels" value={formatInteger(entity.labelCount)} />
+            <HeroMetric label="Addresses" value={formatInteger(entity.addressCount)} />
+            <HeroMetric label="First label block" value={formatBlock(entity.firstSeenBlock)} />
+            <HeroMetric label="Latest label block" value={formatBlock(entity.latestSeenBlock)} />
+            <HeroMetric
+              label="Attribution groups"
+              value={formatInteger(entity.attributionGroups.length)}
+            />
+          </dl>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-1.5">
           {entity.roles.slice(0, 6).map((role) => (
@@ -397,17 +425,19 @@ function EntityHero({ entity }: { entity: EntityDetailSummary }) {
           <Copy size={13} />
           {copied ? "Copied" : "Copy ID"}
         </Button>
-        <Button
-          asChild
-          className="rounded-full font-mono text-2xs uppercase tracking-[0.04em]"
-          size="sm"
-          variant="outline"
-        >
-          <a href="#addresses">
-            <Database size={13} />
-            Labels
-          </a>
-        </Button>
+        {!isUnidentified && (
+          <Button
+            asChild
+            className="rounded-full font-mono text-2xs uppercase tracking-[0.04em]"
+            size="sm"
+            variant="outline"
+          >
+            <a href="#addresses">
+              <Database size={13} />
+              Labels
+            </a>
+          </Button>
+        )}
       </div>
     </header>
   );
@@ -802,11 +832,17 @@ function CounterpartiesPanel({
 
 function RecentTransfersPanel({
   freshTransferIds,
+  isUnidentified,
   transfers,
 }: {
   freshTransferIds: ReadonlySet<string>;
+  isUnidentified: boolean;
   transfers: LiveTransferRow[];
 }) {
+  const emptyMessage = isUnidentified
+    ? "Recent transfers cannot be listed for this pooled category because it has no registered boundary addresses."
+    : "No recent boundary transfers.";
+
   return (
     <Panel>
       <PanelHead>
@@ -835,7 +871,7 @@ function RecentTransfersPanel({
             </div>
           </div>
         ))}
-        {transfers.length === 0 && <EmptyPanelRow>No recent boundary transfers.</EmptyPanelRow>}
+        {transfers.length === 0 && <EmptyPanelRow>{emptyMessage}</EmptyPanelRow>}
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
@@ -888,7 +924,7 @@ function RecentTransfersPanel({
             {transfers.length === 0 && (
               <TableRow>
                 <TableCell className="h-32 text-center text-muted-foreground" colSpan={5}>
-                  No recent boundary transfers.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}
@@ -949,6 +985,24 @@ function EvidencePanel({
   const confidence = countBy(labels, (label) => label.confidence);
   const sourceTypes = countBy(labels, (label) => label.sourceType);
   const policies = countBy(labels, (label) => label.countingPolicy);
+
+  if (entity.entityId === "unidentified") {
+    return (
+      <Panel className={cn("flex flex-col", className)}>
+        <PanelHead>
+          <PanelTitle>
+            <ShieldCheck size={14} />
+            Classification
+          </PanelTitle>
+        </PanelHead>
+        <PanelBody className="flex-1 text-sm text-muted-foreground">
+          USDC transfers enter this pool when an address has no applicable entity boundary label.
+          The flow totals describe the pool; there is no shared attribution evidence for its
+          wallets.
+        </PanelBody>
+      </Panel>
+    );
+  }
 
   return (
     <Panel className={cn("flex flex-col", className)}>
@@ -1066,7 +1120,30 @@ function EvidenceMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AddressLabelsPanel({ labels }: { labels: EntityAddressLabel[] }) {
+function AddressLabelsPanel({
+  isUnidentified,
+  labels,
+}: {
+  isUnidentified: boolean;
+  labels: EntityAddressLabel[];
+}) {
+  if (isUnidentified) {
+    return (
+      <Panel id="addresses">
+        <PanelHead>
+          <PanelTitle>
+            <Database size={14} />
+            Address registry
+          </PanelTitle>
+        </PanelHead>
+        <PanelBody className="text-sm text-muted-foreground">
+          Unidentified wallets are grouped for flow analysis without being registered as labeled
+          addresses. There are no entity labels or label evidence rows to display here.
+        </PanelBody>
+      </Panel>
+    );
+  }
+
   return (
     <Panel id="addresses">
       <PanelHead>

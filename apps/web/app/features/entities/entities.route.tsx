@@ -1,5 +1,5 @@
 import type { EntityListResponse, EntitySummary, TopEntityFlowsResponse } from "@stableflow/shared";
-import { Blocks, ChevronRight, LayoutGrid, Search, Table2 } from "lucide-react";
+import { Blocks, ChevronRight, LayoutGrid, Table2 } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useLoaderData, useSearchParams } from "react-router";
 import {
@@ -96,7 +96,6 @@ export async function loader(): Promise<EntitiesLoaderData> {
 export default function Entities() {
   const { entities, topFlows } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const query = searchParams.get("q") ?? "";
   const category = searchParams.get("category") ?? "all";
   const view = normalizeViewMode(searchParams.get("view"));
   const enrichedEntities = useMemo(
@@ -106,29 +105,10 @@ export default function Entities() {
   const categoryOptions = useMemo(() => getCategoryOptions(entities), [entities]);
   const visibleEntities = useMemo(
     () =>
-      enrichedEntities.filter((entity) => {
-        if (category !== "all" && entity.category !== category) {
-          return false;
-        }
-
-        if (query.trim().length === 0) {
-          return true;
-        }
-
-        const normalizedQuery = query.trim().toLowerCase();
-        const haystack = [
-          entity.entityName,
-          entity.entityId,
-          entity.category,
-          entity.roles.join(" "),
-          entity.sourceTypes.join(" "),
-        ]
-          .join(" ")
-          .toLowerCase();
-
-        return haystack.includes(normalizedQuery);
-      }),
-    [category, enrichedEntities, query],
+      category === "all"
+        ? enrichedEntities
+        : enrichedEntities.filter((entity) => entity.category === category),
+    [category, enrichedEntities],
   );
   const totalAddresses = entities.data.reduce((total, entity) => total + entity.addressCount, 0);
   const sourceSummaries = useMemo(() => getSourceSummaries(entities.data), [entities.data]);
@@ -196,7 +176,7 @@ export default function Entities() {
 
         <Panel>
           <PanelBody className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 items-center">
               <ToggleGroup
                 aria-label="Entity category"
                 type="single"
@@ -213,18 +193,6 @@ export default function Entities() {
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
-
-              <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-border bg-surface-2 px-3 font-mono text-sm text-muted-foreground sm:w-72">
-                <Search size={14} className="shrink-0" />
-                <input
-                  aria-label="Filter entities"
-                  className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
-                  onChange={(event) => updateSearchParam("q", event.target.value)}
-                  placeholder="Filter entities..."
-                  type="search"
-                  value={query}
-                />
-              </label>
             </div>
 
             <div className="flex items-center justify-between gap-3 lg:justify-end">
@@ -344,10 +312,20 @@ function EntityTable({ entities }: { entities: EnrichedEntity[] }) {
                   <RoleList roles={entity.roles} />
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatInteger(entity.addressCount)}
+                  {entity.entityId === "unidentified" ? (
+                    <span title="Unidentified wallets are not counted in the address registry">
+                      —
+                    </span>
+                  ) : (
+                    formatInteger(entity.addressCount)
+                  )}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatInteger(entity.labelCount)}
+                  {entity.entityId === "unidentified" ? (
+                    <span title="This pooled category has no address labels">—</span>
+                  ) : (
+                    formatInteger(entity.labelCount)
+                  )}
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   {entity.flow ? formatUsdNumber(getFlowVolume(entity.flow)) : "-"}
@@ -422,8 +400,18 @@ function EntityCards({ entities }: { entities: EnrichedEntity[] }) {
                   </span>
                   {entity.flow ? <FlowNet className="mt-1" flow={entity.flow} /> : <EmptyMetric />}
                 </div>
-                <CardMetric label="Addresses" value={formatInteger(entity.addressCount)} />
-                <CardMetric label="Labels" value={formatInteger(entity.labelCount)} />
+                <CardMetric
+                  label="Addresses"
+                  value={
+                    entity.entityId === "unidentified" ? "—" : formatInteger(entity.addressCount)
+                  }
+                />
+                <CardMetric
+                  label="Labels"
+                  value={
+                    entity.entityId === "unidentified" ? "—" : formatInteger(entity.labelCount)
+                  }
+                />
               </div>
             </div>
           </article>

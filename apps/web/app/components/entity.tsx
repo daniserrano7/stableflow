@@ -40,7 +40,7 @@ function Entity({
           isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground",
         )}
       >
-        {glyph && (
+        {glyph && !isWallet && (
           <>
             <span className="shrink-0">{glyph}</span>
             <span aria-hidden className="shrink-0 text-muted-foreground/50">

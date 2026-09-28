@@ -24,7 +24,7 @@ export function AppHeader({
   backLink,
   breadcrumbs = [{ label: "Overview" }],
   headingId = "home-title",
-  searchPlaceholder = "Search entities...",
+  searchPlaceholder = "Search Stableflow...",
 }: AppHeaderProps) {
   const { openSearch } = useSearchDialog();
   const [shortcutLabel, setShortcutLabel] = useState("⌘K");
