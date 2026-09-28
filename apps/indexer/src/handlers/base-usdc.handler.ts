@@ -8,6 +8,7 @@ import {
   usdcTransfers,
   usdcTransferVolumeBuckets,
 } from "ponder:schema";
+import { eq } from "drizzle-orm";
 import { formatUnits, parseAbi } from "viem";
 import { base } from "viem/chains";
 import { baseProtocolContracts, baseUsdc } from "../chains/base.chain.js";
@@ -39,6 +40,9 @@ type BlockStats = {
 
 const blockStats = new Map<bigint, BlockStats>();
 const discoveredFlowLabelsByAddress = new Map<string, FlowLabel>();
+const promotedLabelRefreshIntervalMs = 30_000;
+let lastPromotedLabelRefreshAt = 0;
+let promotedLabelRefresh: Promise<void> | null = null;
 
 type FlowDirection = "in" | "out";
 type BridgeDirection = "inbound" | "outbound";
@@ -368,6 +372,50 @@ const getFlowLabel = async ({
 
   if (cachedDiscoveredLabel !== undefined) {
     return cachedDiscoveredLabel;
+  }
+
+  // Operator promotions arrive through a separate database connection. Ponder's
+  // db.find() can cache a missing row, so refresh these labels with raw SQL.
+  if (Date.now() - lastPromotedLabelRefreshAt >= promotedLabelRefreshIntervalMs) {
+    if (promotedLabelRefresh === null) {
+      promotedLabelRefresh = (async () => {
+        const labels = await context.db.sql
+          .select({
+            address: discoveredAddressLabels.address,
+            attributionGroup: discoveredAddressLabels.attributionGroup,
+            category: discoveredAddressLabels.category,
+            countingPolicy: discoveredAddressLabels.countingPolicy,
+            entityId: discoveredAddressLabels.entityId,
+            entityName: discoveredAddressLabels.entityName,
+          })
+          .from(discoveredAddressLabels)
+          .where(eq(discoveredAddressLabels.sourceType, "candidate_review"));
+
+        for (const label of labels) {
+          discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), {
+            attributionGroup: label.attributionGroup,
+            category: label.category as AddressLabel["category"],
+            countingPolicy: label.countingPolicy as AddressLabel["countingPolicy"],
+            entityId: label.entityId,
+            entityName: label.entityName,
+          });
+        }
+
+        lastPromotedLabelRefreshAt = Date.now();
+      })();
+    }
+
+    try {
+      await promotedLabelRefresh;
+    } finally {
+      promotedLabelRefresh = null;
+    }
+  }
+
+  const promotedLabel = discoveredFlowLabelsByAddress.get(normalizedAddress);
+
+  if (promotedLabel !== undefined) {
+    return promotedLabel;
   }
 
   const discoveredLabel = await context.db.find(discoveredAddressLabels, {

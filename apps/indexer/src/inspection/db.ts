@@ -11,6 +11,7 @@ export type ReadOnlyDb = {
 
 export type OperatorDb = ReadOnlyDb & {
   execute: <Row extends QueryResultRow>(text: string, values?: unknown[]) => Promise<Row[]>;
+  tryAdvisoryLock: (key1: number, key2: number) => Promise<(() => Promise<void>) | null>;
 };
 
 const assertReadOnlyQuery = (text: string) => {
@@ -46,7 +47,7 @@ export const createOperatorDb = (): OperatorDb => {
   const pool = new Pool({
     application_name: "stableflow-indexer-label-operator",
     connectionString: env.DATABASE_URL,
-    max: 1,
+    max: 2,
   });
 
   return {
@@ -60,6 +61,32 @@ export const createOperatorDb = (): OperatorDb => {
 
       const result = await pool.query<Row>(text, values);
       return result.rows;
+    },
+    tryAdvisoryLock: async (key1, key2) => {
+      const client = await pool.connect();
+
+      try {
+        const result = await client.query<{ acquired: boolean }>(
+          "select pg_try_advisory_lock($1::integer, $2::integer) as acquired",
+          [key1, key2],
+        );
+
+        if (result.rows[0]?.acquired !== true) {
+          client.release();
+          return null;
+        }
+
+        return async () => {
+          try {
+            await client.query("select pg_advisory_unlock($1::integer, $2::integer)", [key1, key2]);
+          } finally {
+            client.release();
+          }
+        };
+      } catch (error) {
+        client.release();
+        throw error;
+      }
     },
   };
 };

@@ -10,6 +10,11 @@ const poolIdentityAbi = parseAbi([
 ]);
 
 const v3PoolAbi = parseAbi(["function fee() view returns (uint24)"]);
+const v3FactoryAbi = parseAbi([
+  "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address)",
+]);
+
+const aerodromeFactoryAbi = parseAbi(["function isPool(address pool) view returns (bool)"]);
 
 const aerodromePoolAbi = parseAbi(["function stable() view returns (bool)"]);
 
@@ -20,6 +25,7 @@ type FactoryMetadata = {
   entityId: string;
   entityName: string;
   factoryAddress: Address;
+  isFactoryPool: (poolAddress: Address, token0: Address, token1: Address) => Promise<boolean>;
   poolKind: (poolAddress: Address) => Promise<string>;
   sourceEvent: string;
   verifier: string;
@@ -50,6 +56,20 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
         entityId: "uniswap-v3",
         entityName: "Uniswap V3",
         factoryAddress: baseProtocolFactories.uniswapV3Factory,
+        isFactoryPool: async (poolAddress, token0, token1) => {
+          const fee = await publicClient.readContract({
+            abi: v3PoolAbi,
+            address: poolAddress,
+            functionName: "fee",
+          });
+          const registeredPool = await publicClient.readContract({
+            abi: v3FactoryAbi,
+            address: baseProtocolFactories.uniswapV3Factory,
+            functionName: "getPool",
+            args: [token0, token1, fee],
+          });
+          return registeredPool.toLowerCase() === poolAddress.toLowerCase();
+        },
         poolKind: (poolAddress) =>
           safeReadPoolKind("v3_pool", async () => {
             const fee = await publicClient.readContract({
@@ -60,7 +80,7 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
 
             return `fee:${fee.toString()}`;
           }),
-        sourceEvent: "factory() + token0() + token1()",
+        sourceEvent: "factory.getPool(token0, token1, fee)",
         verifier: "uniswap_v3_pool_identity",
       },
       {
@@ -68,6 +88,20 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
         entityId: "pancakeswap-v3",
         entityName: "PancakeSwap V3",
         factoryAddress: baseProtocolFactories.pancakeSwapV3Factory,
+        isFactoryPool: async (poolAddress, token0, token1) => {
+          const fee = await publicClient.readContract({
+            abi: v3PoolAbi,
+            address: poolAddress,
+            functionName: "fee",
+          });
+          const registeredPool = await publicClient.readContract({
+            abi: v3FactoryAbi,
+            address: baseProtocolFactories.pancakeSwapV3Factory,
+            functionName: "getPool",
+            args: [token0, token1, fee],
+          });
+          return registeredPool.toLowerCase() === poolAddress.toLowerCase();
+        },
         poolKind: (poolAddress) =>
           safeReadPoolKind("v3_pool", async () => {
             const fee = await publicClient.readContract({
@@ -78,7 +112,7 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
 
             return `fee:${fee.toString()}`;
           }),
-        sourceEvent: "factory() + token0() + token1()",
+        sourceEvent: "factory.getPool(token0, token1, fee)",
         verifier: "pancakeswap_v3_pool_identity",
       },
       {
@@ -86,6 +120,13 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
         entityId: "aerodrome",
         entityName: "Aerodrome",
         factoryAddress: baseProtocolFactories.aerodromePoolFactory,
+        isFactoryPool: (poolAddress) =>
+          publicClient.readContract({
+            abi: aerodromeFactoryAbi,
+            address: baseProtocolFactories.aerodromePoolFactory,
+            functionName: "isPool",
+            args: [poolAddress],
+          }),
         poolKind: (poolAddress) =>
           safeReadPoolKind("aerodrome_pool", async () => {
             const stable = await publicClient.readContract({
@@ -96,7 +137,7 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
 
             return stable ? "stable" : "volatile";
           }),
-        sourceEvent: "factory() + token0() + token1()",
+        sourceEvent: "factory.isPool(pool)",
         verifier: "aerodrome_pool_identity",
       },
       {
@@ -104,6 +145,13 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
         entityId: "aerodrome",
         entityName: "Aerodrome",
         factoryAddress: baseProtocolFactories.aerodromeSlipstreamFactory,
+        isFactoryPool: (poolAddress) =>
+          publicClient.readContract({
+            abi: aerodromeFactoryAbi,
+            address: baseProtocolFactories.aerodromeSlipstreamFactory,
+            functionName: "isPool",
+            args: [poolAddress],
+          }),
         poolKind: (poolAddress) =>
           safeReadPoolKind("slipstream_pool", async () => {
             const tickSpacing = await publicClient.readContract({
@@ -114,7 +162,7 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
 
             return `tickSpacing:${tickSpacing.toString()}`;
           }),
-        sourceEvent: "factory() + token0() + token1()",
+        sourceEvent: "factory.isPool(pool)",
         verifier: "aerodrome_slipstream_pool_identity",
       },
       {
@@ -122,6 +170,13 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
         entityId: "aerodrome",
         entityName: "Aerodrome",
         factoryAddress: baseProtocolFactories.aerodromeSlipstream3Factory,
+        isFactoryPool: (poolAddress) =>
+          publicClient.readContract({
+            abi: aerodromeFactoryAbi,
+            address: baseProtocolFactories.aerodromeSlipstream3Factory,
+            functionName: "isPool",
+            args: [poolAddress],
+          }),
         poolKind: (poolAddress) =>
           safeReadPoolKind("slipstream_pool", async () => {
             const tickSpacing = await publicClient.readContract({
@@ -132,7 +187,7 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
 
             return `tickSpacing:${tickSpacing.toString()}`;
           }),
-        sourceEvent: "factory() + token0() + token1()",
+        sourceEvent: "factory.isPool(pool)",
         verifier: "aerodrome_slipstream_pool_identity",
       },
       {
@@ -140,6 +195,13 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
         entityId: "aerodrome",
         entityName: "Aerodrome",
         factoryAddress: baseProtocolFactories.aerodromeSlipstreamPoolFactory,
+        isFactoryPool: (poolAddress) =>
+          publicClient.readContract({
+            abi: aerodromeFactoryAbi,
+            address: baseProtocolFactories.aerodromeSlipstreamPoolFactory,
+            functionName: "isPool",
+            args: [poolAddress],
+          }),
         poolKind: (poolAddress) =>
           safeReadPoolKind("slipstream_pool", async () => {
             const tickSpacing = await publicClient.readContract({
@@ -150,7 +212,7 @@ const factoryMetadataByAddress = new Map<string, FactoryMetadata>(
 
             return `tickSpacing:${tickSpacing.toString()}`;
           }),
-        sourceEvent: "factory() + token0() + token1()",
+        sourceEvent: "factory.isPool(pool)",
         verifier: "aerodrome_slipstream_pool_identity",
       },
     ] satisfies FactoryMetadata[]
@@ -189,6 +251,10 @@ export const verifyDexPoolCandidate = async (
       return null;
     }
 
+    if (!(await factoryMetadata.isFactoryPool(candidate.address, token0, token1))) {
+      return null;
+    }
+
     const poolKind = await factoryMetadata.poolKind(candidate.address);
 
     return {
@@ -197,10 +263,11 @@ export const verifyDexPoolCandidate = async (
       countingPolicy: "boundary",
       evidenceDetails: JSON.stringify({
         factory,
+        factoryMembership: true,
         token0,
         token1,
       }),
-      evidenceSource: "onchain_pool_identity",
+      evidenceSource: "onchain_factory_membership",
       poolKind,
       sourceAddress: factory,
       sourceEvent: factoryMetadata.sourceEvent,

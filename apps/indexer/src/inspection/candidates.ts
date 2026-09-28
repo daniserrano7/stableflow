@@ -4,7 +4,10 @@ import { baseUsdc } from "../chains/base.chain.js";
 import { baseAddressLabels } from "../labels/base-address-labels.js";
 import type { InspectionArgs } from "./args.js";
 import type { OperatorDb, ReadOnlyDb } from "./db.js";
+import { isAutoPromotable } from "./discovery-policy.js";
 import { getInspectionWindow, type InspectionWindow } from "./queries.js";
+
+export { isAutoPromotable } from "./discovery-policy.js";
 
 export type CandidateStatus = "candidate" | "rejected" | "verified";
 
@@ -106,7 +109,7 @@ const hasAddressLabelCandidatesTable = async (db: ReadOnlyDb) => {
   return rows[0]?.exists ?? false;
 };
 
-const ensureAddressLabelCandidateReviewsTable = async (db: OperatorDb) => {
+export const ensureAddressLabelCandidateReviewsTable = async (db: OperatorDb) => {
   await db.execute(`
     create table if not exists address_label_candidate_reviews (
       id text primary key,
@@ -139,9 +142,15 @@ const ensureAddressLabelCandidateReviewsTable = async (db: OperatorDb) => {
       first_seen_timestamp numeric not null,
       last_seen_timestamp numeric not null,
       reviewed_at numeric,
+      checked_at numeric,
       promoted_at numeric,
       rejection_reason text
     )
+  `);
+
+  await db.execute(`
+    alter table address_label_candidate_reviews
+    add column if not exists checked_at numeric
   `);
 
   await db.execute(`
@@ -210,6 +219,7 @@ const rowToStoredCandidate = (row: StoredCandidateDbRow): AddressLabelCandidate 
 export const getUnidentifiedAddressCandidates = async (
   db: ReadOnlyDb,
   args: InspectionArgs,
+  options: { checkedCooldownMinutes?: number } = {},
 ): Promise<{
   candidates: UnidentifiedAddressCandidate[];
   window: InspectionWindow | null;
@@ -236,6 +246,14 @@ export const getUnidentifiedAddressCandidates = async (
   const candidateFilter = hasCandidateTable
     ? "and coalesce(candidates.status, 'candidate') <> 'rejected'"
     : "";
+  const cooldownThreshold =
+    options.checkedCooldownMinutes === undefined
+      ? null
+      : Math.floor(Date.now() / 1000) - options.checkedCooldownMinutes * 60;
+  const checkedCooldownFilter =
+    hasCandidateTable && cooldownThreshold !== null
+      ? "and (candidates.checked_at is null or candidates.checked_at < $5::bigint)"
+      : "";
 
   const rows = await db.query<CandidateDbRow>(
     `
@@ -300,6 +318,7 @@ export const getUnidentifiedAddressCandidates = async (
       where discovered.address is null
         and address_volume.address <> all($3::text[])
         ${candidateFilter}
+        ${checkedCooldownFilter}
       order by (address_volume.total_touch_value::numeric) desc
       limit $4::integer
     `,
@@ -308,6 +327,7 @@ export const getUnidentifiedAddressCandidates = async (
       window.endEpochExclusive.toString(),
       ignoredCandidateAddresses,
       args.limit,
+      ...(checkedCooldownFilter === "" ? [] : [cooldownThreshold]),
     ],
   );
 
@@ -326,7 +346,7 @@ export const upsertAddressLabelCandidate = async ({
   db: OperatorDb;
   verification: CandidateVerification;
 }) => {
-  const status: CandidateStatus = verification.confidence === "high" ? "verified" : "candidate";
+  const status: CandidateStatus = isAutoPromotable(verification) ? "verified" : "candidate";
   const now = BigInt(Math.floor(Date.now() / 1000));
 
   await ensureAddressLabelCandidateReviewsTable(db);
@@ -363,7 +383,8 @@ export const upsertAddressLabelCandidate = async ({
         last_seen_block,
         first_seen_timestamp,
         last_seen_timestamp,
-        reviewed_at
+        reviewed_at,
+        checked_at
       )
       values (
         $1,
@@ -395,7 +416,8 @@ export const upsertAddressLabelCandidate = async ({
         $27,
         $28,
         $29,
-        $30
+        $30,
+        $31
       )
       on conflict (id) do update set
         status = excluded.status,
@@ -425,6 +447,7 @@ export const upsertAddressLabelCandidate = async ({
         first_seen_timestamp = least(address_label_candidate_reviews.first_seen_timestamp, excluded.first_seen_timestamp),
         last_seen_timestamp = greatest(address_label_candidate_reviews.last_seen_timestamp, excluded.last_seen_timestamp),
         reviewed_at = excluded.reviewed_at,
+        checked_at = excluded.checked_at,
         rejection_reason = null
       where address_label_candidate_reviews.status <> 'rejected'
     `,
@@ -458,12 +481,17 @@ export const upsertAddressLabelCandidate = async ({
       candidate.lastSeenBlock.toString(),
       candidate.firstSeenTimestamp.toString(),
       candidate.lastSeenTimestamp.toString(),
-      verification.confidence === "high" ? now.toString() : null,
+      isAutoPromotable(verification) ? now.toString() : null,
+      now.toString(),
     ],
   );
 };
 
-export const getVerifiedUnpromotedCandidates = async (db: ReadOnlyDb, limit: number) => {
+export const getVerifiedMissingLabels = async (
+  db: ReadOnlyDb,
+  limit: number,
+  evidenceSource = "onchain_factory_membership",
+) => {
   const hasCandidateTable = await hasAddressLabelCandidatesTable(db);
 
   if (!hasCandidateTable) {
@@ -507,11 +535,19 @@ export const getVerifiedUnpromotedCandidates = async (db: ReadOnlyDb, limit: num
         '0'::text as unique_counterparties
       from address_label_candidate_reviews
       where status = 'verified'
-        and promoted_at is null
+        and confidence = 'high'
+        and evidence_source = $2
+        and counting_policy = 'boundary'
+        and suggested_entity_id <> 'unidentified'
+        and not exists (
+          select 1
+          from discovered_address_labels discovered
+          where discovered.id = address_label_candidate_reviews.id
+        )
       order by observed_total_value desc
       limit $1::integer
     `,
-    [limit],
+    [limit, evidenceSource],
   );
 
   return rows.map(rowToStoredCandidate);
@@ -521,7 +557,7 @@ export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) =
   await ensureAddressLabelCandidateReviewsTable(db);
   await ensurePonderLiveQueryTable(db);
 
-  const candidates = await getVerifiedUnpromotedCandidates(db, limit);
+  const candidates = await getVerifiedMissingLabels(db, limit);
   const now = BigInt(Math.floor(Date.now() / 1000));
 
   for (const candidate of candidates) {
