@@ -1,6 +1,8 @@
 # Stableflow MCP (local development)
 
-This is a public, read-only Streamable HTTP MCP server. It calls the existing private Stableflow API; it does not connect to PostgreSQL, call an LLM, or require an OpenAI/Anthropic API key. Its five tools expose recent USDC transfers, flow KPIs, top entity flows, index search, and entity details.
+This is a public, read-only Streamable HTTP MCP server. It calls the existing private Stableflow API; it does not connect to PostgreSQL, call an LLM, or require an OpenAI/Anthropic API key. Its nine tools expose recent transfers, paginated transfer history, flow KPIs, top entity flows, a flow graph, an entity catalog, index search, entity details, and two-entity flow comparison.
+
+`top_entity_flows` supports net, gross (inflow + outflow), inflow, and outflow rankings for up to 24 hours of indexed data. By default it excludes the pooled `Unidentified` category, which is not one organization; set `includeUnidentified: true` to inspect it. The API keeps its existing default of including that category for the web UI. `transfer_history` returns up to 20 rows per call with older/newer cursors and all/large/whale amount filters. `entity_catalog` returns up to 50 entities per page with `offset` and `meta.hasMore`. Flow tools report the actual indexed bucket window so chat answers can disclose incomplete or stale coverage. No tool triggers indexing or historical backfill.
 
 Run the API on port 3001, then run `pnpm --filter @stableflow/mcp dev` from the repo root. The local endpoint is `http://localhost:3002/mcp` and its health check is `/health`. Running `pnpm dev` starts web, API, shared, and MCP together, but the API still needs its local database. The indexer remains a separate process and must **not** be backfilled for this feature.
 

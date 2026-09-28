@@ -38,6 +38,11 @@ interface EntityDetailOptions {
   windowMinutes?: number;
 }
 
+interface EntityListOptions {
+  limit?: number;
+  offset?: number;
+}
+
 type EntityRegistryLabel = Pick<
   EntityAddressLabel,
   | "address"
@@ -133,7 +138,7 @@ interface BucketWindow {
 export class EntitiesService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async listEntities(): Promise<EntityListResponse> {
+  async listEntities(options: EntityListOptions = {}): Promise<EntityListResponse> {
     const [discoveredLabels, flowIdentities] = await Promise.all([
       this.databaseService.db
         .select({
@@ -199,11 +204,17 @@ export class EntitiesService {
         a.entityId.localeCompare(b.entityId),
     );
 
+    const offset = options.offset ?? 0;
+    const limit = options.limit ?? entities.length;
+
     return {
-      data: entities,
+      data: entities.slice(offset, offset + limit),
       meta: {
         categories: this.summarizeCategories(entities),
         generatedAt: new Date().toISOString(),
+        hasMore: offset + limit < entities.length,
+        limit,
+        offset,
         totalEntities: entities.length,
         totalLabels: entities.reduce((total, entity) => total + entity.labelCount, 0),
       },

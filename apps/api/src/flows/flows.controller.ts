@@ -13,7 +13,11 @@ const integerQueryParam = ({ max, min }: { max: number; min: number }) =>
 const topEntityFlowsQuerySchema = z
   .object({
     limit: integerQueryParam({ max: 20, min: 1 }),
-    mode: z.enum(["net", "inflow", "outflow"]).optional(),
+    mode: z.enum(["net", "inflow", "outflow", "gross"]).optional(),
+    includeUnidentified: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .optional(),
     windowMinutes: integerQueryParam({ max: 24 * 60, min: 1 }),
   })
   .strict();
@@ -73,6 +77,7 @@ export class FlowsController {
     return this.flowsService.listTopEntityFlows({
       limit: parsedQuery.data.limit,
       mode: parsedQuery.data.mode,
+      includeUnidentified: parsedQuery.data.includeUnidentified,
       windowMinutes: parsedQuery.data.windowMinutes,
     });
   }

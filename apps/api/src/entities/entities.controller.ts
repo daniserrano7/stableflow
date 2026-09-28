@@ -16,13 +16,26 @@ const entityDetailQuerySchema = z
   })
   .strict();
 
+const entityListQuerySchema = z
+  .object({
+    limit: integerQueryParam({ max: 100, min: 1 }),
+    offset: integerQueryParam({ max: 10_000, min: 0 }),
+  })
+  .strict();
+
 @Controller("entities")
 export class EntitiesController {
   constructor(private readonly entitiesService: EntitiesService) {}
 
   @Get()
-  listEntities() {
-    return this.entitiesService.listEntities();
+  listEntities(@Query() query: Record<string, unknown>) {
+    const parsedQuery = entityListQuerySchema.safeParse(query);
+
+    if (!parsedQuery.success) {
+      throw new BadRequestException("Invalid entity catalog query parameters");
+    }
+
+    return this.entitiesService.listEntities(parsedQuery.data);
   }
 
   @Get(":entityId")

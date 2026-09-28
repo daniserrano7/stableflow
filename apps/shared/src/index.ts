@@ -40,6 +40,9 @@ export interface EntityListResponse {
   meta: {
     categories: EntityCategorySummary[];
     generatedAt: string;
+    hasMore: boolean;
+    limit: number;
+    offset: number;
     totalEntities: number;
     totalLabels: number;
   };
@@ -307,7 +310,7 @@ export interface FlowKpisResponse {
   };
 }
 
-export type TopEntityFlowMode = "net" | "inflow" | "outflow";
+export type TopEntityFlowMode = "net" | "inflow" | "outflow" | "gross";
 
 export interface TopEntityFlowAmount {
   currency: StablecoinSymbol;

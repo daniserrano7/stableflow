@@ -11,11 +11,13 @@ export class TransfersController {
     @Query("filter") filter?: string,
     @Query("cursor") cursor?: string,
     @Query("direction") direction?: string,
+    @Query("limit") limit?: string,
   ) {
     const query = new URLSearchParams();
     if (filter !== undefined) query.set("filter", filter);
     if (cursor !== undefined) query.set("cursor", cursor);
     if (direction !== undefined) query.set("direction", direction);
+    if (limit !== undefined) query.set("limit", limit);
     let params: ReturnType<typeof parseMovementParams>;
     try {
       params = parseMovementParams(query);

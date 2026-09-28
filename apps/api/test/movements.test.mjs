@@ -13,6 +13,7 @@ test("movement parameters reject malformed filters and cursors before querying",
     cursor: null,
     direction: "older",
   });
+  assert.equal(parseMovementParams(new URLSearchParams("limit=10")).limit, 10);
   for (const query of [
     "filter=small",
     "cursor=-1:0",
@@ -22,6 +23,9 @@ test("movement parameters reject malformed filters and cursors before querying",
     "direction=newer",
     "direction=sideways",
     "cursor=",
+    "limit=0",
+    "limit=51",
+    "limit=1.5",
   ]) {
     assert.throws(() => parseMovementParams(new URLSearchParams(query)), undefined, query);
   }
@@ -72,6 +76,13 @@ test("database pagination preserves same-block events, exact thresholds, and pag
     assert.equal(first.meta.newerCursor, null);
     assert.equal(first.meta.olderCursor, "100:65");
     assert.equal(first.data[0].from.entityId, from.entityId);
+    const smallPage = await get("filter=whale&limit=5");
+    assert.equal(smallPage.data.length, 5);
+    assert.equal(smallPage.meta.limit, 5);
+    assert.equal(
+      (await get(`filter=whale&limit=5&cursor=${smallPage.meta.olderCursor}`)).data[0].id,
+      "movement-109",
+    );
     const second = await get(`filter=whale&cursor=${first.meta.olderCursor}`);
     assert.equal(second.data[0].id, "movement-64");
     assert.equal(second.data.at(-1).id, "movement-15");

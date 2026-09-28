@@ -54,7 +54,12 @@ export class TransfersService {
     };
   }
 
-  async listMovements({ filter, cursor, direction }: MovementParams): Promise<MovementsResponse> {
+  async listMovements({
+    filter,
+    cursor,
+    direction,
+    limit = movementsPageSize,
+  }: MovementParams): Promise<MovementsResponse> {
     const newer = direction === "newer";
     const compare = newer ? gt : lt;
     const order = newer ? asc : desc;
@@ -85,9 +90,9 @@ export class TransfersService {
         ),
       )
       .orderBy(order(usdcTransfers.blockNumber), order(usdcTransfers.logIndex))
-      .limit(movementsPageSize + 1);
-    const hasMore = records.length > movementsPageSize;
-    const page = records.slice(0, movementsPageSize);
+      .limit(limit + 1);
+    const hasMore = records.length > limit;
+    const page = records.slice(0, limit);
     if (newer) page.reverse();
     const first = page.at(0);
     const last = page.at(-1);
@@ -96,7 +101,7 @@ export class TransfersService {
       data: await this.toLiveTransferRows(page),
       meta: {
         generatedAt: new Date().toISOString(),
-        limit: movementsPageSize,
+        limit,
         filter,
         newerCursor: first && (newer ? hasMore : cursor !== null) ? toCursor(first) : null,
         olderCursor: last && (newer ? cursor !== null : hasMore) ? toCursor(last) : null,

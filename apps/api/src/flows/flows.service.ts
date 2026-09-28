@@ -35,13 +35,13 @@ const graphCandidateBridgeEdgeLimit = 120;
 const graphCandidatePairEdgeLimit = 240;
 const graphMaxEdges = 30;
 const graphMaxNodes = 24;
-const includeUnidentified = true;
 const maxLimit = 20;
 const maxWindowMinutes = 24 * 60;
 const minWindowMinutes = 1;
 const oneMinuteBucketSize = "1m";
 
 interface TopEntityFlowOptions {
+  includeUnidentified?: boolean;
   limit?: number;
   mode?: TopEntityFlowMode;
   windowMinutes?: number;
@@ -175,6 +175,7 @@ export class FlowsService {
   }
 
   async listTopEntityFlows(options: TopEntityFlowOptions): Promise<TopEntityFlowsResponse> {
+    const includeUnidentified = options.includeUnidentified ?? true;
     const limit = normalizeLimit(options.limit);
     const mode = normalizeMode(options.mode);
     const windowMinutes = normalizeWindowMinutes(options.windowMinutes);
@@ -223,7 +224,11 @@ export class FlowsService {
       );
 
     return {
-      data: toTopEntityFlowRows(rows, mode, limit),
+      data: toTopEntityFlowRows(
+        includeUnidentified ? rows : rows.filter((row) => row.entityId !== "unidentified"),
+        mode,
+        limit,
+      ),
       meta: {
         generatedAt: new Date().toISOString(),
         includeUnidentified,
@@ -1146,6 +1151,10 @@ const getSelectedValue = (
     return outflowValue;
   }
 
+  if (mode === "gross") {
+    return inflowValue + outflowValue;
+  }
+
   return netValue;
 };
 
@@ -1175,7 +1184,7 @@ const normalizeLimit = (limit: number | undefined) => {
 };
 
 const normalizeMode = (mode: TopEntityFlowMode | undefined): TopEntityFlowMode => {
-  if (mode === "inflow" || mode === "outflow" || mode === "net") {
+  if (mode === "inflow" || mode === "outflow" || mode === "net" || mode === "gross") {
     return mode;
   }
 
