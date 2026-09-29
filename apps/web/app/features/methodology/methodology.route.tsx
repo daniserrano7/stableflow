@@ -8,7 +8,7 @@ export function meta() {
     {
       name: "description",
       content:
-        "How Stableflow measures native USDC movements on Base, attributes entity flows, and handles coverage limitations.",
+        "How Stableflow measures native USDC transfers on Base, attributes entity flows, and handles coverage limitations.",
     },
   ];
 }
@@ -25,7 +25,7 @@ const scopeFacts = [
   ["Network", "Base mainnet", "Chain ID 8453"],
   ["Asset", "Native USDC", "USDbC is excluded"],
   ["Precision", "6 decimals", "Amounts stay USDC-denominated"],
-  ["Time", "UTC", "Used throughout Movements"],
+  ["Time", "UTC", "Used throughout Transfers"],
 ] as const;
 
 const limits = [
@@ -142,9 +142,12 @@ export default function Methodology() {
             />
           </div>
           <p className="max-w-4xl text-md leading-relaxed text-muted-foreground">
-            One movement is one on-chain USDC Transfer event. A transaction can contain several
-            movements, so raw volume is not a count of users, swaps, or deposits. Entity totals are
-            boundary-based and should not be added together to recreate raw chain volume.
+            One transfer is one on-chain USDC Transfer event. A transaction can contain several
+            transfers: a routed swap moves the same USDC through a router and a pool, emitting a
+            transfer for each hop. Headline volume therefore counts each transaction once, as the
+            sum of every address&apos;s positive net change, so those hops are not double counted.
+            Entity totals are boundary-based and should not be added together to recreate chain
+            volume.
           </p>
         </PanelBody>
       </Panel>
@@ -168,7 +171,7 @@ export default function Methodology() {
             <MethodStep
               number="03"
               title="Count crossings"
-              detail="Only movements that cross the boundary affect external flow."
+              detail="Only transfers that cross the boundary affect external flow."
             />
           </ol>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -201,12 +204,12 @@ export default function Methodology() {
             <Callout
               eyebrow="Supply"
               title="Mint"
-              detail="Zero address → recipient. Visible in Movements and treated as a supply event."
+              detail="Zero address → recipient. Visible in Transfers and treated as a supply event."
             />
             <Callout
               eyebrow="Supply"
               title="Burn"
-              detail="Sender → zero address. Visible in Movements and treated as a supply event."
+              detail="Sender → zero address. Visible in Transfers and treated as a supply event."
             />
           </div>
           <p className="max-w-4xl text-md text-muted-foreground">

@@ -84,8 +84,9 @@ interface BridgeFlowAggregateRow {
 }
 
 interface VolumeBucketAggregateRow {
+  /** Counts each transaction's net value once, so routed hops don't inflate volume. */
+  adjustedValue: string;
   bucketStart: string;
-  totalValue: string;
   transferCount: string;
 }
 
@@ -271,8 +272,8 @@ export class FlowsService {
             this.listVolumeBucketRows(window),
             this.listVolumeBucketRows(previousWindow),
           ]);
-    const currentValue = sumBigInt(currentRows, (row) => BigInt(row.totalValue));
-    const previousValue = sumBigInt(previousRows, (row) => BigInt(row.totalValue));
+    const currentValue = sumBigInt(currentRows, (row) => BigInt(row.adjustedValue));
+    const previousValue = sumBigInt(previousRows, (row) => BigInt(row.adjustedValue));
 
     return {
       delta:
@@ -283,7 +284,7 @@ export class FlowsService {
       label: "24H USDC VOLUME · BASE",
       series: toKpiSeries(window, currentRows, {
         getBucketStartSeconds: (row) => Number(BigInt(row.bucketStart)),
-        getValue: (row) => BigInt(row.totalValue),
+        getValue: (row) => BigInt(row.adjustedValue),
         valueFormatter: formatUsdcSeriesValue,
       }),
       tone: "accent",
@@ -570,7 +571,7 @@ export class FlowsService {
     return this.databaseService.db
       .select({
         bucketStart: sql<string>`${usdcTransferVolumeBuckets.bucketStart}::text`,
-        totalValue: sql<string>`sum(${usdcTransferVolumeBuckets.totalValue})::text`,
+        adjustedValue: sql<string>`sum(${usdcTransferVolumeBuckets.adjustedValue})::text`,
         transferCount: sql<string>`sum(${usdcTransferVolumeBuckets.transferCount})::text`,
       })
       .from(usdcTransferVolumeBuckets)

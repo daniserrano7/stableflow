@@ -5,7 +5,7 @@ import type {
   SearchAddressResult,
   SearchEntityResult,
   SearchResponse,
-  SearchTransactionResult,
+  SearchTransferResult,
 } from "@stableflow/shared";
 import { desc, eq, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.service.js";
@@ -32,10 +32,10 @@ export class SearchService {
     const query = rawQuery.trim().toLowerCase();
     const isHexQuery = hexQueryPattern.test(query);
 
-    const [entityResponse, discoveredLabels, transactionRows] = await Promise.all([
+    const [entityResponse, discoveredLabels, transferRows] = await Promise.all([
       this.entitiesService.listEntities(),
       this.searchDiscoveredLabels(query, limit),
-      isHexQuery && query.length >= 10 ? this.searchTransactions(query, limit) : [],
+      isHexQuery && query.length >= 10 ? this.searchTransfers(query, limit) : [],
     ]);
 
     const entities = entityResponse.data
@@ -120,26 +120,20 @@ export class SearchService {
       .sort(compareRankedResults)
       .slice(0, limit)
       .map(({ result }) => result);
-    const seenTransactions = new Set<string>();
-    const transactions = transactionRows
-      .filter((row) => {
-        const key = row.transactionHash.toLowerCase();
-        if (seenTransactions.has(key)) return false;
-        seenTransactions.add(key);
-        return true;
-      })
-      .map(
-        (row): SearchTransactionResult => ({
-          amount: toTokenAmount(row.value),
-          blockNumber: row.blockNumber.toString(),
-          blockTimestamp: new Date(Number(row.blockTimestamp) * 1000).toISOString(),
-          fromAddress: row.fromAddress,
-          toAddress: row.toAddress,
-          transactionHash: row.transactionHash,
-          type: "transaction",
-        }),
-      );
-    const data = [...entities, ...addresses, ...transactions];
+    const transfers = transferRows.map(
+      (row): SearchTransferResult => ({
+        amount: toTokenAmount(row.value),
+        blockNumber: row.blockNumber.toString(),
+        blockTimestamp: new Date(Number(row.blockTimestamp) * 1000).toISOString(),
+        fromAddress: row.fromAddress,
+        logIndex: row.logIndex,
+        toAddress: row.toAddress,
+        transactionHash: row.transactionHash,
+        transferId: row.id,
+        type: "transfer",
+      }),
+    );
+    const data = [...entities, ...addresses, ...transfers];
 
     return {
       data,
@@ -176,7 +170,8 @@ export class SearchService {
       .limit(limit * 3);
   }
 
-  private searchTransactions(query: string, limit: number) {
+  // Transfers are the unit users browse, so a transaction hash matches each of its transfers.
+  private searchTransfers(query: string, limit: number) {
     const pattern = `${escapeLikePattern(query)}%`;
     const condition = transactionPattern.test(query)
       ? eq(usdcTransfers.transactionHash, query as `0x${string}`)
@@ -187,14 +182,16 @@ export class SearchService {
         blockNumber: usdcTransfers.blockNumber,
         blockTimestamp: usdcTransfers.blockTimestamp,
         fromAddress: usdcTransfers.fromAddress,
+        id: usdcTransfers.id,
+        logIndex: usdcTransfers.logIndex,
         toAddress: usdcTransfers.toAddress,
         transactionHash: usdcTransfers.transactionHash,
         value: usdcTransfers.value,
       })
       .from(usdcTransfers)
       .where(condition)
-      .orderBy(desc(usdcTransfers.blockNumber), desc(usdcTransfers.logIndex))
-      .limit(limit * 3);
+      .orderBy(desc(usdcTransfers.blockNumber), desc(usdcTransfers.value))
+      .limit(limit);
   }
 }
 

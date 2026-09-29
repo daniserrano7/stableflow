@@ -1,5 +1,14 @@
-import { BadRequestException, Controller, Get, Headers, Query, Sse } from "@nestjs/common";
-import { parseMovementParams } from "@stableflow/shared";
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Headers,
+  NotFoundException,
+  Param,
+  Query,
+  Sse,
+} from "@nestjs/common";
+import { parseTransferId, parseTransferListParams } from "@stableflow/shared";
 import { parseLiveTransferEventId } from "./live-transfer-event-id.js";
 import { TransfersService } from "./transfers.service.js";
 
@@ -8,7 +17,7 @@ export class TransfersController {
   constructor(private readonly transfersService: TransfersService) {}
 
   @Get()
-  listMovements(
+  listTransfers(
     @Query("filter") filter?: string,
     @Query("cursor") cursor?: string,
     @Query("direction") direction?: string,
@@ -19,13 +28,13 @@ export class TransfersController {
     if (cursor !== undefined) query.set("cursor", cursor);
     if (direction !== undefined) query.set("direction", direction);
     if (limit !== undefined) query.set("limit", limit);
-    let params: ReturnType<typeof parseMovementParams>;
+    let params: ReturnType<typeof parseTransferListParams>;
     try {
-      params = parseMovementParams(query);
+      params = parseTransferListParams(query);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "Invalid parameters");
     }
-    return this.transfersService.listMovements(params);
+    return this.transfersService.listTransfers(params);
   }
 
   @Get("recent")
@@ -48,5 +57,15 @@ export class TransfersController {
     return this.transfersService.createLiveTransfersStream(
       resumedCursor !== undefined ? resumedCursor : (initialCursor ?? null),
     );
+  }
+
+  // Declared last so the static "recent" and "live" routes win over this parameter.
+  @Get(":transferId")
+  async getTransfer(@Param("transferId") transferId: string) {
+    const parsed = parseTransferId(transferId);
+    if (parsed === null) throw new BadRequestException("Invalid transfer ID.");
+    const transfer = await this.transfersService.getTransfer(parsed);
+    if (transfer === null) throw new NotFoundException("Transfer not found.");
+    return transfer;
   }
 }

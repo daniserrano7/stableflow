@@ -8,7 +8,7 @@ const entityIdSchema = z
   .min(1)
   .max(128)
   .regex(/^[a-zA-Z0-9_.:-]+$/);
-const movementCursorSchema = z.string().regex(/^\d{1,20}:\d{1,10}$/);
+const transferCursorSchema = z.string().regex(/^\d{1,20}:\d{1,10}$/);
 
 function result(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
@@ -99,7 +99,7 @@ export function createStableflowServer(client: ApiClient): McpServer {
         "Page through Base USDC transfers in block order. Filter all, large (at least 10,000 USDC), or whale (at least 1,000,000 USDC). Pass the returned olderCursor or newerCursor to continue. This is a transfer list, not an aggregate for a time window.",
       inputSchema: z.object({
         filter: z.enum(["all", "large", "whale"]).default("all"),
-        cursor: movementCursorSchema.optional(),
+        cursor: transferCursorSchema.optional(),
         direction: z.enum(["older", "newer"]).default("older"),
         limit: z.number().int().min(1).max(20).default(10),
       }),

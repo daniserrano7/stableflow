@@ -30,3 +30,15 @@ export function timeAgo(ts: number, now = Date.now()): string {
   const d = Math.floor(h / 24);
   return `${d}d ago`;
 }
+
+/** `2026-09-28T14:03:12.000Z` → `2026-09-28 14:03:12`. */
+export function fmtUtcTimestamp(iso: string): string {
+  return iso.replace("T", " ").replace(/\.\d{3}Z$/, "");
+}
+
+/** Full-precision decimal string with thousands separators; avoids float rounding. */
+export function fmtTokenAmount(formatted: string): string {
+  const [integer = "0", fraction] = formatted.split(".");
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return fraction ? `${grouped}.${fraction}` : grouped;
+}

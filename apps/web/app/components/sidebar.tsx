@@ -8,7 +8,7 @@ const sidebarItems = [
   { href: "/", icon: Network, label: "Overview" },
   { href: "/entities", icon: Blocks, label: "Entities" },
   { href: "/assets", icon: Coins, label: "Assets" },
-  { href: "/movements", icon: ArrowLeftRight, label: "Movements" },
+  { href: "/transfers", icon: ArrowLeftRight, label: "Transfers" },
   { href: "/methodology", icon: BookOpen, label: "Methodology" },
 ];
 

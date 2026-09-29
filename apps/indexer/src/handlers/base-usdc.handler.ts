@@ -17,6 +17,7 @@ import {
   resolveAcrossRemoteNetwork,
   resolveCctpRemoteNetwork,
 } from "../chains/external-networks.js";
+import { TransactionNetValueTracker } from "../flows/transaction-net-value.js";
 import {
   type AddressLabel,
   type DiscoveredAddressLabelInput,
@@ -76,6 +77,8 @@ const getAddressLabelId = (address: `0x${string}`) => `${base.id}:${address.toLo
 
 const zeroAddress = "0x0000000000000000000000000000000000000000";
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+const transactionNetValue = new TransactionNetValueTracker();
 
 const getBucketStart = (timestamp: bigint) => timestamp - (timestamp % bucketSizeSeconds);
 
@@ -671,6 +674,14 @@ ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
     .onConflictDoNothing();
 
   if (insertedTransfer !== null) {
+    // A transaction lives in one block, so its adjusted deltas always land in the same bucket.
+    const adjustedValue = transactionNetValue.add({
+      from: event.args.from,
+      to: event.args.to,
+      transactionHash: event.transaction.hash,
+      value: event.args.value,
+    });
+
     await context.db
       .insert(usdcTransferVolumeBuckets)
       .values({
@@ -681,10 +692,12 @@ ponder.on("BaseUsdc:Transfer", async ({ event, context }) => {
         bucketStart,
         transferCount: 1n,
         totalValue: event.args.value,
+        adjustedValue,
       })
       .onConflictDoUpdate((row) => ({
         transferCount: row.transferCount + 1n,
         totalValue: row.totalValue + event.args.value,
+        adjustedValue: row.adjustedValue + adjustedValue,
       }));
 
     const fromLabel = await getFlowLabel({ address: event.args.from, context });

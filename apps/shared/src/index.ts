@@ -4,14 +4,14 @@ export type StablecoinSymbol = "USDC";
 
 export type ProtocolSlug = "aave" | "morpho";
 
-export type MovementKind =
+export type TransferKind =
   | "token_transfer"
   | "protocol_inflow"
   | "protocol_outflow"
   | "protocol_deposit"
   | "protocol_withdrawal";
 
-export type MovementDirection = "inflow" | "outflow" | "neutral";
+export type TransferDirection = "inflow" | "outflow" | "neutral";
 
 export type ClassificationConfidence = "low" | "medium" | "high";
 
@@ -184,9 +184,12 @@ export interface SearchAddressResult {
   role: string | null;
 }
 
-export interface SearchTransactionResult {
-  type: "transaction";
+/** A USDC transfer matched by its transaction hash. */
+export interface SearchTransferResult {
+  type: "transfer";
+  transferId: string;
   transactionHash: string;
+  logIndex: number;
   blockNumber: string;
   blockTimestamp: string;
   fromAddress: string;
@@ -194,7 +197,7 @@ export interface SearchTransactionResult {
   amount: LiveTransferAmount;
 }
 
-export type SearchResult = SearchEntityResult | SearchAddressResult | SearchTransactionResult;
+export type SearchResult = SearchEntityResult | SearchAddressResult | SearchTransferResult;
 
 export interface SearchResponse {
   data: SearchResult[];
@@ -350,16 +353,43 @@ export interface TopEntityFlowsResponse {
   };
 }
 
-export type { MovementFilter, MovementParams } from "./movements.js";
-export { movementsPageSize, movementThresholds, parseMovementParams } from "./movements.js";
+export type { TransferFilter, TransferListParams } from "./transfers.js";
+export {
+  parseTransferId,
+  parseTransferListParams,
+  transfersPageSize,
+  transferThresholds,
+} from "./transfers.js";
 
-export interface MovementsResponse {
+export interface TransferListResponse {
   data: LiveTransferRow[];
   meta: {
     generatedAt: string;
     limit: number;
-    filter: import("./movements.js").MovementFilter;
+    filter: import("./transfers.js").TransferFilter;
     olderCursor: string | null;
     newerCursor: string | null;
+  };
+}
+
+export interface TransferDetailResponse {
+  data: {
+    transfer: LiveTransferRow;
+    transaction: {
+      hash: string;
+      transferCount: number;
+      /**
+       * USDC the transaction moves with each unit counted once: the sum of every address's
+       * positive net change, so hops through routers or pools are not double counted.
+       */
+      adjustedValue: LiveTransferAmount;
+      /** USDC transfers in the transaction by log index, including this one (capped). */
+      transfers: LiveTransferRow[];
+    };
+  };
+  meta: {
+    generatedAt: string;
+    chainId: number;
+    tokenAddress: string;
   };
 }

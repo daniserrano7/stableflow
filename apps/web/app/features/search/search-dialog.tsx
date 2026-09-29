@@ -1,13 +1,13 @@
 import type { SearchResult } from "@stableflow/shared";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowLeftRight,
   ArrowRight,
   Blocks,
   CircleDollarSign,
   Coins,
   ExternalLink,
   FileText,
-  Hash,
   Home,
   LoaderCircle,
   Search,
@@ -27,11 +27,12 @@ import {
 } from "react";
 import { useNavigate } from "react-router";
 import { selectedAssetChain } from "~/features/assets/assets.config";
+import { getTransferPath } from "~/features/transfers/transfer-link";
 import { cn } from "~/utils/cn";
 import { fetchSearchResults, searchQueryKey } from "./search.query";
 import { SearchDialogContext } from "./search-dialog-context";
 
-type SearchItemKind = "address" | "asset" | "entity" | "page" | "transaction";
+type SearchItemKind = "address" | "asset" | "entity" | "page" | "transfer";
 
 interface SearchItem {
   external?: boolean;
@@ -85,7 +86,7 @@ const assetItems: SearchItem[] = selectedAssetChain.assets.map((asset) => ({
 }));
 
 const predefinedItems = [...navigationItems, ...assetItems];
-const groupOrder = ["Navigation", "Assets", "Entities", "Addresses", "Transactions"];
+const groupOrder = ["Navigation", "Assets", "Entities", "Addresses", "Transfers"];
 const emptyRemoteResults: SearchResult[] = [];
 
 export function SearchDialogProvider({ children }: { children: ReactNode }) {
@@ -229,7 +230,7 @@ function SearchDialog({
         >
           <DialogPrimitive.Title className="sr-only">Search Stableflow</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Search pages, assets, entities, addresses, and transactions.
+            Search pages, assets, entities, addresses, and transfers by transaction hash.
           </DialogPrimitive.Description>
 
           <div className="flex min-h-15 items-center gap-3 border-border border-b px-4">
@@ -441,16 +442,15 @@ function toSearchItem(result: SearchResult): SearchItem {
         subtitle: `${shortHex(result.address)}${result.role ? ` · ${formatCategory(result.role)}` : " · Base address"}`,
         title: result.label ?? result.entityName ?? "Unlabeled address",
       };
-    case "transaction":
+    case "transfer":
       return {
-        external: true,
-        group: "Transactions",
-        href: `https://basescan.org/tx/${result.transactionHash}`,
-        id: `transaction:${result.transactionHash.toLowerCase()}`,
+        group: "Transfers",
+        href: getTransferPath(result.transferId),
+        id: `transfer:${result.transferId}`,
         keywords: result.transactionHash,
-        kind: "transaction",
-        subtitle: `${formatAmount(result.amount.formatted)} USDC · Block ${Number(result.blockNumber).toLocaleString("en-US")}`,
-        title: shortHex(result.transactionHash, 10, 8),
+        kind: "transfer",
+        subtitle: `Tx ${shortHex(result.transactionHash, 10, 6)} · log ${result.logIndex} · Block ${Number(result.blockNumber).toLocaleString("en-US")}`,
+        title: `${formatAmount(result.amount.formatted)} USDC transfer`,
       };
   }
 }
@@ -468,8 +468,8 @@ function getItemIcon(item: SearchItem) {
       return Blocks;
     case "address":
       return WalletCards;
-    case "transaction":
-      return Hash;
+    case "transfer":
+      return ArrowLeftRight;
     default:
       return FileText;
   }

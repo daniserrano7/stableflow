@@ -3,7 +3,13 @@ import { index, type RouteConfig, route } from "@react-router/dev/routes";
 export default [
   index("features/home/home.route.tsx"),
   route("design-system", "features/design-system/design-system.route.tsx"),
-  route("movements", "features/movements/movements.route.tsx"),
+  route("transfers", "features/transfers/transfers.route.tsx"),
+  route("transfers/:transferId", "features/transfers/transfer-detail.route.tsx"),
+  // Pre-rename URLs; transfers were briefly called movements.
+  route("movements", "features/transfers/movements-redirect.ts", { id: "movements-redirect" }),
+  route("movements/:transferId", "features/transfers/movements-redirect.ts", {
+    id: "movement-redirect",
+  }),
   route("methodology/attribution", "features/methodology/attribution.resource.ts"),
   route("methodology", "features/methodology/methodology.route.tsx"),
   route("entities", "features/entities/entities.route.tsx"),

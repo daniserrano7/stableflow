@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { useRowLink } from "~/hooks/use-row-link";
+import { getTransferPath, TransferRowLink } from "../transfers/transfer-link";
 import {
   getEntityGlyph,
   getPartyCategory,
@@ -45,6 +47,8 @@ export function LiveTransfersTable({
   onFilterChange,
   transfers,
 }: LiveTransfersTableProps) {
+  const rowLink = useRowLink();
+
   return (
     <Panel className="min-h-0 flex-1">
       <PanelHead className="flex-wrap gap-2">
@@ -89,13 +93,16 @@ export function LiveTransfersTable({
               <TableHead className="w-[16%] text-right" scope="col">
                 Protocol
               </TableHead>
+              <TableHead className="w-10" aria-label="Details" scope="col" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {transfers.map((transfer) => (
               <TableRow
+                className="group cursor-pointer"
                 data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
                 key={transfer.id}
+                {...rowLink(getTransferPath(transfer.id))}
               >
                 <TableCell>
                   <TransferEntity party={transfer.from} />
@@ -121,11 +128,14 @@ export function LiveTransfersTable({
                 <TableCell className="text-right">
                   <Tag category={getTransferCategory(transfer)} />
                 </TableCell>
+                <TableCell className="text-right">
+                  <TransferRowLink transferId={transfer.id} />
+                </TableCell>
               </TableRow>
             ))}
             {transfers.length === 0 && (
               <TableRow>
-                <TableCell className="h-32 text-center text-muted-foreground" colSpan={5}>
+                <TableCell className="h-32 text-center text-muted-foreground" colSpan={6}>
                   No transfers match this filter yet.
                 </TableCell>
               </TableRow>
@@ -138,8 +148,8 @@ export function LiveTransfersTable({
         <span className="inline-flex items-center gap-1.5">
           <CircleDollarSign size={13} /> {transfers.length} shown
         </span>
-        <Link className="hover:text-accent" to={`/movements?filter=${filter}`}>
-          View all movements →
+        <Link className="hover:text-accent" to={`/transfers?filter=${filter}`}>
+          View all transfers →
         </Link>
         <span>
           {matchingCount} matching · {bufferedCount} buffered
@@ -154,6 +164,7 @@ export function TransferEntity({ party }: { party: LiveTransferParty }) {
   const entity = (
     <Entity
       category={category}
+      className="max-w-full"
       entityId={party.entityId}
       glyph={getEntityGlyph(party, category)}
       isWallet={!party.isIdentified}

@@ -6,5 +6,5 @@
     "outDir": "dist/inspection",
     "sourceMap": false
   },
-  "include": ["src/env/env.ts", "src/inspection/**/*.ts"]
+  "include": ["src/env/env.ts", "src/flows/**/*.ts", "src/inspection/**/*.ts"]
 }

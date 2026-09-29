@@ -1,6 +1,7 @@
 export * from "./amount";
 export * from "./anomaly-item";
 export * from "./chip";
+export * from "./copy-button";
 export * from "./entity";
 export * from "./flow-bar";
 export * from "./kpi";

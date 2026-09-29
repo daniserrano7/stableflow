@@ -18,7 +18,7 @@ StableFlow helps users answer questions like:
 - Which protocols are receiving or losing stablecoin flows?
 - Which stablecoins are most active?
 - Which chains are gaining activity?
-- What large or unusual movements happened recently?
+- What large or unusual transfers happened recently?
 - Are there spikes, drops, or anomalies in protocol-level activity?
 
 The project is also intended as a technical portfolio project demonstrating:
@@ -50,7 +50,7 @@ The initial scope should be:
   - net flow
   - daily volume
   - active addresses
-  - large movements
+  - large transfers
   - simple anomalies
 
 The architecture should be designed to support multiple chains, stablecoins, and protocols later, but the first implementation should focus on finishing a clean, working MVP.
@@ -188,7 +188,7 @@ Main pages:
 | `/protocols/aave` | Aave stablecoin flows |
 | `/protocols/morpho` | Morpho stablecoin flows |
 | `/chains/base` | Base stablecoin activity |
-| `/movements` | Relevant movement feed |
+| `/transfers` | Relevant transfer feed |
 | `/methodology` | Data methodology and limitations |
 
 ### Backend
@@ -210,7 +210,7 @@ The API should expose data for:
 - stablecoin pages
 - protocol pages
 - chain pages
-- relevant movements
+- relevant transfers
 - rankings
 - anomalies
 
@@ -266,7 +266,7 @@ Initial tables may include:
 - `protocols`
 - `protocol_contracts`
 - `token_transfers`
-- `movements`
+- `transfer_classifications`
 - `daily_asset_metrics`
 - `daily_protocol_metrics`
 - `daily_chain_metrics`
@@ -277,9 +277,9 @@ Initial tables may include:
 
 ---
 
-## Movement Classification
+## Transfer Classification
 
-A movement is a semantic interpretation of a raw transfer.
+A transfer classification is a semantic interpretation of a raw transfer.
 
 Examples:
 
@@ -289,17 +289,17 @@ protocol contract -> wallet = protocol_outflow
 wallet -> wallet = token_transfer
 ```
 
-Suggested movement fields:
+Suggested classification fields:
 
 ```ts
-type MovementKind =
+type TransferKind =
   | "token_transfer"
   | "protocol_inflow"
   | "protocol_outflow"
   | "protocol_deposit"
   | "protocol_withdrawal";
 
-type MovementDirection =
+type TransferDirection =
   | "inflow"
   | "outflow"
   | "neutral";
@@ -310,7 +310,7 @@ type ClassificationConfidence =
   | "high";
 ```
 
-Important: do not label a movement as a deposit or withdrawal unless the indexed event proves it. A token transfer into a known protocol contract should initially be called protocol_inflow.
+Important: do not label a transfer as a deposit or withdrawal unless the indexed event proves it. A token transfer into a known protocol contract should initially be called protocol_inflow.
 
 ---
 
@@ -350,7 +350,7 @@ Features:
 - Aave page
 - Morpho page
 - Base page
-- movement feed
+- transfer feed
 - basic charts
 - responsive layout
 - methodology page
@@ -381,17 +381,17 @@ Features:
 
 - index USDC transfers on Base
 - classify transfers involving known protocol contracts
-- store movements in PostgreSQL
+- store transfers in PostgreSQL
 - compute daily aggregates
 - expose data through Nest.js API
 - connect frontend via TanStack Query
 - show real protocol inflows/outflows
-- show relevant large movements
+- show relevant large transfers
 - add basic anomaly rules
 
 Success criteria:
 
-- StableFlow can show real USDC movement data on Base
+- StableFlow can show real USDC transfer data on Base
 - Aave and Morpho have protocol flow pages
 - homepage is powered by real indexed metrics
 - the system can recover from restarts using checkpoints
@@ -440,7 +440,7 @@ Initial anomaly detection should be simple and explainable.
 Examples:
 
 - current daily inflow is more than 2.5x the 30-day average
-- movement amount is above the 95th percentile
+- transfer amount is above the 95th percentile
 - protocol net outflow is unusually negative
 - daily transfer count drops sharply
 - stablecoin activity spikes compared to previous periods
@@ -532,11 +532,11 @@ The initial goal is a focused stablecoin flow explorer, not a full DeFi platform
 
 Short description:
 
-StableFlow is a visual stablecoin flow explorer that indexes USDC movements on Base, classifies protocol inflows and outflows across Aave and Morpho, computes historical metrics and anomalies, and exposes the data through a public React SSR analytics dashboard.
+StableFlow is a visual stablecoin flow explorer that indexes USDC transfers on Base, classifies protocol inflows and outflows across Aave and Morpho, computes historical metrics and anomalies, and exposes the data through a public React SSR analytics dashboard.
 
 Technical description:
 
-Built an end-to-end Web3 data product with EVM indexing, protocol-aware movement classification, PostgreSQL aggregation pipelines, GraphQL APIs, anomaly detection rules, and a public SSR dashboard deployed with Cloudflare and Docker-based backend infrastructure.
+Built an end-to-end Web3 data product with EVM indexing, protocol-aware transfer classification, PostgreSQL aggregation pipelines, GraphQL APIs, anomaly detection rules, and a public SSR dashboard deployed with Cloudflare and Docker-based backend infrastructure.
 
 ---
 
@@ -556,18 +556,24 @@ Built an end-to-end Web3 data product with EVM indexing, protocol-aware movement
 
 - `/`: live native USDC transfers and flow analytics on Base.
 - `/entities` and `/entities/:entityId`: searchable registry and shared entity detail pages, including Aave and Morpho.
-- `/movements`: indexed transfer history with 50 rows per page, UTC timestamps, address/transaction explorer links, and URL-backed filters. Large includes transfers of at least 10,000 USDC; whale includes transfers of at least 1,000,000 USDC. Filters apply in the database before pagination.
+- `/transfers`: indexed transfer history with 50 rows per page, UTC timestamps, address/transaction explorer links, and URL-backed filters. Large includes transfers of at least 10,000 USDC; whale includes transfers of at least 1,000,000 USDC. Filters apply in the database before pagination.
 - `/methodology`: scope, counting rules, attribution, bridge semantics, and coverage limits, adapted from `docs/usdc-flow-attribution-strategy.md`. `/methodology/attribution` serves that source document directly.
 
 The header identifies Base mainnet / native USDC as the current scope and links to coverage details. The design system remains available at `/design-system` as a development reference.
 
-### Movement API and validation
+### Transfer API and validation
 
 `GET /v1/transfers?filter=all|large|whale&cursor=<blockNumber>:<logIndex>&direction=older|newer`
 
 The initial request omits the cursor and direction. Responses include `olderCursor` and `newerCursor` (null at the corresponding end), with at most 50 rows in descending block/log order. Use the returned cursor with the matching direction. Changing filters starts a new page. Cursor pagination avoids offset shifts when newer transfers arrive; reorgs or historical reindexing can still change results. Invalid parameters return HTTP 400. Existing `/v1/transfers/recent` and `/v1/transfers/live` endpoints remain available.
 
-`pnpm test` includes movement parameter validation. To also run PostgreSQL pagination and amount-boundary integration tests, supply `TEST_DATABASE_URL` for a local test database:
+`GET /v1/transfers/:transferId` returns one transfer, where the ID is the indexer key `<transactionHash>-<logIndex>`. The response also describes its transaction: the transfer count, up to 100 of its transfers, and its adjusted value. Malformed IDs return 400; unknown IDs return 404. The web app serves it at `/transfers/:transferId`, and old `/movements` URLs redirect there.
+
+### Volume and double counting
+
+A transaction can emit several USDC transfers. A routed swap, for example, moves the same USDC through a router and a pool, producing one transfer per hop. `usdc_transfer_volume_buckets.totalValue` sums every transfer. `adjustedValue` counts each transaction once, as the sum of every address's positive net change within it. The 24h volume KPI uses the adjusted value. On early indexed data, raw volume was about 18% higher than adjusted.
+
+`pnpm test` includes transfer parameter validation. To also run PostgreSQL pagination and amount-boundary integration tests, supply `TEST_DATABASE_URL` for a local test database:
 
 ```bash
 TEST_DATABASE_URL=postgresql://localhost/stableflow_test pnpm --filter @stableflow/api test

@@ -29,7 +29,7 @@
     "labels:report": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/discovery-report.js",
     "labels:reject": "pnpm inspect:build && node --env-file-if-exists=.env.local dist/inspection/src/inspection/reject-candidate.js",
     "start": "DATABASE_SCHEMA=${DATABASE_SCHEMA:-public} PONDER_TELEMETRY_DISABLED=1 ponder start",
-    "test": "pnpm inspect:build && node --test dist/inspection/src/inspection/*.test.js",
+    "test": "pnpm inspect:build && node --test dist/inspection/src/*/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

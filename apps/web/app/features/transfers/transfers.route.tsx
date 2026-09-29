@@ -1,7 +1,7 @@
 import {
   type LiveTransferRow,
-  type MovementsResponse,
-  parseMovementParams,
+  parseTransferListParams,
+  type TransferListResponse,
 } from "@stableflow/shared";
 import { ArrowLeftRight, ArrowRight } from "lucide-react";
 import { Link, useLoaderData, useNavigation } from "react-router";
@@ -17,30 +17,32 @@ import {
 } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { getApiUrl } from "~/config/api.server";
-import { fmtUSDC } from "~/utils/format";
+import { useRowLink } from "~/hooks/use-row-link";
+import { fmtUSDC, fmtUtcTimestamp } from "~/utils/format";
 import { getTransferAmount, getTransferMagnitude } from "../live-transfers/live-transfers.utils";
 import { TransferEntity } from "../live-transfers/live-transfers-table";
 import {
   liveTransferConnectionLabels,
   useLiveTransfers,
 } from "../live-transfers/use-live-transfers";
+import { getTransferPath, TransferRowLink } from "./transfer-link";
 
 export function meta() {
   return [
-    { title: "Movements | Stableflow" },
+    { title: "Transfers | Stableflow" },
     {
       name: "description",
-      content: "Explore indexed USDC transfers on Base, including large and whale movements.",
+      content: "Explore indexed USDC transfers on Base, including large and whale transfers.",
     },
   ];
 }
 
-export async function loader({ request }: { request: Request }): Promise<MovementsResponse> {
+export async function loader({ request }: { request: Request }): Promise<TransferListResponse> {
   const params = new URL(request.url).searchParams;
   try {
-    parseMovementParams(params);
+    parseTransferListParams(params);
   } catch (error) {
-    throw new Response(error instanceof Error ? error.message : "Invalid movement parameters", {
+    throw new Response(error instanceof Error ? error.message : "Invalid transfer parameters", {
       status: 400,
     });
   }
@@ -53,11 +55,11 @@ export async function loader({ request }: { request: Request }): Promise<Movemen
     headers: { accept: "application/json" },
     signal: request.signal,
   });
-  if (!response.ok) throw new Response("Unable to load movements", { status: response.status });
+  if (!response.ok) throw new Response("Unable to load transfers", { status: response.status });
   return response.json();
 }
 
-export default function Movements() {
+export default function Transfers() {
   const { data: initialTransfers, meta } = useLoaderData<typeof loader>();
   const pending = useNavigation().state !== "idle";
   // Only the latest page streams; older pages are a stable slice of history.
@@ -72,15 +74,16 @@ export default function Movements() {
     initialTransfers,
     maxBufferedRows: meta.limit,
   });
+  const rowLink = useRowLink();
   const olderCursor = getOlderCursor({ data, initialTransfers, isLatestPage, meta });
   const amounts = data.map(getTransferAmount);
-  const pageVolume = amounts.reduce((total, amount) => total + amount, 0);
-  const averageMovement = data.length > 0 ? pageVolume / data.length : 0;
-  const largestMovement = amounts.length > 0 ? Math.max(...amounts) : 0;
+  const pageTotal = amounts.reduce((total, amount) => total + amount, 0);
+  const averageTransfer = data.length > 0 ? pageTotal / data.length : 0;
+  const largestTransfer = amounts.length > 0 ? Math.max(...amounts) : 0;
   const pageLink = (cursor: string, direction: string) =>
-    `/movements?${new URLSearchParams({ filter: meta.filter, cursor, direction })}`;
+    `/transfers?${new URLSearchParams({ filter: meta.filter, cursor, direction })}`;
   return (
-    <PublicPage title="Movements">
+    <PublicPage title="Transfers">
       <Panel>
         <PanelBody className="flex flex-col items-start gap-5 p-5 sm:flex-row">
           <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-accent text-background shadow-[var(--shadow-glow-accent)]">
@@ -90,25 +93,25 @@ export default function Movements() {
             <p className="mb-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
               Onchain transfers · Base · USDC
             </p>
-            <h1 className="m-0 text-2xl font-medium leading-tight">Movement History</h1>
+            <h1 className="m-0 text-2xl font-medium leading-tight">Transfer History</h1>
           </div>
         </PanelBody>
       </Panel>
       <section
-        aria-label="Current movement page summary"
+        aria-label="Current transfer page summary"
         className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4"
       >
-        <KPI label="Movements shown" value={data.length} unit={`/ ${meta.limit} max`} />
-        <KPI label="Page volume" value={fmtUSDC(pageVolume)} unit="USDC" />
-        <KPI label="Average movement" value={fmtUSDC(averageMovement)} unit="USDC" />
-        <KPI label="Largest movement" value={fmtUSDC(largestMovement)} unit="USDC" />
+        <KPI label="Transfers shown" value={data.length} unit={`/ ${meta.limit} max`} />
+        <KPI label="Page total" value={fmtUSDC(pageTotal)} unit="USDC" />
+        <KPI label="Average transfer" value={fmtUSDC(averageTransfer)} unit="USDC" />
+        <KPI label="Largest transfer" value={fmtUSDC(largestTransfer)} unit="USDC" />
       </section>
       <Panel aria-busy={pending}>
         <PanelHead className="flex-wrap gap-3">
-          <PanelTitle live={isLatestPage && connectionStatus === "live"}>Movements</PanelTitle>
+          <PanelTitle live={isLatestPage && connectionStatus === "live"}>Transfers</PanelTitle>
           <PanelActions>
-            <nav aria-label="Movement size">
-              <ToggleGroup aria-label="Movement size" type="single" value={meta.filter}>
+            <nav aria-label="Transfer size">
+              <ToggleGroup aria-label="Transfer size" type="single" value={meta.filter}>
                 {(
                   [
                     ["all", "All"],
@@ -119,7 +122,7 @@ export default function Movements() {
                   <ToggleGroupItem asChild key={filter} value={filter}>
                     <Link
                       aria-current={meta.filter === filter ? "page" : undefined}
-                      to={`/movements?filter=${filter}`}
+                      to={`/transfers?filter=${filter}`}
                     >
                       {label}
                     </Link>
@@ -135,37 +138,47 @@ export default function Movements() {
         >
           <span>
             {pending
-              ? "Loading movements…"
-              : `${data.length} movements · up to ${meta.limit} per page`}
+              ? "Loading transfers…"
+              : `${data.length} transfers · up to ${meta.limit} per page`}
           </span>
           {isLatestPage && <span>{liveTransferConnectionLabels[connectionStatus]}</span>}
           {meta.newerCursor && (
-            <Link className="hover:text-accent" to={`/movements?filter=${meta.filter}`}>
-              Latest movements ↗
+            <Link className="hover:text-accent" to={`/transfers?filter=${meta.filter}`}>
+              Latest transfers ↗
             </Link>
           )}
         </div>
         <div className="overflow-x-auto">
-          <Table className="min-w-[1060px]">
+          {/* Fixed layout keeps columns from resizing as live rows with longer values arrive. */}
+          <Table className="min-w-[1100px] table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Time (UTC)</TableHead>
-                <TableHead>From</TableHead>
-                <TableHead className="w-8" aria-label="Direction" />
-                <TableHead>To</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Transaction / log</TableHead>
+                <TableHead className="w-[180px]" scope="col">
+                  Time (UTC)
+                </TableHead>
+                <TableHead scope="col">From</TableHead>
+                <TableHead className="w-10" aria-label="Direction" scope="col" />
+                <TableHead scope="col">To</TableHead>
+                <TableHead className="w-[200px] text-right" scope="col">
+                  Amount
+                </TableHead>
+                <TableHead className="w-[180px]" scope="col">
+                  Transaction / log
+                </TableHead>
+                <TableHead className="w-10" aria-label="Details" scope="col" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((transfer) => (
                 <TableRow
+                  className="group cursor-pointer"
                   data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
                   key={transfer.id}
+                  {...rowLink(getTransferPath(transfer.id))}
                 >
                   <TableCell className="font-mono text-xs">
                     <time dateTime={transfer.blockTimestamp}>
-                      {transfer.blockTimestamp.replace("T", " ").replace(".000Z", "")}
+                      {fmtUtcTimestamp(transfer.blockTimestamp)}
                     </time>
                     <span className="block text-muted-foreground">
                       Block {transfer.blockNumber}
@@ -224,12 +237,15 @@ export default function Movements() {
                       Log {transfer.logIndex}
                     </span>
                   </TableCell>
+                  <TableCell className="text-right">
+                    <TransferRowLink transferId={transfer.id} />
+                  </TableCell>
                 </TableRow>
               ))}
               {data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    No indexed movements match this page and filter. Try all movements or return to
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    No indexed transfers match this page and filter. Try all transfers or return to
                     the latest page.
                   </TableCell>
                 </TableRow>
@@ -238,7 +254,7 @@ export default function Movements() {
           </Table>
         </div>
         <nav
-          aria-label="Movement pagination"
+          aria-label="Transfer pagination"
           className="flex justify-between gap-3 border-t border-border px-3.5 py-2.5 font-mono text-xs"
         >
           {meta.newerCursor ? (
@@ -276,7 +292,7 @@ function getOlderCursor({
   data: LiveTransferRow[];
   initialTransfers: LiveTransferRow[];
   isLatestPage: boolean;
-  meta: MovementsResponse["meta"];
+  meta: TransferListResponse["meta"];
 }) {
   const last = data.at(-1);
   if (!isLatestPage || last === undefined) return meta.olderCursor;

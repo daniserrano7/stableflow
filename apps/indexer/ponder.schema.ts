@@ -28,7 +28,10 @@ export const usdcTransferVolumeBuckets = onchainTable(
     bucketSize: t.text().notNull(),
     bucketStart: t.bigint().notNull(),
     transferCount: t.bigint().notNull(),
+    /** Sum of every transfer's value; hops inside one transaction are counted each time. */
     totalValue: t.bigint().notNull(),
+    /** Value counted once per transaction (see TransactionNetValueTracker). */
+    adjustedValue: t.bigint().notNull(),
   }),
   (table) => ({
     bucketStartIndex: index("usdc_transfer_volume_buckets_bucket_start_idx").on(table.bucketStart),

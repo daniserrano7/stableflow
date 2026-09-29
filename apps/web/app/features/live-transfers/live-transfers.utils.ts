@@ -1,14 +1,15 @@
 import {
   type LiveTransferParty,
   type LiveTransferRow,
-  movementThresholds,
+  type TransferFilter,
+  transferThresholds,
 } from "@stableflow/shared";
 import type { Category } from "~/styles/tokens";
 
-export type TransferFilter = "all" | "large" | "whale";
+export type { TransferFilter };
 
-export const largeTransferThreshold = movementThresholds.large;
-export const whaleThreshold = movementThresholds.whale;
+export const largeTransferThreshold = transferThresholds.large;
+export const whaleThreshold = transferThresholds.whale;
 
 export const transferFilterOptions: { label: string; value: TransferFilter }[] = [
   { label: "All", value: "all" },

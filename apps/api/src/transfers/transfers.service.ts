@@ -6,20 +6,23 @@ import type {
   LiveTransferCursor,
   LiveTransferParty,
   LiveTransferRow,
-  MovementParams,
-  MovementsResponse,
   RecentTransfersResponse,
+  TransferDetailResponse,
+  TransferListParams,
+  TransferListResponse,
 } from "@stableflow/shared";
-import { movementsPageSize, movementThresholds } from "@stableflow/shared";
-import { and, asc, desc, eq, gt, gte, inArray, lt, or } from "drizzle-orm";
+import { transfersPageSize, transferThresholds } from "@stableflow/shared";
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { concatMap, filter, from, interval, map, merge, Observable, startWith } from "rxjs";
 import { DatabaseService } from "../database/database.service.js";
-import { toTokenAmount } from "../tokens/base-usdc.js";
+import { baseUsdc, toTokenAmount } from "../tokens/base-usdc.js";
 import { toLiveTransferEventId } from "./live-transfer-event-id.js";
 
 const defaultRecentTransfersLimit = 20;
 const liveTransfersPollIntervalMs = 1_000;
 const liveTransfersHeartbeatIntervalMs = 15_000;
+const maxTransactionTransfers = 100;
+const baseChainId = 8453;
 
 interface AddressLabel {
   address: string;
@@ -56,30 +59,21 @@ export class TransfersService {
     };
   }
 
-  async listMovements({
+  async listTransfers({
     filter,
     cursor,
     direction,
-    limit = movementsPageSize,
-  }: MovementParams): Promise<MovementsResponse> {
+    limit = transfersPageSize,
+  }: TransferListParams): Promise<TransferListResponse> {
     const newer = direction === "newer";
     const compare = newer ? gt : lt;
     const order = newer ? asc : desc;
     const records = await this.databaseService.db
-      .select({
-        blockNumber: usdcTransfers.blockNumber,
-        blockTimestamp: usdcTransfers.blockTimestamp,
-        fromAddress: usdcTransfers.fromAddress,
-        id: usdcTransfers.id,
-        logIndex: usdcTransfers.logIndex,
-        toAddress: usdcTransfers.toAddress,
-        transactionHash: usdcTransfers.transactionHash,
-        value: usdcTransfers.value,
-      })
+      .select(transferRecordColumns)
       .from(usdcTransfers)
       .where(
         and(
-          gte(usdcTransfers.value, BigInt(movementThresholds[filter]) * 1_000_000n),
+          gte(usdcTransfers.value, BigInt(transferThresholds[filter]) * 1_000_000n),
           cursor === null
             ? undefined
             : or(
@@ -108,6 +102,89 @@ export class TransfersService {
         newerCursor: first && (newer ? hasMore : cursor !== null) ? toCursor(first) : null,
         olderCursor: last && (newer ? cursor !== null : hasMore) ? toCursor(last) : null,
       },
+    };
+  }
+
+  async getTransfer({
+    id,
+    transactionHash,
+  }: {
+    id: string;
+    transactionHash: string;
+  }): Promise<TransferDetailResponse | null> {
+    const hash = transactionHash as `0x${string}`;
+    // All lookups hit the transaction hash index; the transfer is one of the siblings.
+    const [siblingRecords, transactionTotals] = await Promise.all([
+      this.databaseService.db
+        .select(transferRecordColumns)
+        .from(usdcTransfers)
+        .where(eq(usdcTransfers.transactionHash, hash))
+        .orderBy(asc(usdcTransfers.logIndex))
+        .limit(maxTransactionTransfers),
+      this.getTransactionTotals(hash),
+    ]);
+    let transferRecord = siblingRecords.find((record) => record.id === id);
+    if (transferRecord === undefined) {
+      // Transactions with more transfers than the cap may leave this one outside the list.
+      [transferRecord] = await this.databaseService.db
+        .select(transferRecordColumns)
+        .from(usdcTransfers)
+        .where(eq(usdcTransfers.id, id))
+        .limit(1);
+    }
+    if (transferRecord === undefined) return null;
+
+    const rows = await this.toLiveTransferRows([transferRecord, ...siblingRecords]);
+    return {
+      data: {
+        transfer: rows[0] as LiveTransferRow,
+        transaction: {
+          adjustedValue: toTokenAmount(transactionTotals.adjustedValue),
+          hash: transferRecord.transactionHash,
+          transferCount: transactionTotals.transferCount,
+          transfers: rows.slice(1),
+        },
+      },
+      meta: {
+        chainId: baseChainId,
+        generatedAt: new Date().toISOString(),
+        tokenAddress: baseUsdc.address,
+      },
+    };
+  }
+
+  /**
+   * Counts every transfer in the transaction and its adjusted value: the sum of each address's
+   * positive net change, matching the indexer's TransactionNetValueTracker.
+   */
+  private async getTransactionTotals(transactionHash: `0x${string}`) {
+    const result = await this.databaseService.db.execute<{
+      adjusted_value: string;
+      transfer_count: number;
+    }>(sql`
+      with transfers as (
+        select ${usdcTransfers.fromAddress} as from_address,
+               ${usdcTransfers.toAddress} as to_address,
+               ${usdcTransfers.value} as value
+        from ${usdcTransfers}
+        where ${usdcTransfers.transactionHash} = ${transactionHash}
+      ),
+      nets as (
+        select lower(address) as address, sum(delta) as net
+        from (
+          select to_address as address, value as delta from transfers
+          union all
+          select from_address, -value from transfers
+        ) legs
+        group by 1
+      )
+      select (select count(*) from transfers)::int as transfer_count,
+             coalesce((select sum(net) from nets where net > 0), 0)::text as adjusted_value
+    `);
+    const [totals] = result.rows;
+    return {
+      adjustedValue: BigInt(totals?.adjusted_value ?? "0"),
+      transferCount: totals?.transfer_count ?? 0,
     };
   }
 
@@ -163,16 +240,7 @@ export class TransfersService {
 
   private async getRecentTransferRecords(limit: number): Promise<TransferRecord[]> {
     const records = await this.databaseService.db
-      .select({
-        blockNumber: usdcTransfers.blockNumber,
-        blockTimestamp: usdcTransfers.blockTimestamp,
-        fromAddress: usdcTransfers.fromAddress,
-        id: usdcTransfers.id,
-        logIndex: usdcTransfers.logIndex,
-        toAddress: usdcTransfers.toAddress,
-        transactionHash: usdcTransfers.transactionHash,
-        value: usdcTransfers.value,
-      })
+      .select(transferRecordColumns)
       .from(usdcTransfers)
       .orderBy(desc(usdcTransfers.blockNumber), desc(usdcTransfers.logIndex))
       .limit(limit);
@@ -185,16 +253,7 @@ export class TransfersService {
     limit: number,
   ): Promise<TransferRecord[]> {
     return this.databaseService.db
-      .select({
-        blockNumber: usdcTransfers.blockNumber,
-        blockTimestamp: usdcTransfers.blockTimestamp,
-        fromAddress: usdcTransfers.fromAddress,
-        id: usdcTransfers.id,
-        logIndex: usdcTransfers.logIndex,
-        toAddress: usdcTransfers.toAddress,
-        transactionHash: usdcTransfers.transactionHash,
-        value: usdcTransfers.value,
-      })
+      .select(transferRecordColumns)
       .from(usdcTransfers)
       .where(
         or(
@@ -327,4 +386,15 @@ const formatCategory = (category: string) => {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+};
+
+const transferRecordColumns = {
+  blockNumber: usdcTransfers.blockNumber,
+  blockTimestamp: usdcTransfers.blockTimestamp,
+  fromAddress: usdcTransfers.fromAddress,
+  id: usdcTransfers.id,
+  logIndex: usdcTransfers.logIndex,
+  toAddress: usdcTransfers.toAddress,
+  transactionHash: usdcTransfers.transactionHash,
+  value: usdcTransfers.value,
 };

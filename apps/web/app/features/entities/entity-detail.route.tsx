@@ -57,9 +57,11 @@ import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 import { getApiUrl } from "~/config/api.server";
 import { getVisualIdentity } from "~/config/visuals";
+import { useRowLink } from "~/hooks/use-row-link";
 import { CATEGORY, type Category } from "~/styles/tokens";
 import { cn } from "~/utils/cn";
 import { shortAddr } from "~/utils/format";
+import { getTransferPath, TransferRowLink } from "../transfers/transfer-link";
 import {
   appendEntityDetailSearchParams,
   type EntityDetailWindow,
@@ -841,6 +843,7 @@ function RecentTransfersPanel({
   const emptyMessage = isUnidentified
     ? "Recent transfers cannot be listed for this pooled category because it has no registered boundary addresses."
     : "No recent boundary transfers.";
+  const rowLink = useRowLink();
 
   return (
     <Panel>
@@ -851,9 +854,10 @@ function RecentTransfersPanel({
       <div className="divide-y divide-border lg:hidden">
         {transfers.map((transfer) => (
           <div
-            className="px-4 py-3 data-[fresh=true]:animate-[sf-row-in_0.9s_ease-out] motion-reduce:data-[fresh=true]:animate-none"
+            className="group cursor-pointer px-4 py-3 transition-colors hover:bg-surface-2 data-[fresh=true]:animate-[sf-row-in_0.9s_ease-out] motion-reduce:data-[fresh=true]:animate-none"
             data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
             key={transfer.id}
+            {...rowLink(getTransferPath(transfer.id))}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="grid min-w-0 flex-1 gap-2">
@@ -866,7 +870,10 @@ function RecentTransfersPanel({
               <span>
                 Block {formatBlock(transfer.blockNumber)} · {formatUtcTime(transfer.blockTimestamp)}
               </span>
-              <ExternalHashLink hash={transfer.transactionHash} />
+              <span className="inline-flex items-center gap-2">
+                <ExternalHashLink hash={transfer.transactionHash} />
+                <TransferRowLink transferId={transfer.id} />
+              </span>
             </div>
           </div>
         ))}
@@ -874,7 +881,7 @@ function RecentTransfersPanel({
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
-        <Table className="min-w-[760px] table-fixed">
+        <Table className="min-w-[800px] table-fixed">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[27%]" scope="col">
@@ -892,13 +899,16 @@ function RecentTransfersPanel({
               <TableHead className="w-[14%] text-right" scope="col">
                 Tx
               </TableHead>
+              <TableHead className="w-10" aria-label="Details" scope="col" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {transfers.map((transfer) => (
               <TableRow
+                className="group cursor-pointer"
                 data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
                 key={transfer.id}
+                {...rowLink(getTransferPath(transfer.id))}
               >
                 <TableCell className="min-w-0">
                   <TransferPartyCell party={transfer.from} />
@@ -918,11 +928,14 @@ function RecentTransfersPanel({
                 <TableCell className="text-right">
                   <ExternalHashLink hash={transfer.transactionHash} />
                 </TableCell>
+                <TableCell className="text-right">
+                  <TransferRowLink transferId={transfer.id} />
+                </TableCell>
               </TableRow>
             ))}
             {transfers.length === 0 && (
               <TableRow>
-                <TableCell className="h-32 text-center text-muted-foreground" colSpan={5}>
+                <TableCell className="h-32 text-center text-muted-foreground" colSpan={6}>
                   {emptyMessage}
                 </TableCell>
               </TableRow>
