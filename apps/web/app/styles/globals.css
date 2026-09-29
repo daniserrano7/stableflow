@@ -207,6 +207,32 @@
   animation: sf-fade-in 0.2s var(--ease-out-quart);
 }
 
+/* <details> whose content slides and fades open and closed. Needs interpolate-size to tween to
+   height: auto; browsers without it simply open instantly. */
+@utility details-animated {
+  interpolate-size: allow-keywords;
+
+  &::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--duration-base) var(--ease-out-quart),
+      opacity var(--duration-base) var(--ease-out-quart),
+      content-visibility var(--duration-base) allow-discrete;
+  }
+  &[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+  /* The global reduced-motion reset uses `*`, which never matches pseudo-elements. */
+  @media (prefers-reduced-motion: reduce) {
+    &::details-content {
+      transition: none;
+    }
+  }
+}
+
 /* Staged page entrance: direct children rise in, ~100ms apart. Opt-in, so reduced-motion users
    (and anyone before this stylesheet applies) get the content with no motion at all. */
 @keyframes sf-enter {

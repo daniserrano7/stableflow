@@ -289,7 +289,7 @@ function TransferDetails({
       </dl>
       <p className="m-0 px-4 py-3 text-xs text-muted-foreground">
         Entity labels are attributed from registered and discovered addresses.{" "}
-        <Link className="text-accent" to="/methodology">
+        <Link className="text-accent" to="/methodology#labels">
           How attribution works →
         </Link>
       </p>

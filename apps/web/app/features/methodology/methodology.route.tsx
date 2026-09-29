@@ -1,6 +1,12 @@
+import { transferThresholds } from "@stableflow/shared";
+import { ArrowUpRight, Check, Scale, SquareDashed, Tag as TagIcon, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { Panel, PanelBody, PanelHead, PanelTitle } from "~/components";
+import { Amount, Panel, PanelBody, PanelHead, PanelTitle, Tag } from "~/components";
 import { AppPage } from "~/components/app-page";
+import { PageHeader } from "~/components/page-header";
+import { FlowExample } from "./flow-example";
+import { MethodologyQuestions } from "./methodology-questions";
 
 export function meta() {
   return [
@@ -13,290 +19,243 @@ export function meta() {
   ];
 }
 
-const sectionLinks = [
-  ["scope", "Scope"],
-  ["counting", "Counting flows"],
-  ["labels", "Labels"],
-  ["bridges", "Bridges & supply"],
-  ["limits", "Limits"],
+const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+const takeaways = [
+  {
+    detail: "Known addresses are grouped into entities, like an exchange or a lending protocol.",
+    icon: TagIcon,
+    title: "Label addresses",
+  },
+  {
+    detail: "Only USDC entering or leaving an entity counts. Moves inside it don't.",
+    icon: SquareDashed,
+    title: "Count what crosses",
+  },
+  {
+    detail: "Net flow is inflow minus outflow. Entity rankings sort by it.",
+    icon: Scale,
+    title: "Net it out",
+  },
 ] as const;
 
-const scopeFacts = [
-  ["Network", "Base mainnet", "Chain ID 8453"],
-  ["Asset", "Native USDC", "USDbC is excluded"],
-  ["Precision", "6 decimals", "Amounts stay USDC-denominated"],
-  ["Time", "UTC", "Used throughout Transfers"],
-] as const;
+const included: ReactNode[] = [
+  "Native USDC on Base mainnet",
+  "Every USDC transfer since indexing began",
+  "Mints and burns, as supply changes",
+  "Bridge activity from Circle CCTP and Across events",
+  <>
+    Labelled protocols, bridges and issuers.{" "}
+    <Link className="text-accent hover:underline" to="/entities">
+      See entities
+    </Link>
+  </>,
+];
 
-const limits = [
-  [
-    "Indexed history",
-    "Coverage starts at the indexer’s configured blocks, not necessarily Base genesis.",
-  ],
-  [
-    "Recent data",
-    "Indexing delays and chain reorganizations can briefly change the latest results.",
-  ],
-  ["Unidentified", "Means no applicable label was found—not that the address is one person."],
-  [
-    "Transfer meaning",
-    "A USDC transfer alone cannot prove a deposit, repayment, withdrawal, or swap.",
-  ],
-] as const;
+const excluded: ReactNode[] = [
+  "USDbC, the older bridged USDC",
+  "Other chains and other stablecoins",
+  "Blocks before the indexer's start",
+  "Why a transfer happened",
+  "Who is behind an unidentified address",
+];
+
+const formatThreshold = (value: number) => `${value.toLocaleString("en-US")} USDC`;
+
+const terms: { definition: string; sample?: ReactNode; term: string }[] = [
+  {
+    definition: "USDC moved on Base, counting each transaction once.",
+    sample: <Amount magnitude="small" value={4_410_000_000} />,
+    term: "Volume",
+  },
+  {
+    definition: "USDC entering an entity from outside it.",
+    sample: <Amount trend="up" value={500} />,
+    term: "Inflow",
+  },
+  {
+    definition: "USDC leaving an entity for outside it.",
+    sample: <Amount trend="down" value={300} />,
+    term: "Outflow",
+  },
+  {
+    definition: "Inflow minus outflow. Green when more came in, orange when more left.",
+    sample: (
+      <span className="inline-flex gap-2.5 font-medium font-mono text-sm tabular-nums">
+        <span className="text-inflow">+2.24M</span>
+        <span className="text-outflow">−1.93M</span>
+      </span>
+    ),
+    term: "Net flow",
+  },
+  {
+    definition: `One transfer of ${formatThreshold(transferThresholds.large)} or more.`,
+    sample: <Amount value={25_000} />,
+    term: "Large transfer",
+  },
+  {
+    definition: `One transfer of ${formatThreshold(transferThresholds.whale)} or more. Describes the transfer, not the wallet's wealth.`,
+    sample: <Amount value={2_400_000} />,
+    term: "Whale",
+  },
+  {
+    definition: "No label is known for the address yet.",
+    sample: <Tag>Unidentified</Tag>,
+    term: "Unidentified",
+  },
+  {
+    definition: "USDC moving to or from another chain, confirmed from bridge protocol events.",
+    sample: <Tag category="bridge" />,
+    term: "Bridge flow",
+  },
+  {
+    definition: "USDC created or destroyed via the zero address. Tracked as supply.",
+    sample: <span className="font-mono text-muted-foreground text-xs">0x0000...0000</span>,
+    term: "Mint and burn",
+  },
+];
 
 export default function Methodology() {
   return (
-    <AppPage breadcrumbs={[{ label: "Methodology" }]}>
-      <Panel>
-        <PanelBody className="space-y-4 p-5">
-          <div className="max-w-3xl space-y-2">
-            <p className="font-mono text-2xs uppercase tracking-[0.08em] text-accent">
-              The short version
-            </p>
-            <p className="text-lg leading-relaxed text-foreground">
-              Stableflow counts USDC transfer events, groups known addresses into entities, and
-              measures value crossing each entity’s boundary.
-            </p>
-            <p className="text-md text-muted-foreground">
-              Use this page to understand what the numbers mean. The full attribution strategy is
-              available at the end for edge cases and implementation detail.
-            </p>
-          </div>
-          <nav aria-label="Methodology sections" className="flex flex-wrap gap-2">
-            {sectionLinks.map(([id, title]) => (
+    <AppPage breadcrumbs={[{ label: "Methodology" }]} headingId="methodology-title">
+      <PageHeader
+        description="How Stableflow turns raw USDC transfers into the entity flows you see across the app."
+        id="methodology-title"
+        stats={[
+          { label: "Network", unit: "mainnet", value: "Base" },
+          { label: "Asset", unit: "native", value: "USDC" },
+          { label: "Timezone", value: "UTC" },
+        ]}
+        title="Methodology"
+      />
+
+      <section aria-labelledby="flow-title">
+        <Panel>
+          <PanelHead>
+            <PanelTitle id="flow-title">How a flow is counted</PanelTitle>
+            <span className="font-mono text-2xs text-muted-foreground uppercase tracking-[0.06em]">
+              Worked example
+            </span>
+          </PanelHead>
+          <PanelBody className="grid gap-6">
+            <FlowExample />
+            <ol className="m-0 grid list-none gap-4 border-border border-t p-0 pt-5 md:grid-cols-3">
+              {takeaways.map(({ detail, icon: Icon, title }, index) => (
+                <li className="flex gap-3" key={title}>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-muted-foreground">
+                    <Icon aria-hidden size={15} strokeWidth={1.75} />
+                  </span>
+                  <div>
+                    <h3 className="m-0 font-medium text-md">
+                      <span className="mr-1.5 font-mono text-muted-foreground text-xs">
+                        {index + 1}
+                      </span>
+                      {title}
+                    </h3>
+                    <p className="m-0 mt-0.5 text-muted-foreground text-sm">{detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </PanelBody>
+        </Panel>
+      </section>
+
+      <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+        <section aria-labelledby="coverage-title">
+          <Panel className="h-full">
+            <PanelHead>
+              <PanelTitle id="coverage-title">What's covered</PanelTitle>
+            </PanelHead>
+            <PanelBody className="grid gap-5">
+              <ScopeList items={included} kind="included" title="Included" />
+              <ScopeList items={excluded} kind="excluded" title="Not included" />
               <a
-                className="rounded-md border border-border bg-surface-2 px-3 py-2 text-md text-muted-foreground transition-colors hover:border-[var(--border-strong)] hover:text-foreground"
-                href={`#${id}`}
-                key={id}
+                className="inline-flex min-w-0 items-center gap-1 font-mono text-muted-foreground text-xs hover:text-accent"
+                href={`https://basescan.org/token/${usdcContract}`}
+                rel="noreferrer"
+                target="_blank"
               >
-                {title}
+                <span className="truncate">USDC contract {usdcContract}</span>
+                <ArrowUpRight aria-hidden className="shrink-0" size={12} />
               </a>
-            ))}
-          </nav>
-        </PanelBody>
-      </Panel>
+            </PanelBody>
+          </Panel>
+        </section>
 
-      <Panel id="scope" className="scroll-mt-4">
-        <PanelHead>
-          <PanelTitle>What Stableflow covers</PanelTitle>
-        </PanelHead>
-        <PanelBody className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {scopeFacts.map(([label, value, note]) => (
-              <div className="rounded-md border border-border bg-surface-2 p-3.5" key={label}>
-                <p className="font-mono text-2xs uppercase tracking-[0.08em] text-muted-foreground">
-                  {label}
-                </p>
-                <p className="mt-2 text-lg font-medium">{value}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{note}</p>
-              </div>
-            ))}
-          </div>
-          <a
-            className="block break-all font-mono text-sm text-accent"
-            href="https://basescan.org/token/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-            target="_blank"
-            rel="noreferrer"
-          >
-            USDC contract · 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 ↗
-          </a>
-        </PanelBody>
-      </Panel>
+        <section aria-labelledby="terms-title">
+          <Panel className="h-full">
+            <PanelHead>
+              <PanelTitle id="terms-title">Key terms</PanelTitle>
+            </PanelHead>
+            <dl className="m-0 divide-y divide-border">
+              {terms.map(({ definition, sample, term }) => (
+                <div
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-4 py-2.5"
+                  key={term}
+                >
+                  <dt className="font-medium text-md">{term}</dt>
+                  <dd className="col-start-1 m-0 text-muted-foreground text-sm">{definition}</dd>
+                  {sample && <dd className="col-start-2 row-span-2 row-start-1 m-0">{sample}</dd>}
+                </div>
+              ))}
+            </dl>
+          </Panel>
+        </section>
+      </div>
 
-      <Panel id="counting" className="scroll-mt-4">
-        <PanelHead>
-          <PanelTitle>How flows are counted</PanelTitle>
-        </PanelHead>
-        <PanelBody className="space-y-4">
-          <div className="flex flex-col gap-2 rounded-md border border-accent/30 bg-surface-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-md text-muted-foreground">The number used in rankings</span>
-            <span className="font-mono text-lg">
-              Net flow = <span className="text-inflow">inflow</span> −{" "}
-              <span className="text-outflow">outflow</span>
-            </span>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <FlowCard
-              route="Outside → Entity"
-              title="Inflow"
-              tone="text-inflow"
-              detail="Counts value entering the entity boundary."
-            />
-            <FlowCard
-              route="Entity → Outside"
-              title="Outflow"
-              tone="text-outflow"
-              detail="Counts value leaving the entity boundary."
-            />
-            <FlowCard
-              route="Entity → Same group"
-              title="Internal"
-              tone="text-muted-foreground"
-              detail="Excluded from external entity flow."
-            />
-            <FlowCard
-              route="Entity A → Entity B"
-              title="External"
-              tone="text-accent"
-              detail="A’s outflow and B’s inflow both increase."
-            />
-          </div>
-          <p className="max-w-4xl text-md leading-relaxed text-muted-foreground">
-            One transfer is one on-chain USDC Transfer event. A transaction can contain several
-            transfers: a routed swap moves the same USDC through a router and a pool, emitting a
-            transfer for each hop. Headline volume therefore counts each transaction once, as the
-            sum of every address&apos;s positive net change, so those hops are not double counted.
-            Entity totals are boundary-based and should not be added together to recreate chain
-            volume.
+      <section aria-labelledby="questions-title">
+        <Panel>
+          <PanelHead>
+            <PanelTitle id="questions-title">Common questions</PanelTitle>
+          </PanelHead>
+          <MethodologyQuestions />
+          <p className="m-0 border-border border-t px-4 py-3 text-muted-foreground text-xs">
+            Per-protocol edge cases are in the full attribution strategy, which also lists work that
+            isn't live yet.{" "}
+            <a className="text-accent hover:underline" href="/methodology/attribution">
+              Read it as plain text
+            </a>
           </p>
-        </PanelBody>
-      </Panel>
-
-      <Panel id="labels" className="scroll-mt-4">
-        <PanelHead>
-          <PanelTitle>How labels become entity flows</PanelTitle>
-        </PanelHead>
-        <PanelBody className="space-y-4">
-          <ol className="grid gap-3 md:grid-cols-3">
-            <MethodStep
-              number="01"
-              title="Label addresses"
-              detail="Attach an entity, role, confidence, and source to known addresses."
-            />
-            <MethodStep
-              number="02"
-              title="Group one entity"
-              detail="Related operational addresses share one accounting boundary."
-            />
-            <MethodStep
-              number="03"
-              title="Count crossings"
-              detail="Only transfers that cross the boundary affect external flow."
-            />
-          </ol>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Callout
-              title="Boundary labels count"
-              detail="An identity label alone does not automatically contribute to inflow or outflow."
-            />
-            <Callout
-              title="Unknown is not a wallet type"
-              detail="Unidentified only means no applicable attribution is currently known."
-            />
-          </div>
-          <Link className="inline-block text-md text-accent" to="/entities">
-            Explore entity labels and sources →
-          </Link>
-        </PanelBody>
-      </Panel>
-
-      <Panel id="bridges" className="scroll-mt-4">
-        <PanelHead>
-          <PanelTitle>Bridges and supply are separate</PanelTitle>
-        </PanelHead>
-        <PanelBody className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            <Callout
-              eyebrow="Cross-chain"
-              title="Bridge flow"
-              detail="Confirmed from protocol events such as CCTP messages or Across deposits and fills—not from a bridge address alone."
-            />
-            <Callout
-              eyebrow="Supply"
-              title="Mint"
-              detail="Zero address → recipient. Visible in Transfers and treated as a supply event."
-            />
-            <Callout
-              eyebrow="Supply"
-              title="Burn"
-              detail="Sender → zero address. Visible in Transfers and treated as a supply event."
-            />
-          </div>
-          <p className="max-w-4xl text-md text-muted-foreground">
-            These signals are stored separately from general entity flow. Supported event sources do
-            not imply coverage of every bridge or cross-chain route.
-          </p>
-        </PanelBody>
-      </Panel>
-
-      <Panel id="limits" className="scroll-mt-4">
-        <PanelHead>
-          <PanelTitle>Read the numbers with these limits</PanelTitle>
-        </PanelHead>
-        <PanelBody className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {limits.map(([title, detail]) => (
-              <Callout detail={detail} key={title} title={title} />
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-md bg-surface-2 px-4 py-3 font-mono text-sm text-muted-foreground">
-            <span>
-              Large <strong className="font-medium text-foreground">≥ 10,000 USDC</strong>
-            </span>
-            <span>
-              Whale <strong className="font-medium text-foreground">≥ 1,000,000 USDC</strong>
-            </span>
-            <span>Large includes whales · thresholds describe transfers, not wallet wealth</span>
-          </div>
-        </PanelBody>
-      </Panel>
-
-      <Panel id="sources" className="scroll-mt-4">
-        <PanelBody className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-medium">Need the full methodology?</h2>
-            <p className="mt-1 max-w-3xl text-md text-muted-foreground">
-              Read the detailed counting rules, edge cases, discovery sources, and implementation
-              notes. Planned work in that document is not a promise of current coverage.
-            </p>
-          </div>
-          <a className="shrink-0 text-md text-accent" href="/methodology/attribution">
-            Read the full attribution strategy →
-          </a>
-        </PanelBody>
-      </Panel>
+        </Panel>
+      </section>
     </AppPage>
   );
 }
 
-function FlowCard({
-  detail,
-  route,
+function ScopeList({
+  items,
+  kind,
   title,
-  tone,
 }: {
-  detail: string;
-  route: string;
+  items: ReactNode[];
+  kind: "excluded" | "included";
   title: string;
-  tone: string;
 }) {
-  return (
-    <div className="rounded-md border border-border bg-surface-2 p-3.5">
-      <p className="font-mono text-sm text-foreground">{route}</p>
-      <p className={`mt-3 text-lg font-medium ${tone}`}>{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
-    </div>
-  );
-}
+  const Icon = kind === "included" ? Check : X;
 
-function MethodStep({ detail, number, title }: { detail: string; number: string; title: string }) {
   return (
-    <li className="relative rounded-md border border-border bg-surface-2 p-4">
-      <span className="font-mono text-2xs text-accent">{number}</span>
-      <h3 className="mt-3 text-lg font-medium">{title}</h3>
-      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{detail}</p>
-    </li>
-  );
-}
-
-function Callout({ detail, eyebrow, title }: { detail: string; eyebrow?: string; title: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface-2 p-4">
-      {eyebrow && (
-        <p className="font-mono text-2xs uppercase tracking-[0.08em] text-accent">{eyebrow}</p>
-      )}
-      <h3 className={eyebrow ? "mt-2 text-lg font-medium" : "text-lg font-medium"}>{title}</h3>
-      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{detail}</p>
+    <div className="grid gap-2.5">
+      <p className="eyebrow m-0">{title}</p>
+      <ul className="m-0 grid list-none gap-2 p-0">
+        {items.map((item, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static list that never reorders
+          <li className="flex items-start gap-2.5 text-sm" key={index}>
+            <span
+              className={
+                kind === "included"
+                  ? "mt-px flex size-4.5 shrink-0 items-center justify-center rounded-full bg-surface-3 text-foreground"
+                  : "mt-px flex size-4.5 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground"
+              }
+            >
+              <Icon aria-hidden size={11} strokeWidth={2.5} />
+            </span>
+            <span className={kind === "included" ? "text-foreground" : "text-muted-foreground"}>
+              {item}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
