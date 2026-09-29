@@ -1,12 +1,14 @@
 import {
+  type LiveTransferParty,
   type LiveTransferRow,
   parseTransferListParams,
   type TransferListResponse,
 } from "@stableflow/shared";
-import { ArrowLeftRight, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link, useLoaderData, useNavigation } from "react-router";
-import { Amount, KPI, Panel, PanelActions, PanelBody, PanelHead, PanelTitle } from "~/components";
-import { PublicPage } from "~/components/public-page";
+import { Amount, Panel, PanelActions, PanelHead, PanelTitle } from "~/components";
+import { AppPage } from "~/components/app-page";
+import { PageHeader } from "~/components/page-header";
 import {
   Table,
   TableBody,
@@ -83,29 +85,17 @@ export default function Transfers() {
   const pageLink = (cursor: string, direction: string) =>
     `/transfers?${new URLSearchParams({ filter: meta.filter, cursor, direction })}`;
   return (
-    <PublicPage title="Transfers">
-      <Panel>
-        <PanelBody className="flex flex-col items-start gap-5 p-5 sm:flex-row">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-accent text-background shadow-[var(--shadow-glow-accent)]">
-            <ArrowLeftRight size={25} strokeWidth={1.8} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="mb-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
-              Onchain transfers · Base · USDC
-            </p>
-            <h1 className="m-0 text-2xl font-medium leading-tight">Transfer History</h1>
-          </div>
-        </PanelBody>
-      </Panel>
-      <section
-        aria-label="Current transfer page summary"
-        className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        <KPI label="Transfers shown" value={data.length} unit={`/ ${meta.limit} max`} />
-        <KPI label="Page total" value={fmtUSDC(pageTotal)} unit="USDC" />
-        <KPI label="Average transfer" value={fmtUSDC(averageTransfer)} unit="USDC" />
-        <KPI label="Largest transfer" value={fmtUSDC(largestTransfer)} unit="USDC" />
-      </section>
+    <AppPage breadcrumbs={[{ label: "Transfers" }]} headingId="transfers-title">
+      <PageHeader
+        description="Every native USDC transfer indexed on Base, newest first. Open one to see its parties and the rest of its transaction."
+        id="transfers-title"
+        stats={[
+          { label: "Page total", unit: "USDC", value: fmtUSDC(pageTotal) },
+          { label: "Average", unit: "USDC", value: fmtUSDC(averageTransfer) },
+          { label: "Largest", unit: "USDC", value: fmtUSDC(largestTransfer) },
+        ]}
+        title="Transfers"
+      />
       <Panel aria-busy={pending}>
         <PanelHead className="flex-wrap gap-3">
           <PanelTitle live={isLatestPage && connectionStatus === "live"}>Transfers</PanelTitle>
@@ -185,16 +175,7 @@ export default function Transfers() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <TransferEntity party={transfer.from} />
-                    <a
-                      className="mt-1 block font-mono text-2xs text-muted-foreground hover:text-accent"
-                      href={`https://basescan.org/address/${transfer.from.address}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={transfer.from.address}
-                    >
-                      {transfer.from.address.slice(0, 8)}…{transfer.from.address.slice(-6)} ↗
-                    </a>
+                    <PartyCell party={transfer.from} />
                   </TableCell>
                   <TableCell>
                     <span
@@ -205,16 +186,7 @@ export default function Transfers() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <TransferEntity party={transfer.to} />
-                    <a
-                      className="mt-1 block font-mono text-2xs text-muted-foreground hover:text-accent"
-                      href={`https://basescan.org/address/${transfer.to.address}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={transfer.to.address}
-                    >
-                      {transfer.to.address.slice(0, 8)}…{transfer.to.address.slice(-6)} ↗
-                    </a>
+                    <PartyCell party={transfer.to} />
                   </TableCell>
                   <TableCell className="text-right" title={`${transfer.amount.formatted} USDC`}>
                     <Amount
@@ -277,7 +249,7 @@ export default function Transfers() {
           )}
         </nav>
       </Panel>
-    </PublicPage>
+    </AppPage>
   );
 }
 
@@ -300,4 +272,28 @@ function getOlderCursor({
   const hasEvictedRows = initialTransfers.some((transfer) => !visibleIds.has(transfer.id));
   if (meta.olderCursor === null && !hasEvictedRows) return null;
   return `${last.cursor.blockNumber}:${last.cursor.logIndex}`;
+}
+
+// One line for every party, labeled or not: a second line only on labeled rows made row heights
+// differ, so the live table jumped as rows streamed in. A labeled entity shows its address
+// inline; for an unlabeled wallet the chip already is the address.
+function PartyCell({ party }: { party: LiveTransferParty }) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="min-w-0">
+        <TransferEntity party={party} />
+      </span>
+      {party.isIdentified && (
+        <a
+          className="shrink-0 font-mono text-2xs text-muted-foreground hover:text-accent"
+          href={`https://basescan.org/address/${party.address}`}
+          rel="noreferrer"
+          target="_blank"
+          title={party.address}
+        >
+          {party.address.slice(0, 6)}…{party.address.slice(-4)} ↗
+        </a>
+      )}
+    </span>
+  );
 }

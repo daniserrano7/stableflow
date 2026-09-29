@@ -56,7 +56,7 @@ export function ScopeBadges({ className }: { className?: string }) {
 
 function BaseMark() {
   return (
-    <svg aria-hidden className="size-4 shrink-0" viewBox="0 0 111 111">
+    <svg aria-hidden="true" className="size-4 shrink-0" viewBox="0 0 111 111">
       <path
         d="M54.921 110.034c30.438 0 55.113-24.632 55.113-55.017C110.034 24.632 85.359 0 54.921 0 26.043 0 2.353 22.171 0 50.392h72.847v9.25H0c2.353 28.22 26.043 50.392 54.921 50.392Z"
         fill="#0052FF"
@@ -67,7 +67,7 @@ function BaseMark() {
 
 function UsdcMark() {
   return (
-    <svg aria-hidden className="size-4 shrink-0" viewBox="0 0 32 32">
+    <svg aria-hidden="true" className="size-4 shrink-0" viewBox="0 0 32 32">
       <circle cx="16" cy="16" fill="#2775CA" r="16" />
       <g fill="none" stroke="#fff" strokeLinecap="round">
         <path d="M12.4 7.2a9.6 9.6 0 0 0 0 17.6M19.6 7.2a9.6 9.6 0 0 1 0 17.6" strokeWidth="1.7" />

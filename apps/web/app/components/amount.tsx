@@ -10,10 +10,11 @@ export interface AmountProps extends React.HTMLAttributes<HTMLSpanElement> {
   magnitude?: "small" | "large" | "whale";
 }
 
+// Size tokens, so ≥ 10K and whale transfers stand out from routine ones at a glance.
 const magnitudeClasses = {
-  large: "text-accent",
+  large: "text-magnitude-large",
   small: "",
-  whale: "text-anomaly",
+  whale: "text-whale",
 } satisfies Record<NonNullable<AmountProps["magnitude"]>, string>;
 
 const trendClasses = {

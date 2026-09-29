@@ -8,7 +8,7 @@ import { ArrowDown, ArrowRight, ExternalLink, Layers, Receipt } from "lucide-rea
 import { type ReactNode, useEffect, useState } from "react";
 import { Link, useLoaderData } from "react-router";
 import { Amount, CopyButton, Panel, PanelHead, PanelTitle, Tag, VisualMark } from "~/components";
-import { PublicPage } from "~/components/public-page";
+import { AppPage } from "~/components/app-page";
 import { Button } from "~/components/ui/button";
 import {
   Table,
@@ -21,6 +21,7 @@ import {
 import { getApiUrl } from "~/config/api.server";
 import { getVisualIdentity } from "~/config/visuals";
 import { useRowLink } from "~/hooks/use-row-link";
+import { getAddressAvatarBackground } from "~/utils/address-avatar";
 import { cn } from "~/utils/cn";
 import { fmtTokenAmount, fmtUSDC, fmtUtcTimestamp, timeAgo } from "~/utils/format";
 import {
@@ -81,12 +82,12 @@ export default function TransferDetail() {
   const { transaction, transfer } = data;
 
   return (
-    <PublicPage
+    <AppPage
       breadcrumbs={[
         { label: "Transfers", to: "/transfers" },
         { label: `${shortHex(transfer.transactionHash)} · log ${transfer.logIndex}` },
       ]}
-      title="Transfer"
+      headingId="transfer-title"
     >
       <TransferHero transfer={transfer} />
       {/* Same layout for every transfer; the transaction list is context for this one. */}
@@ -98,7 +99,7 @@ export default function TransferDetail() {
         />
         <TransactionTransfers transaction={transaction} transferId={transfer.id} />
       </div>
-    </PublicPage>
+    </AppPage>
   );
 }
 
@@ -110,20 +111,25 @@ function TransferHero({ transfer }: { transfer: LiveTransferRow }) {
     <Panel>
       <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center">
         <div className="min-w-0 flex-1">
-          <p className="mb-2 flex flex-wrap items-center gap-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
+          {/* min-h fits the size badge, so the row is as tall with or without it: no shift when
+              moving between a small transfer and a ≥ 10K one. */}
+          <p className="mb-2 flex min-h-6 flex-wrap items-center gap-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
             <span>Transfer · Base · USDC</span>
             {magnitude !== "small" && <Tag>{magnitude === "whale" ? "Whale" : "≥ 10K"}</Tag>}
           </p>
           {/* Exact amount: the compact table format would round small transfers to 0. */}
           <h1
+            id="transfer-title"
             className={cn(
               "m-0 break-all font-mono text-3xl font-medium leading-tight tabular-nums",
-              magnitude === "whale" && "text-anomaly",
-              magnitude === "large" && "text-accent",
+              magnitude === "whale" && "text-whale",
+              magnitude === "large" && "text-magnitude-large",
             )}
           >
             {fmtTokenAmount(transfer.amount.formatted)}
-            <span className="ml-2 text-sm text-muted-foreground">USDC</span>
+            {/* The space lives inside the small span: screen readers get "… USDC" while the
+                visual gap stays at unit size rather than a full display-size space. */}
+            <span className="ml-1.5 text-sm text-muted-foreground">{" USDC"}</span>
           </h1>
           <p className="mt-2 font-mono text-xs text-muted-foreground">
             <time dateTime={transfer.blockTimestamp}>
@@ -173,11 +179,18 @@ function PartyBlock({ label, party }: { label: "From" | "To"; party: LiveTransfe
     <div className="flex min-w-0 flex-col gap-4 p-5 xl:px-7">
       <div className="flex items-center gap-3">
         <VisualMark
-          className="size-10 rounded-lg font-mono text-sm font-semibold text-[oklch(0.13_0.012_254)]"
-          fallback={getEntityGlyph(party, category)}
+          className={cn(
+            "size-10 font-mono text-sm font-semibold text-[oklch(0.13_0.012_254)]",
+            party.isIdentified ? "rounded-lg" : "rounded-full",
+          )}
+          fallback={party.isIdentified ? getEntityGlyph(party, category) : null}
           imageName={visual?.name}
           imageUrl={visual?.imageUrl}
-          style={{ background: `var(--cat-${category})` }}
+          style={{
+            background: party.isIdentified
+              ? `var(--cat-${category})`
+              : getAddressAvatarBackground(party.address),
+          }}
         />
         <div className="min-w-0 flex-1">
           <p className="m-0 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
@@ -239,7 +252,10 @@ function TransferDetails({
       </PanelHead>
       <dl className="m-0 flex-1 font-mono text-xs">
         <DetailRow copyLabel="transfer ID" copyValue={transfer.id} label="Transfer ID">
-          {transfer.id}
+          {/* Middle-truncated so it never wraps a stray character; copy and hover give the full ID. */}
+          <span title={transfer.id}>
+            {shortHex(transfer.transactionHash)}-{transfer.logIndex}
+          </span>
         </DetailRow>
         <DetailRow copyLabel="raw value" copyValue={transfer.amount.raw} label="Raw value">
           {transfer.amount.raw} <span className="text-muted-foreground">(6 decimals)</span>

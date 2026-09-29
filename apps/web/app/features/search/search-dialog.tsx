@@ -220,7 +220,7 @@ function SearchDialog({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-modal bg-black/55 backdrop-blur-sm data-[state=closed]:opacity-0 data-[state=open]:animate-in" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-modal bg-black/55 backdrop-blur-sm data-[state=closed]:opacity-0 data-[state=open]:animate-fade-in" />
         <DialogPrimitive.Content
           className="fixed top-[min(14vh,7rem)] left-1/2 z-modal flex max-h-[min(42rem,80vh)] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-[var(--border-strong)] bg-surface-1 shadow-lg outline-none data-[state=closed]:opacity-0 data-[state=open]:animate-slide-in"
           onOpenAutoFocus={(event) => {

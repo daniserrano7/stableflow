@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Panel, PanelBody, PanelHead, PanelTitle } from "~/components";
-import { PublicPage } from "~/components/public-page";
+import { AppPage } from "~/components/app-page";
 
 export function meta() {
   return [
@@ -46,7 +46,7 @@ const limits = [
 
 export default function Methodology() {
   return (
-    <PublicPage title="Methodology">
+    <AppPage breadcrumbs={[{ label: "Methodology" }]}>
       <Panel>
         <PanelBody className="space-y-4 p-5">
           <div className="max-w-3xl space-y-2">
@@ -255,7 +255,7 @@ export default function Methodology() {
           </a>
         </PanelBody>
       </Panel>
-    </PublicPage>
+    </AppPage>
   );
 }
 

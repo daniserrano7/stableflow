@@ -95,25 +95,17 @@ const formatCompactUsdc = (formattedAmount: string, signed: boolean) => {
   const sign = value < 0 ? "-" : signed && value > 0 ? "+" : "";
   const absoluteValue = Math.abs(value);
 
+  // The magnitude suffix belongs to the number ("$64.34M"), not in a detached unit slot.
   if (absoluteValue >= 1_000_000_000) {
-    return {
-      unit: "B",
-      value: `${sign}$${(absoluteValue / 1_000_000_000).toFixed(2)}`,
-    };
+    return { unit: null, value: `${sign}$${(absoluteValue / 1_000_000_000).toFixed(2)}B` };
   }
 
   if (absoluteValue >= 1_000_000) {
-    return {
-      unit: "M",
-      value: `${sign}$${(absoluteValue / 1_000_000).toFixed(2)}`,
-    };
+    return { unit: null, value: `${sign}$${(absoluteValue / 1_000_000).toFixed(2)}M` };
   }
 
   if (absoluteValue >= 1_000) {
-    return {
-      unit: "K",
-      value: `${sign}$${(absoluteValue / 1_000).toFixed(1)}`,
-    };
+    return { unit: null, value: `${sign}$${(absoluteValue / 1_000).toFixed(1)}K` };
   }
 
   return {

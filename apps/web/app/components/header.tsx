@@ -1,26 +1,33 @@
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
 import { useSearchDialog } from "~/features/search/search-dialog-context";
+import { McpConnectWidget } from "./mcp-connect-widget";
 import { ScopeBadges } from "./scope-badges";
 
-interface HeaderBreadcrumb {
+export interface HeaderBreadcrumb {
   label: string;
   to?: string;
 }
 
 interface AppHeaderProps {
   breadcrumbs?: HeaderBreadcrumb[];
+  /** False when the page renders its own <h1>, so the document keeps a single one. */
+  brandAsHeading?: boolean;
   headingId?: string;
   searchPlaceholder?: string;
 }
 
 export function AppHeader({
   breadcrumbs = [{ label: "Overview" }],
+  brandAsHeading = true,
   headingId = "home-title",
   searchPlaceholder = "Search Stableflow...",
 }: AppHeaderProps) {
   const { openSearch } = useSearchDialog();
+  const Brand = brandAsHeading ? "h1" : "p";
+  // Root loader data; absent while an error boundary renders the header.
+  const mcpUrl = (useRouteLoaderData("root") as { mcpUrl: string | null } | undefined)?.mcpUrl;
   const [shortcutLabel, setShortcutLabel] = useState("⌘K");
 
   useEffect(() => {
@@ -33,9 +40,9 @@ export function AppHeader({
     <header className="flex min-h-12 flex-col items-stretch gap-3.5 rounded-lg border border-border bg-glass px-3.5 py-2 backdrop-blur-xl backdrop-saturate-150 lg:flex-row lg:items-center">
       <div className="flex min-w-0 items-center gap-2 lg:min-w-56">
         <div className="min-w-0">
-          <h1 id={headingId} className="m-0 text-md font-semibold leading-none tracking-normal">
+          <Brand id={headingId} className="m-0 text-md font-semibold leading-none tracking-normal">
             Stableflow
-          </h1>
+          </Brand>
           <nav
             aria-label="Breadcrumb"
             className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden font-mono text-xs leading-none text-muted-foreground"
@@ -83,7 +90,10 @@ export function AppHeader({
         </kbd>
       </button>
 
-      <ScopeBadges className="self-start lg:ml-auto lg:self-auto" />
+      <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+        <ScopeBadges />
+        <McpConnectWidget mcpUrl={mcpUrl ?? null} />
+      </div>
     </header>
   );
 }

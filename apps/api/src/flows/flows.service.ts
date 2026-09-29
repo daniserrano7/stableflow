@@ -737,7 +737,15 @@ const toPercentDelta = (
   comparisonLabel: string,
 ): FlowKpiDelta => ({
   label: toPercentDeltaLabel(currentValue, previousValue, comparisonLabel),
-  trend: currentValue > previousValue ? "up" : currentValue < previousValue ? "down" : "flat",
+  // With no previous window there is no comparison, so no up arrow implying growth.
+  trend:
+    previousValue === 0n
+      ? "flat"
+      : currentValue > previousValue
+        ? "up"
+        : currentValue < previousValue
+          ? "down"
+          : "flat",
 });
 
 const toPercentDeltaLabel = (
@@ -746,7 +754,9 @@ const toPercentDeltaLabel = (
   comparisonLabel: string,
 ) => {
   if (previousValue === 0n) {
-    return currentValue === 0n ? `0.0% ${comparisonLabel}` : `new ${comparisonLabel}`;
+    return currentValue === 0n
+      ? `0.0% ${comparisonLabel}`
+      : `no ${comparisonLabel.replace(/^vs /, "")} to compare`;
   }
 
   const percent = (Number(currentValue - previousValue) / Number(previousValue)) * 100;

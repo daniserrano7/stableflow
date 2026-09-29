@@ -42,8 +42,7 @@ import {
   Tag,
   VisualMark,
 } from "~/components";
-import { AppHeader } from "~/components/header";
-import { AppSidebar } from "~/components/sidebar";
+import { AppPage } from "~/components/app-page";
 import { Button } from "~/components/ui/button";
 import {
   Table,
@@ -194,72 +193,53 @@ export default function EntityDetail() {
   };
 
   return (
-    <main className="grid min-h-screen grid-cols-[3.5rem_minmax(0,1fr)] bg-background text-foreground">
-      <div className="bg-ambient" />
-      <div className="bg-grid" />
+    <AppPage
+      breadcrumbs={[{ label: "Entities", to: "/entities" }, { label: entity.entityName }]}
+      footerNote={
+        entity.entityId === "unidentified"
+          ? `Pooled wallets · ${detail.data.counterparties.length} counterparties shown`
+          : `${entity.labelCount} labels · ${detail.data.counterparties.length} counterparties`
+      }
+      headingId="entity-title"
+      searchPlaceholder="Search entities..."
+    >
+      <EntityHero entity={entity} flow={flow} />
 
-      <AppSidebar />
+      <div className="flex flex-col gap-3.5">
+        <EntityKpiBand flow={flow} onWindowChange={updateWindow} windowMinutes={windowMinutes} />
 
-      <section
-        className="flex min-h-screen min-w-0 flex-col gap-3.5 px-3 pt-4 pb-6 lg:px-6"
-        aria-labelledby="entity-title"
-      >
-        <AppHeader
-          breadcrumbs={[{ label: "Entities", to: "/entities" }, { label: entity.entityName }]}
-          headingId="entity-app-title"
-          searchPlaceholder="Search entities..."
-        />
-
-        <EntityHero entity={entity} flow={flow} />
-
-        <div className="flex flex-col gap-3.5">
-          <EntityKpiBand flow={flow} onWindowChange={updateWindow} windowMinutes={windowMinutes} />
-
-          <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.65fr)]">
-            <EntityFlowGraph
-              counterparties={detail.data.counterparties}
-              entity={entity}
-              flow={flow}
-              mode={mode}
-              onWindowChange={updateWindow}
-              windowMinutes={windowMinutes}
-            />
-
-            <div className="grid min-w-0 gap-3.5 md:grid-cols-2 xl:h-full xl:grid-cols-1">
-              <CounterpartiesPanel counterparties={detail.data.counterparties} mode={mode} />
-              <EvidencePanel
-                className="xl:flex-1"
-                labels={detail.data.addressLabels}
-                entity={entity}
-              />
-            </div>
-          </div>
-
-          <RecentTransfersPanel
-            isUnidentified={entity.entityId === "unidentified"}
-            freshTransferIds={freshTransferIds}
-            transfers={detail.data.recentTransfers}
+        <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.65fr)]">
+          <EntityFlowGraph
+            counterparties={detail.data.counterparties}
+            entity={entity}
+            flow={flow}
+            mode={mode}
+            onWindowChange={updateWindow}
+            windowMinutes={windowMinutes}
           />
+
+          <div className="grid min-w-0 gap-3.5 md:grid-cols-2 xl:h-full xl:grid-cols-1">
+            <CounterpartiesPanel counterparties={detail.data.counterparties} mode={mode} />
+            <EvidencePanel
+              className="xl:flex-1"
+              labels={detail.data.addressLabels}
+              entity={entity}
+            />
+          </div>
         </div>
 
-        <AddressLabelsPanel
+        <RecentTransfersPanel
           isUnidentified={entity.entityId === "unidentified"}
-          labels={detail.data.addressLabels}
+          freshTransferIds={freshTransferIds}
+          transfers={detail.data.recentTransfers}
         />
+      </div>
 
-        <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
-          <span>Stableflow · v0.1.0</span>
-          <Link className="hover:text-accent" to="/methodology">
-            Methodology · Base / USDC coverage
-          </Link>
-          <span>
-            {entity.entityId === "unidentified"
-              ? `Pooled wallets · ${detail.data.counterparties.length} counterparties shown`
-              : `${entity.labelCount} labels · ${detail.data.counterparties.length} counterparties`}
-          </span>
-        </footer>
-      </section>
-    </main>
+      <AddressLabelsPanel
+        isUnidentified={entity.entityId === "unidentified"}
+        labels={detail.data.addressLabels}
+      />
+    </AppPage>
   );
 }
 

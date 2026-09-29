@@ -28,7 +28,7 @@ function Tag({ category, children, className, ...props }: TagProps) {
   return (
     <Badge
       className={cn(
-        "rounded-full border border-border bg-surface-2 px-[7px] py-[3px] font-mono text-[9px] text-muted-foreground uppercase tracking-[0.04em]",
+        "rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-2xs whitespace-nowrap text-muted-foreground uppercase tracking-[0.04em]",
         category && tagCategoryClasses[category],
         className,
       )}

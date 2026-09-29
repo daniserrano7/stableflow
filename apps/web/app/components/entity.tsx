@@ -1,11 +1,14 @@
 import type * as React from "react";
 import { getVisualIdentity } from "~/config/visuals";
 import type { Category } from "~/styles/tokens";
+import { getAddressAvatarBackground } from "~/utils/address-avatar";
 import { cn } from "~/utils/cn";
 import { VisualMark } from "./visual-mark";
 
 export interface EntityProps extends React.HTMLAttributes<HTMLSpanElement> {
   name: string;
+  /** Wallet address; gives unlabeled wallets a recognisable avatar instead of a generic mark. */
+  address?: string;
   glyph?: React.ReactNode;
   color?: string;
   category?: Category;
@@ -14,6 +17,7 @@ export interface EntityProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 function Entity({
+  address,
   category,
   className,
   color,
@@ -24,31 +28,28 @@ function Entity({
   ...props
 }: EntityProps) {
   const visual = entityId ? getVisualIdentity("entity", entityId) : undefined;
+  const walletAvatar = isWallet && address ? getAddressAvatarBackground(address) : undefined;
 
   return (
     <span className={cn("inline-flex items-center gap-2", className)} {...props}>
+      {/* Wallets are round, entities are rounded squares: the shape says which is which. */}
       <VisualMark
-        className="size-5 rounded-[5px] font-mono font-semibold text-[9px] text-[oklch(0.13_0.012_254)]"
-        fallback={glyph}
+        className={cn(
+          "size-5 font-mono font-semibold text-[9px] text-[oklch(0.13_0.012_254)]",
+          walletAvatar ? "rounded-full" : "rounded-[5px]",
+        )}
+        fallback={walletAvatar ? null : glyph}
         imageName={visual?.name}
         imageUrl={visual?.imageUrl}
-        style={{ background: color ?? `var(--cat-${category ?? "wallet"})` }}
+        style={{ background: walletAvatar ?? color ?? `var(--cat-${category ?? "wallet"})` }}
       />
       <span
         className={cn(
-          "inline-flex min-w-0 items-center gap-1.5",
-          isWallet ? "font-mono text-2xs text-muted-foreground" : "font-medium text-foreground",
+          "min-w-0 truncate",
+          isWallet ? "font-mono text-xs text-muted-foreground" : "font-medium text-foreground",
         )}
       >
-        {glyph && !isWallet && (
-          <>
-            <span className="shrink-0">{glyph}</span>
-            <span aria-hidden className="shrink-0 text-muted-foreground/50">
-              ·
-            </span>
-          </>
-        )}
-        <span className="min-w-0 truncate">{name}</span>
+        {name}
       </span>
     </span>
   );

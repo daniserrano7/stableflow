@@ -1,7 +1,9 @@
 import { ArrowLeftRight, Blocks, BookOpen, Coins, Network, Palette } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useRouteLoaderData } from "react-router";
+import type { ThemeMode } from "../styles/tokens";
 import { cn } from "../utils/cn";
+import { ThemeToggle } from "./theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 const sidebarItems = [
@@ -14,6 +16,7 @@ const sidebarItems = [
 
 export function AppSidebar() {
   const { pathname } = useLocation();
+  const theme = (useRouteLoaderData("root") as { theme: ThemeMode } | undefined)?.theme ?? "dark";
 
   return (
     <aside
@@ -45,6 +48,7 @@ export function AppSidebar() {
       </nav>
 
       <div className="flex-1" />
+      <ThemeToggle initialTheme={theme} />
       <div className="my-2 h-px w-6 bg-border" />
       <SidebarItem
         icon={<Palette size={16} strokeWidth={1.6} />}
@@ -64,7 +68,7 @@ function isSidebarItemActive(pathname: string, href: string, label: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function SidebarItem({
+export function SidebarItem({
   icon,
   isActive,
   label,

@@ -9,31 +9,42 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
-  useLoaderData,
   useRouteError,
+  useRouteLoaderData,
 } from "react-router";
-import { McpConnectWidget } from "./components/mcp-connect-widget";
-import { PublicPage } from "./components/public-page";
+import { AppPage } from "./components/app-page";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { SearchDialogProvider } from "./features/search/search-dialog";
+import { readThemeCookie } from "./styles/tokens";
 import stylesHref from "./styles.css?url";
 
 export const links: LinksFunction = () => [
+  // Geist / Geist Mono are the design system's fonts (tokens.css); without this they never load
+  // and every page silently falls back to the system UI font.
+  { href: "https://fonts.googleapis.com", rel: "preconnect" },
+  { crossOrigin: "anonymous", href: "https://fonts.gstatic.com", rel: "preconnect" },
+  {
+    href: "https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap",
+    rel: "stylesheet",
+  },
   { href: stylesHref, rel: "stylesheet" },
   { href: "/brand-icon.svg", rel: "icon", type: "image/svg+xml" },
   { href: "/brand-icon.svg", rel: "apple-touch-icon" },
 ];
 
-export function loader() {
+export function loader({ request }: { request: Request }) {
   const configuredUrl = process.env.STABLEFLOW_MCP_PUBLIC_URL;
   const mcpUrl =
     configuredUrl || (process.env.NODE_ENV === "development" ? "http://localhost:3002/mcp" : null);
-  return { mcpUrl };
+  // Rendered on the server so the first paint already has the chosen theme (no flash).
+  return { mcpUrl, theme: readThemeCookie(request.headers.get("cookie")) };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const theme = useRouteLoaderData<typeof loader>("root")?.theme ?? "dark";
+
   return (
-    <html className="dark" data-theme="dark" lang="en">
+    <html className={theme} data-theme={theme} lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta content="width=device-width, initial-scale=1" name="viewport" />
@@ -59,7 +70,6 @@ const createQueryClient = () =>
   });
 
 export default function App() {
-  const { mcpUrl } = useLoaderData<typeof loader>();
   const [queryClient] = useState(createQueryClient);
 
   return (
@@ -67,7 +77,6 @@ export default function App() {
       <SearchDialogProvider>
         <TooltipProvider delayDuration={150}>
           <Outlet />
-          <McpConnectWidget mcpUrl={mcpUrl} />
         </TooltipProvider>
       </SearchDialogProvider>
     </QueryClientProvider>
@@ -76,7 +85,7 @@ export default function App() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
-  // The boundary replaces App, so it must provide what PublicPage's header search needs.
+  // The boundary replaces App, so it must provide what AppPage's header search needs.
   const [queryClient] = useState(createQueryClient);
   const status = isRouteErrorResponse(error) ? error.status : 500;
   const title =
@@ -89,7 +98,7 @@ export function ErrorBoundary() {
     <QueryClientProvider client={queryClient}>
       <SearchDialogProvider>
         <TooltipProvider>
-          <PublicPage title={title}>
+          <AppPage breadcrumbs={[{ label: title }]}>
             <div className="rounded-lg border border-border bg-glass p-6">
               <p className="mb-4 text-sm text-muted-foreground">
                 {status === 404
@@ -108,7 +117,7 @@ export function ErrorBoundary() {
                 <Link to="/methodology">Methodology</Link>
               </nav>
             </div>
-          </PublicPage>
+          </AppPage>
         </TooltipProvider>
       </SearchDialogProvider>
     </QueryClientProvider>

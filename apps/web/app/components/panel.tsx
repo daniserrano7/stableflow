@@ -42,7 +42,7 @@ function PanelTitle({ children, className, live, ...props }: PanelTitleProps) {
   return (
     <CardTitle
       className={cn(
-        "flex items-center gap-2 font-mono text-muted-foreground text-sm uppercase tracking-[0.06em]",
+        "flex items-center gap-2 font-medium text-foreground text-md tracking-normal [&>svg]:text-muted-foreground",
         className,
       )}
       {...props}

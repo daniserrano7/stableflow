@@ -6,9 +6,8 @@ import type {
 } from "@stableflow/shared";
 import { useState } from "react";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
-import { Link, useLoaderData } from "react-router";
-import { AppHeader } from "../../components/header";
-import { AppSidebar } from "../../components/sidebar";
+import { useLoaderData } from "react-router";
+import { AppPage } from "~/components/app-page";
 import { getApiUrl } from "../../config/api.server";
 import { FlowKpis } from "../flow-kpis/flow-kpis";
 import {
@@ -159,50 +158,30 @@ export default function Home() {
   const visibleTransfers = matchingTransfers.slice(0, maxVisibleTransferRows);
 
   return (
-    <main className="grid min-h-screen grid-cols-[3.5rem_minmax(0,1fr)] bg-background text-foreground">
-      <div className="bg-ambient" />
-      <div className="bg-grid" />
+    <AppPage breadcrumbs={[{ label: "Overview" }]} footerNote="Live USDC transfers">
+      {/* Flow summaries side by side from xl, the live feed full width beneath them. */}
+      <FlowKpis initialKpis={loaderData.flowKpis} />
 
-      <AppSidebar />
+      <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.55fr)_minmax(24rem,1fr)]">
+        <LiveTransfersGraph
+          bufferedCount={transfers.length}
+          freshTransferIds={freshTransferIds}
+          initialGraph={loaderData.liveTransferGraph}
+          transfers={transfers}
+        />
+        <TopEntityFlows initialFlows={loaderData.topEntityFlows} />
+      </div>
 
-      <section
-        className="flex min-h-screen min-w-0 flex-col gap-3.5 px-3 pt-4 pb-6 lg:px-6"
-        aria-labelledby="home-title"
-      >
-        <AppHeader />
-
-        <FlowKpis initialKpis={loaderData.flowKpis} />
-
-        <div className="grid gap-3.5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(28rem,0.8fr)]">
-          <div className="flex min-w-0 flex-col gap-3.5">
-            <LiveTransfersGraph
-              bufferedCount={transfers.length}
-              freshTransferIds={freshTransferIds}
-              initialGraph={loaderData.liveTransferGraph}
-              transfers={transfers}
-            />
-            <LiveTransfersTable
-              bufferedCount={transfers.length}
-              connectionStatus={connectionStatus}
-              filter={filter}
-              freshTransferIds={freshTransferIds}
-              matchingCount={matchingTransfers.length}
-              onFilterChange={setFilter}
-              transfers={visibleTransfers}
-            />
-          </div>
-          <TopEntityFlows initialFlows={loaderData.topEntityFlows} />
-        </div>
-
-        <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
-          <span>Stableflow · v0.1.0</span>
-          <Link className="hover:text-accent" to="/methodology">
-            Methodology · Base / USDC coverage
-          </Link>
-          <span>Live USDC transfers</span>
-        </footer>
-      </section>
-    </main>
+      <LiveTransfersTable
+        bufferedCount={transfers.length}
+        connectionStatus={connectionStatus}
+        filter={filter}
+        freshTransferIds={freshTransferIds}
+        matchingCount={matchingTransfers.length}
+        onFilterChange={setFilter}
+        transfers={visibleTransfers}
+      />
+    </AppPage>
   );
 }
 

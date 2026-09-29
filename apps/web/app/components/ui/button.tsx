@@ -4,7 +4,7 @@ import * as React from "react";
 import { cn } from "~/utils/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors transition-shadow duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 select-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-[color,background-color,border-color,box-shadow,scale] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 select-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -36,14 +36,23 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  /** Turns off the press scale where motion would distract (e.g. dense toolbars). */
+  static?: boolean;
 }
 
+// Tactile press feedback; a transition, so releasing mid-press eases back.
+const pressScale = "active:not-disabled:scale-[0.96]";
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ asChild = false, className, size, variant, ...props }, ref) => {
+  ({ asChild = false, className, size, static: isStatic, variant, ...props }, ref) => {
     const Comp = asChild ? SlotPrimitive.Slot : "button";
 
     return (
-      <Comp ref={ref} className={cn(buttonVariants({ size, variant }), className)} {...props} />
+      <Comp
+        ref={ref}
+        className={cn(buttonVariants({ size, variant }), !isStatic && pressScale, className)}
+        {...props}
+      />
     );
   },
 );

@@ -29,7 +29,7 @@ export function VisualMark({
       {imageUrl && (
         <img
           alt=""
-          className="absolute inset-0 size-full bg-white object-cover"
+          className="absolute inset-0 size-full bg-white object-cover outline outline-1 -outline-offset-1 outline-white/10 in-[[data-theme=light]]:outline-black/10"
           loading="lazy"
           onError={(event) => event.currentTarget.remove()}
           referrerPolicy="no-referrer"

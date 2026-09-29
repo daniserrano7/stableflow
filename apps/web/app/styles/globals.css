@@ -33,6 +33,16 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Balanced headings, no orphaned last words in descriptions. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
   ::selection {
     background: var(--accent-soft);
     color: var(--foreground);
@@ -167,6 +177,11 @@
     box-shadow: inset 2px 0 0 transparent;
   }
 }
+@keyframes sf-fade-in {
+  from {
+    opacity: 0;
+  }
+}
 @keyframes sf-shimmer {
   from {
     background-position: -200% 0;
@@ -188,10 +203,37 @@
 @utility animate-shimmer {
   animation: sf-shimmer 1.6s linear infinite;
 }
+@utility animate-fade-in {
+  animation: sf-fade-in 0.2s var(--ease-out-quart);
+}
+
+/* Staged page entrance: direct children rise in, ~100ms apart. Opt-in, so reduced-motion users
+   (and anyone before this stylesheet applies) get the content with no motion at all. */
+@keyframes sf-enter {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-enter > * {
+    animation: sf-enter 400ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+  .stagger-enter > :nth-child(2) {
+    animation-delay: 100ms;
+  }
+  .stagger-enter > :nth-child(3) {
+    animation-delay: 200ms;
+  }
+  .stagger-enter > :nth-child(n + 4) {
+    animation-delay: 300ms;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse-soft,
   .animate-slide-in,
+  .animate-fade-in,
   .animate-row-in,
   .animate-shimmer {
     animation: none;

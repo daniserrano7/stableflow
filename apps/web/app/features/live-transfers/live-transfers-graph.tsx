@@ -1369,11 +1369,11 @@ function getEdgeWidth(edge: GraphEdge, edges: GraphEdge[]) {
 
 function getMagnitudeColor(amount: number) {
   if (amount >= whaleThreshold) {
-    return "var(--anomaly)";
+    return "var(--whale)";
   }
 
   if (amount >= largeTransferThreshold) {
-    return "var(--accent)";
+    return "var(--magnitude-large)";
   }
 
   return "var(--inflow)";

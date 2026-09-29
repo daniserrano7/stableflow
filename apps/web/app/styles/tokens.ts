@@ -88,8 +88,9 @@ export type Asset = keyof typeof ASSET;
 /* Magnitude thresholds, used to colour amounts in tables / charts. */
 export const MAGNITUDE = {
   small: { min: 0, color: CSS_VAR.foreground },
-  large: { min: 100_000, color: CSS_VAR.accent },
-  whale: { min: 1_000_000, color: CSS_VAR.anomaly },
+  // Same thresholds as the ≥ 10K / Whales filters (transferThresholds in @stableflow/shared).
+  large: { min: 10_000, color: "var(--magnitude-large)" },
+  whale: { min: 1_000_000, color: CSS_VAR.whale },
 } as const;
 
 export function classifyAmount(n: number): keyof typeof MAGNITUDE {
@@ -110,4 +111,13 @@ export function setTheme(mode: ThemeMode) {
   const html = document.documentElement;
   html.dataset.theme = mode;
   html.classList.toggle("dark", mode === "dark");
+  html.classList.toggle("light", mode === "light");
+}
+
+export const themeCookieName = "sf-theme";
+
+/* Theme from the request's cookie header; dark is the default look. */
+export function readThemeCookie(cookieHeader: string | null): ThemeMode {
+  const match = cookieHeader?.match(new RegExp(`(?:^|;\\s*)${themeCookieName}=(dark|light)`));
+  return match?.[1] === "light" ? "light" : "dark";
 }

@@ -99,7 +99,9 @@ export function LiveTransfersTable({
           <TableBody>
             {transfers.map((transfer) => (
               <TableRow
-                className="group cursor-pointer"
+                // Fixed height: rows with a protocol tag are otherwise 2px taller than rows with
+                // the "—" placeholder, and the live feed visibly jitters as they stream in.
+                className="group h-10 cursor-pointer"
                 data-fresh={freshTransferIds.has(transfer.id) ? "true" : undefined}
                 key={transfer.id}
                 {...rowLink(getTransferPath(transfer.id))}
@@ -126,7 +128,7 @@ export function LiveTransfersTable({
                   />
                 </TableCell>
                 <TableCell className="text-right">
-                  <Tag category={getTransferCategory(transfer)} />
+                  <ProtocolTag category={getTransferCategory(transfer)} />
                 </TableCell>
                 <TableCell className="text-right">
                   <TransferRowLink transferId={transfer.id} />
@@ -159,10 +161,24 @@ export function LiveTransfersTable({
   );
 }
 
+// Wallet-to-wallet is the default case; a tag on every such row is noise that buries the
+// rows where a protocol is actually involved.
+function ProtocolTag({ category }: { category: ReturnType<typeof getTransferCategory> }) {
+  if (category === "wallet") {
+    return (
+      <span className="text-muted-foreground/60" title="No labeled protocol">
+        —
+      </span>
+    );
+  }
+  return <Tag category={category} />;
+}
+
 export function TransferEntity({ party }: { party: LiveTransferParty }) {
   const category = getPartyCategory(party);
   const entity = (
     <Entity
+      address={party.address}
       category={category}
       className="max-w-full"
       entityId={party.entityId}

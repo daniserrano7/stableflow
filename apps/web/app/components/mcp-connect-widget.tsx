@@ -21,16 +21,16 @@ export function McpConnectWidget({ mcpUrl }: { mcpUrl: string | null }) {
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Trigger asChild>
         <button
-          className="fixed right-4 bottom-4 z-30 inline-flex cursor-pointer items-center gap-2 rounded-full border border-accent/40 bg-surface-2 px-4 py-2.5 font-mono text-xs text-foreground shadow-lg shadow-black/30 transition-colors hover:border-accent hover:bg-surface-3 sm:right-6 sm:bottom-6"
+          className="inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 self-start rounded-md border border-border bg-surface-2 px-3 font-mono text-xs text-foreground transition-[background-color,border-color,scale] duration-150 ease-out hover:border-[var(--border-strong)] hover:bg-surface-3 active:scale-[0.96] lg:self-auto"
           type="button"
         >
-          <Sparkles aria-hidden size={15} className="text-accent" />
+          <Sparkles aria-hidden size={14} className="text-accent" />
           Connect AI
         </button>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm" />
-        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-surface-1 p-5 shadow-2xl sm:p-6">
+        <DialogPrimitive.Overlay className="fixed inset-0 z-modal bg-black/65 backdrop-blur-sm data-[state=open]:animate-fade-in" />
+        <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-modal max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-border bg-surface-1 p-5 shadow-2xl outline-none data-[state=open]:animate-slide-in sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="eyebrow mb-2">Public MCP server</p>

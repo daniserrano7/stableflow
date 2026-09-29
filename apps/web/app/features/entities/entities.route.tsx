@@ -1,5 +1,5 @@
 import type { EntityListResponse, EntitySummary, TopEntityFlowsResponse } from "@stableflow/shared";
-import { Blocks, ChevronRight, LayoutGrid, Table2 } from "lucide-react";
+import { ChevronRight, LayoutGrid, Table2 } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useLoaderData, useSearchParams } from "react-router";
 import {
@@ -12,8 +12,8 @@ import {
   PanelTitle,
   Tag,
 } from "~/components";
-import { AppHeader } from "~/components/header";
-import { AppSidebar } from "~/components/sidebar";
+import { AppPage } from "~/components/app-page";
+import { PageHeader } from "~/components/page-header";
 import { Button } from "~/components/ui/button";
 import {
   Table,
@@ -131,133 +131,88 @@ export default function Entities() {
   };
 
   return (
-    <main className="grid min-h-screen grid-cols-[3.5rem_minmax(0,1fr)] bg-background text-foreground">
-      <div className="bg-ambient" />
-      <div className="bg-grid" />
+    <AppPage
+      breadcrumbs={[{ label: "Entities" }]}
+      footerNote={`${entities.meta.totalLabels} labels · 24h flow context`}
+      headingId="entities-title"
+      searchPlaceholder="Search entities..."
+    >
+      <PageHeader
+        description="Protocols, exchanges and bridges Stableflow recognises on Base, with the addresses and labels that belong to each."
+        id="entities-title"
+        stats={[
+          { label: "Entities", value: entities.meta.totalEntities.toString() },
+          { label: "Addresses", value: formatInteger(totalAddresses) },
+          { label: "Labels", value: formatInteger(entities.meta.totalLabels) },
+          { label: "Categories", value: entities.meta.categories.length.toString() },
+        ]}
+        title="Entities"
+      />
 
-      <AppSidebar />
-
-      <section
-        className="flex min-h-screen min-w-0 flex-col gap-3.5 px-3 pt-4 pb-6 lg:px-6"
-        aria-labelledby="entities-title"
-      >
-        <AppHeader
-          breadcrumbs={[{ label: "Entities" }]}
-          headingId="entities-app-title"
-          searchPlaceholder="Search entities..."
-        />
-
-        <Panel>
-          <PanelBody className="flex flex-col items-start gap-5 p-5 sm:flex-row">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-accent text-background shadow-[var(--shadow-glow-accent)]">
-              <Blocks size={25} strokeWidth={1.8} />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="mb-2 font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
-                Labeled entity registry · Base · USDC
-              </p>
-              <h1 id="entities-title" className="m-0 text-2xl font-medium leading-tight">
-                Entity Registry
-              </h1>
-
-              <dl className="mt-5 grid max-w-3xl grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
-                <SummaryStat label="Entities" value={entities.meta.totalEntities.toString()} />
-                <SummaryStat label="Addresses" value={formatInteger(totalAddresses)} />
-                <SummaryStat label="Labels" value={formatInteger(entities.meta.totalLabels)} />
-                <SummaryStat
-                  label="Categories"
-                  value={entities.meta.categories.length.toString()}
-                />
-              </dl>
-            </div>
-          </PanelBody>
-        </Panel>
-
-        <Panel>
-          <PanelBody className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-center">
-              <ToggleGroup
-                aria-label="Entity category"
-                type="single"
-                value={category}
-                onValueChange={(nextCategory) => {
-                  if (nextCategory.length > 0) {
-                    updateSearchParam("category", nextCategory, "all");
-                  }
-                }}
-              >
-                {categoryOptions.map((option) => (
-                  <ToggleGroupItem key={option.value} value={option.value}>
-                    {option.label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 lg:justify-end">
-              <span className="font-mono text-2xs text-muted-foreground">
-                {visibleEntities.length} entities
-              </span>
-              <ToggleGroup
-                aria-label="Entity view"
-                type="single"
-                value={view}
-                onValueChange={(nextView) => {
-                  if (isViewMode(nextView)) {
-                    updateSearchParam("view", nextView, "table");
-                  }
-                }}
-              >
-                <ToggleGroupItem value="table">
-                  <Table2 size={13} />
-                  Table
+      <Panel>
+        <PanelBody className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center">
+            <ToggleGroup
+              aria-label="Entity category"
+              type="single"
+              value={category}
+              onValueChange={(nextCategory) => {
+                if (nextCategory.length > 0) {
+                  updateSearchParam("category", nextCategory, "all");
+                }
+              }}
+            >
+              {categoryOptions.map((option) => (
+                <ToggleGroupItem key={option.value} value={option.value}>
+                  {option.label}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="cards">
-                  <LayoutGrid size={13} />
-                  Cards
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          </PanelBody>
-        </Panel>
-
-        <div className="grid min-w-0 gap-3.5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="min-w-0">
-            {view === "cards" ? (
-              <EntityCards entities={visibleEntities} />
-            ) : (
-              <EntityTable entities={visibleEntities} />
-            )}
+              ))}
+            </ToggleGroup>
           </div>
 
-          <RegistryRail
-            entities={entities}
-            sourceSummaries={sourceSummaries}
-            totalAddresses={totalAddresses}
-          />
+          <div className="flex items-center justify-between gap-3 lg:justify-end">
+            <span className="font-mono text-2xs text-muted-foreground">
+              {visibleEntities.length} entities
+            </span>
+            <ToggleGroup
+              aria-label="Entity view"
+              type="single"
+              value={view}
+              onValueChange={(nextView) => {
+                if (isViewMode(nextView)) {
+                  updateSearchParam("view", nextView, "table");
+                }
+              }}
+            >
+              <ToggleGroupItem value="table">
+                <Table2 size={13} />
+                Table
+              </ToggleGroupItem>
+              <ToggleGroupItem value="cards">
+                <LayoutGrid size={13} />
+                Cards
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        </PanelBody>
+      </Panel>
+
+      <div className="grid min-w-0 gap-3.5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0">
+          {view === "cards" ? (
+            <EntityCards entities={visibleEntities} />
+          ) : (
+            <EntityTable entities={visibleEntities} />
+          )}
         </div>
 
-        <footer className="flex flex-col items-start justify-between gap-3 p-1 font-mono text-2xs text-muted-foreground md:flex-row md:items-center">
-          <span>Stableflow · v0.1.0</span>
-          <Link className="hover:text-accent" to="/methodology">
-            Methodology · Base / USDC coverage
-          </Link>
-          <span>{entities.meta.totalLabels} labels · 24h flow context</span>
-        </footer>
-      </section>
-    </main>
-  );
-}
-
-function SummaryStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="font-mono text-2xs text-muted-foreground uppercase tracking-[0.08em]">
-        {label}
-      </dt>
-      <dd className="mt-1 font-mono text-lg text-foreground">{value}</dd>
-    </div>
+        <RegistryRail
+          entities={entities}
+          sourceSummaries={sourceSummaries}
+          totalAddresses={totalAddresses}
+        />
+      </div>
+    </AppPage>
   );
 }
 
