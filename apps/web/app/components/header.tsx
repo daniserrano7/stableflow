@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useSearchDialog } from "~/features/search/search-dialog-context";
+import { ScopeBadges } from "./scope-badges";
 
 interface HeaderBreadcrumb {
   label: string;
@@ -81,6 +82,8 @@ export function AppHeader({
           {shortcutLabel}
         </kbd>
       </button>
+
+      <ScopeBadges className="self-start lg:ml-auto lg:self-auto" />
     </header>
   );
 }
