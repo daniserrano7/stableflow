@@ -1,6 +1,6 @@
 import { type Address, createPublicClient, http, parseAbi } from "viem";
 import { base } from "viem/chains";
-import { baseProtocolFactories, baseRpcUrl, baseUsdc } from "../chains/base.chain.js";
+import { baseProtocolFactories, baseRpcUrl, baseUsdc } from "../src/chains/base.chain.js";
 import type { CandidateVerification, UnidentifiedAddressCandidate } from "./candidates.js";
 
 const poolIdentityAbi = parseAbi([

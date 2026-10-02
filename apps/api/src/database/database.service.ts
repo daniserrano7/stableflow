@@ -18,6 +18,7 @@ export class DatabaseService implements OnModuleDestroy {
       application_name: "stableflow-api",
       connectionString: this.configService.getOrThrow("DATABASE_URL"),
       max: 5,
+      options: `-c search_path="${this.configService.getOrThrow("DATABASE_SCHEMA")}"`,
     });
 
     this.db = drizzle(this.pool, { schema: indexerSchema });

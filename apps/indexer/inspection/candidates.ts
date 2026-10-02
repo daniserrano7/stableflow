@@ -1,7 +1,8 @@
 import type { Address } from "viem";
 import { base } from "viem/chains";
-import { baseUsdc } from "../chains/base.chain.js";
-import { baseAddressLabels } from "../labels/base-address-labels.js";
+import { baseUsdc } from "../src/chains/base.chain.js";
+import { baseAddressLabels } from "../src/labels/base-address-labels.js";
+import { opsSchema, opsTables } from "../src/ops/schema.js";
 import type { InspectionArgs } from "./args.js";
 import type { OperatorDb, ReadOnlyDb } from "./db.js";
 import { isAutoPromotable } from "./discovery-policy.js";
@@ -101,17 +102,34 @@ const toBigInt = (value: string) => BigInt(value);
 
 const normalizeAddress = (address: Address) => address.toLowerCase() as Address;
 
-const hasAddressLabelCandidatesTable = async (db: ReadOnlyDb) => {
+const hasLabelOpsTables = async (db: ReadOnlyDb) => {
   const rows = await db.query<{ exists: boolean }>(`
-    select to_regclass('public.address_label_candidate_reviews') is not null as exists
+    select
+      to_regclass('${opsTables.addressLabelCandidateReviews}') is not null
+      and to_regclass('${opsTables.promotedAddressLabels}') is not null as exists
   `);
 
   return rows[0]?.exists ?? false;
 };
 
-export const ensureAddressLabelCandidateReviewsTable = async (db: OperatorDb) => {
+export const ensureOpsSchema = async (db: OperatorDb) => {
+  // Checking first avoids needing CREATE on the database once the schema exists.
   await db.execute(`
-    create table if not exists address_label_candidate_reviews (
+    do $$
+    begin
+      if to_regnamespace('${opsSchema}') is null then
+        create schema ${opsSchema};
+      end if;
+    end
+    $$
+  `);
+};
+
+export const ensureLabelOpsTables = async (db: OperatorDb) => {
+  await ensureOpsSchema(db);
+
+  await db.execute(`
+    create table if not exists ${opsTables.addressLabelCandidateReviews} (
       id text primary key,
       chain_id integer not null,
       address text not null,
@@ -149,31 +167,51 @@ export const ensureAddressLabelCandidateReviewsTable = async (db: OperatorDb) =>
   `);
 
   await db.execute(`
-    alter table address_label_candidate_reviews
+    alter table ${opsTables.addressLabelCandidateReviews}
     add column if not exists checked_at numeric
   `);
 
   await db.execute(`
     create index if not exists address_label_candidate_reviews_address_idx
-    on address_label_candidate_reviews (address)
+    on ${opsTables.addressLabelCandidateReviews} (address)
   `);
 
   await db.execute(`
     create index if not exists address_label_candidate_reviews_status_idx
-    on address_label_candidate_reviews (status)
+    on ${opsTables.addressLabelCandidateReviews} (status)
   `);
 
   await db.execute(`
     create index if not exists address_label_candidate_reviews_observed_total_value_idx
-    on address_label_candidate_reviews (observed_total_value)
+    on ${opsTables.addressLabelCandidateReviews} (observed_total_value)
   `);
-};
 
-const ensurePonderLiveQueryTable = async (db: OperatorDb) => {
+  // The indexer copies these into each deployment's discovered_address_labels.
   await db.execute(`
-    create table if not exists live_query_tables (
-      table_name text primary key
+    create table if not exists ${opsTables.promotedAddressLabels} (
+      id text primary key,
+      chain_id integer not null,
+      address text not null,
+      entity_id text not null,
+      entity_name text not null,
+      category text not null,
+      role text not null,
+      attribution_group text not null,
+      counting_policy text not null,
+      confidence text not null,
+      source_address text not null,
+      source_event text not null,
+      token0 text,
+      token1 text,
+      pool_kind text,
+      first_seen_block bigint not null,
+      promoted_at bigint not null
     )
+  `);
+
+  await db.execute(`
+    create index if not exists promoted_address_labels_promoted_at_idx
+    on ${opsTables.promotedAddressLabels} (promoted_at)
   `);
 };
 
@@ -233,18 +271,27 @@ export const getUnidentifiedAddressCandidates = async (
     };
   }
 
-  const hasCandidateTable = await hasAddressLabelCandidatesTable(db);
+  const hasCandidateTable = await hasLabelOpsTables(db);
   const candidateStatusSelect = hasCandidateTable
     ? "candidates.status as candidate_status"
     : "null::text as candidate_status";
   const candidateJoin = hasCandidateTable
     ? `
-      left join address_label_candidate_reviews candidates
+      left join ${opsTables.addressLabelCandidateReviews} candidates
         on lower(candidates.address::text) = address_volume.address
     `
     : "";
+  // Promotions can reach the ops table before the indexer copies them into
+  // discovered_address_labels, so exclude them here as well.
   const candidateFilter = hasCandidateTable
-    ? "and coalesce(candidates.status, 'candidate') <> 'rejected'"
+    ? `
+        and coalesce(candidates.status, 'candidate') <> 'rejected'
+        and not exists (
+          select 1
+          from ${opsTables.promotedAddressLabels} promoted
+          where lower(promoted.address) = address_volume.address
+        )
+      `
     : "";
   const cooldownThreshold =
     options.checkedCooldownMinutes === undefined
@@ -349,11 +396,11 @@ export const upsertAddressLabelCandidate = async ({
   const status: CandidateStatus = isAutoPromotable(verification) ? "verified" : "candidate";
   const now = BigInt(Math.floor(Date.now() / 1000));
 
-  await ensureAddressLabelCandidateReviewsTable(db);
+  await ensureLabelOpsTables(db);
 
   await db.execute(
     `
-      insert into address_label_candidate_reviews (
+      insert into ${opsTables.addressLabelCandidateReviews} (
         id,
         chain_id,
         address,
@@ -492,7 +539,7 @@ export const getVerifiedMissingLabels = async (
   limit: number,
   evidenceSource = "onchain_factory_membership",
 ) => {
-  const hasCandidateTable = await hasAddressLabelCandidatesTable(db);
+  const hasCandidateTable = await hasLabelOpsTables(db);
 
   if (!hasCandidateTable) {
     return [];
@@ -533,7 +580,7 @@ export const getVerifiedMissingLabels = async (
         promoted_at::text,
         rejection_reason,
         '0'::text as unique_counterparties
-      from address_label_candidate_reviews
+      from ${opsTables.addressLabelCandidateReviews} reviews
       where status = 'verified'
         and confidence = 'high'
         and evidence_source = $2
@@ -541,8 +588,8 @@ export const getVerifiedMissingLabels = async (
         and suggested_entity_id <> 'unidentified'
         and not exists (
           select 1
-          from discovered_address_labels discovered
-          where discovered.id = address_label_candidate_reviews.id
+          from ${opsTables.promotedAddressLabels} promoted
+          where promoted.id = reviews.id
         )
       order by observed_total_value desc
       limit $1::integer
@@ -554,8 +601,7 @@ export const getVerifiedMissingLabels = async (
 };
 
 export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) => {
-  await ensureAddressLabelCandidateReviewsTable(db);
-  await ensurePonderLiveQueryTable(db);
+  await ensureLabelOpsTables(db);
 
   const candidates = await getVerifiedMissingLabels(db, limit);
   const now = BigInt(Math.floor(Date.now() / 1000));
@@ -563,49 +609,50 @@ export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) =
   for (const candidate of candidates) {
     await db.execute(
       `
-        insert into discovered_address_labels (
-          id,
-          chain_id,
-          address,
-          entity_id,
-          entity_name,
-          category,
-          role,
-          attribution_group,
-          counting_policy,
-          confidence,
-          source_type,
-          source_address,
-          source_event,
-          token0,
-          token1,
-          pool_kind,
-          first_seen_block,
-          transaction_hash,
-          log_index
+        with promoted as (
+          insert into ${opsTables.promotedAddressLabels} (
+            id,
+            chain_id,
+            address,
+            entity_id,
+            entity_name,
+            category,
+            role,
+            attribution_group,
+            counting_policy,
+            confidence,
+            source_address,
+            source_event,
+            token0,
+            token1,
+            pool_kind,
+            first_seen_block,
+            promoted_at
+          )
+          values (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            $8,
+            $9,
+            $10,
+            $11,
+            $12,
+            $13,
+            $14,
+            $15,
+            $16,
+            $17::bigint
+          )
+          on conflict (id) do nothing
         )
-        values (
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          $7,
-          $8,
-          $9,
-          $10,
-          $11,
-          $12,
-          $13,
-          $14,
-          $15,
-          $16,
-          $17,
-          $18,
-          $19
-        )
-        on conflict (id) do nothing
+        update ${opsTables.addressLabelCandidateReviews}
+        set promoted_at = $17::bigint
+        where id = $1
       `,
       [
         `${base.id}:${candidate.address}`,
@@ -618,25 +665,14 @@ export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) =
         candidate.attributionGroup,
         candidate.countingPolicy,
         candidate.confidence,
-        "candidate_review",
         candidate.sourceAddress,
         candidate.sourceEvent,
         candidate.token0,
         candidate.token1,
         candidate.poolKind,
         candidate.firstSeenBlock.toString(),
-        "0x0000000000000000000000000000000000000000000000000000000000000000",
-        0,
+        now.toString(),
       ],
-    );
-
-    await db.execute(
-      `
-        update address_label_candidate_reviews
-        set promoted_at = $2::bigint
-        where id = $1
-      `,
-      [`${base.id}:${candidate.address}`, now.toString()],
     );
   }
 
@@ -655,11 +691,11 @@ export const rejectAddressLabelCandidate = async ({
   const normalizedAddress = normalizeAddress(address);
   const now = BigInt(Math.floor(Date.now() / 1000));
 
-  await ensureAddressLabelCandidateReviewsTable(db);
+  await ensureLabelOpsTables(db);
 
   const rows = await db.execute<{ address: Address }>(
     `
-      update address_label_candidate_reviews
+      update ${opsTables.addressLabelCandidateReviews}
       set
         status = 'rejected',
         rejection_reason = $3,

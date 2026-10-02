@@ -21,4 +21,5 @@ export default [
   route("api/flows/live-graph", "features/live-transfers/live-transfer-graph.resource.ts"),
   route("events/transfers", "features/live-transfers/transfers.stream.ts"),
   route("api/flows/top-entities", "features/top-entity-flows/top-entity-flows.resource.ts"),
+  route("health", "features/health/health.resource.ts"),
 ] satisfies RouteConfig;

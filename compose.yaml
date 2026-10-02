@@ -1,0 +1,160 @@
+# Production-like local stack: the same images Railway runs, wired the same way
+# (private network by service name, per-service database roles, views schema).
+#
+#   docker compose up --build        start everything (needs .env, see .env.example)
+#   docker compose down -v           stop and delete all data
+#
+# Web http://localhost:4000 · API http://localhost:4001/v1 · MCP http://localhost:4002/mcp
+# Indexer http://localhost:4003/ready · Postgres localhost:5433 (postgres/postgres)
+
+name: stableflow
+
+x-indexer-build: &indexer-build
+  context: .
+  dockerfile: apps/indexer/Dockerfile
+
+x-healthcheck: &healthcheck
+  interval: 10s
+  timeout: 3s
+  retries: 3
+  start_period: 60s
+  start_interval: 2s
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: railway
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD-SHELL", "pg_isready -U postgres -d railway"]
+
+  # Applies the production roles; idempotent, so it runs on every `up`.
+  db-roles:
+    image: postgres:17
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    volumes:
+      - ./infra/postgres/roles.sql:/roles.sql:ro
+    command: >
+      psql -h postgres -U postgres -d railway -q
+      -v indexer_password=local -v worker_password=local
+      -v api_password=local -v api_dev_password=local
+      -f /roles.sql
+
+  indexer:
+    build: *indexer-build
+    command: sh scripts/start-local.sh
+    restart: on-failure
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    environment:
+      PORT: "42069"
+      DATABASE_URL: postgresql://stableflow_indexer:local@postgres:5432/railway
+      DATABASE_VIEWS_SCHEMA: stableflow
+      PONDER_DISCOVERY_START_BLOCK_8453: ${PONDER_DISCOVERY_START_BLOCK_8453:?Set it in .env}
+      PONDER_RPC_URL_8453: ${PONDER_RPC_URL_8453:?Set it in .env}
+    ports:
+      - "4003:42069"
+    healthcheck:
+      <<: *healthcheck
+      # Like Railway: healthy once backfilled and live (up to an hour).
+      start_period: 1h
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:42069/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+  worker:
+    build: *indexer-build
+    command: node dist/inspection/discovery-worker.js
+    restart: on-failure
+    depends_on:
+      indexer:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      LABEL_DISCOVERY_SCHEDULE_ENABLED: "true"
+      DATABASE_URL: postgresql://stableflow_worker:local@postgres:5432/railway
+      DATABASE_SCHEMA: stableflow
+      PONDER_RPC_URL_8453: ${PONDER_RPC_URL_8453:?Set it in .env}
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: on-failure
+    depends_on:
+      indexer:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgresql://stableflow_api:local@postgres:5432/railway
+      DATABASE_SCHEMA: stableflow
+    ports:
+      - "4001:3000"
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/v1/health/readiness').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: on-failure
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      STABLEFLOW_API_URL: http://api:3000/v1
+      STABLEFLOW_MCP_PUBLIC_URL: http://localhost:4002/mcp
+    ports:
+      - "4000:3000"
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+    restart: on-failure
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      HOST: 0.0.0.0
+      MCP_ALLOWED_HOST: localhost
+      STABLEFLOW_API_URL: http://api:3000/v1
+    ports:
+      - "4002:3000"
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+volumes:
+  postgres-data:

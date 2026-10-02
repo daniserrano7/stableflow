@@ -28,7 +28,7 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env): McpCon
     throw new Error("STABLEFLOW_API_URL must be an HTTP(S) URL ending in /v1");
   }
 
-  if (parsed.HOST === "0.0.0.0" && !parsed.MCP_ALLOWED_HOST) {
+  if ((parsed.HOST === "0.0.0.0" || parsed.HOST === "::") && !parsed.MCP_ALLOWED_HOST) {
     throw new Error("MCP_ALLOWED_HOST is required when binding to all interfaces");
   }
 

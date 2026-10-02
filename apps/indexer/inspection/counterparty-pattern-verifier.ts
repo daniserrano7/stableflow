@@ -1,6 +1,9 @@
 import type { Address } from "viem";
-import { baseUsdc } from "../chains/base.chain.js";
-import { type AddressCountingPolicy, getBaseAddressLabel } from "../labels/base-address-labels.js";
+import { baseUsdc } from "../src/chains/base.chain.js";
+import {
+  type AddressCountingPolicy,
+  getBaseAddressLabel,
+} from "../src/labels/base-address-labels.js";
 import type { CandidateVerification, UnidentifiedAddressCandidate } from "./candidates.js";
 import type { ReadOnlyDb } from "./db.js";
 

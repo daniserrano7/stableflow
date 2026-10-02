@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { TransactionNetValueTracker } from "./transaction-net-value.js";
+import { TransactionNetValueTracker } from "../src/flows/transaction-net-value.js";
 
 const sumTransaction = (
   tracker: TransactionNetValueTracker,

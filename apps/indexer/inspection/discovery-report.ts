@@ -1,3 +1,4 @@
+import { opsTables } from "../src/ops/schema.js";
 import { parseInspectionArgs } from "./args.js";
 import { createReadOnlyDb } from "./db.js";
 import { printJson } from "./reporting.js";
@@ -23,7 +24,7 @@ const run = async () => {
 
   try {
     const [table] = await db.query<{ exists: boolean }>(
-      "select to_regclass('public.address_label_discovery_runs') is not null as exists",
+      `select to_regclass('${opsTables.addressLabelDiscoveryRuns}') is not null as exists`,
     );
 
     if (!table?.exists) {
@@ -36,7 +37,7 @@ const run = async () => {
         select finished_at, first_observed_block::text, latest_block::text, indexed_transfers::text,
           scanned_count, verified_count, promoted_count, restored_count, candidate_count,
           promoted_touch_share_bps, unidentified_directional_share_bps, duration_ms
-        from address_label_discovery_runs
+        from ${opsTables.addressLabelDiscoveryRuns}
         order by id desc
         limit $1::integer
       `,

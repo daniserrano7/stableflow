@@ -1,6 +1,6 @@
 import type { QueryResultRow } from "pg";
 import pg from "pg";
-import { env } from "../env/env.js";
+import { env } from "../src/env/env.js";
 
 const { Pool } = pg;
 
@@ -22,11 +22,15 @@ const assertReadOnlyQuery = (text: string) => {
   }
 };
 
+// Ponder tables are read unqualified, from the views schema in production.
+const searchPathOption = `-c search_path="${env.DATABASE_SCHEMA}"`;
+
 const createPool = (applicationName: string) =>
   new Pool({
     application_name: applicationName,
     connectionString: env.DATABASE_URL,
     max: 1,
+    options: searchPathOption,
   });
 
 export const createReadOnlyDb = (): ReadOnlyDb => {
@@ -48,6 +52,7 @@ export const createOperatorDb = (): OperatorDb => {
     application_name: "stableflow-indexer-label-operator",
     connectionString: env.DATABASE_URL,
     max: 2,
+    options: searchPathOption,
   });
 
   return {

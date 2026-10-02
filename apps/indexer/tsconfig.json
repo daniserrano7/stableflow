@@ -6,5 +6,13 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "types": ["node", "ponder/virtual"]
   },
-  "include": ["src/**/*.ts", "ponder.config.ts", "ponder.schema.ts", "ponder-env.d.ts"]
+  "include": [
+    "src/**/*.ts",
+    "inspection/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "ponder.config.ts",
+    "ponder.schema.ts",
+    "ponder-env.d.ts"
+  ]
 }

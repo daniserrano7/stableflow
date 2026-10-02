@@ -1,7 +1,8 @@
+import { opsTables } from "../src/ops/schema.js";
 import type { InspectionArgs } from "./args.js";
 import { verifyCandidate } from "./candidate-verifiers.js";
 import {
-  ensureAddressLabelCandidateReviewsTable,
+  ensureLabelOpsTables,
   getFallbackCandidateVerification,
   getUnidentifiedAddressCandidates,
   getVerifiedMissingLabels,
@@ -64,7 +65,7 @@ const emptyReport = (status: "empty" | "locked", startedAtMs: number): Discovery
 
 const ensureDiscoveryRunsTable = async (db: OperatorDb) => {
   await db.execute(`
-    create table if not exists address_label_discovery_runs (
+    create table if not exists ${opsTables.addressLabelDiscoveryRuns} (
       id bigserial primary key,
       started_at timestamptz not null,
       finished_at timestamptz not null,
@@ -88,11 +89,11 @@ const ensureDiscoveryRunsTable = async (db: OperatorDb) => {
   `);
 
   await db.execute(`
-    alter table address_label_discovery_runs
+    alter table ${opsTables.addressLabelDiscoveryRuns}
     add column if not exists restored_count integer not null default 0
   `);
   await db.execute(`
-    alter table address_label_discovery_runs
+    alter table ${opsTables.addressLabelDiscoveryRuns}
     add column if not exists first_observed_block numeric
   `);
 };
@@ -105,7 +106,7 @@ const saveDiscoveryReport = async (db: OperatorDb, startedAt: string, report: Di
   await ensureDiscoveryRunsTable(db);
   await db.execute(
     `
-      insert into address_label_discovery_runs (
+      insert into ${opsTables.addressLabelDiscoveryRuns} (
         started_at, finished_at, first_observed_block, latest_block, window_start, window_end,
         indexed_transfers, scanned_count, verified_count, promoted_count,
         candidate_count, raw_transfer_value, restored_count, promoted_touch_value,
@@ -152,7 +153,7 @@ export const runDiscovery = async (
   }
 
   try {
-    await ensureAddressLabelCandidateReviewsTable(db);
+    await ensureLabelOpsTables(db);
     const { candidates, window } = await getUnidentifiedAddressCandidates(db, args, options);
 
     if (window === null) {
@@ -175,7 +176,7 @@ export const runDiscovery = async (
     }
 
     // Older reviews relied on a pool's self-reported factory address. Recheck
-    // them against the factory registry before restoring labels after a reset.
+    // them against the factory registry before promoting them.
     const legacyReviews = await getVerifiedMissingLabels(db, 500, "onchain_pool_identity");
     const scannedAddresses = new Set(
       candidates.map((candidate) => candidate.address.toLowerCase()),

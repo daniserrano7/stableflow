@@ -8,7 +8,6 @@ import {
   usdcTransfers,
   usdcTransferVolumeBuckets,
 } from "ponder:schema";
-import { eq } from "drizzle-orm";
 import { formatUnits, parseAbi } from "viem";
 import { base } from "viem/chains";
 import { baseProtocolContracts, baseUsdc } from "../chains/base.chain.js";
@@ -24,6 +23,7 @@ import {
   getBaseAddressLabel,
   isFlowBoundaryLabel,
 } from "../labels/base-address-labels.js";
+import { readPromotedAddressLabels } from "../labels/promoted-address-labels.js";
 
 const bucketSize = "1m";
 const bucketSizeSeconds = 60n;
@@ -44,6 +44,7 @@ const discoveredFlowLabelsByAddress = new Map<string, FlowLabel>();
 const promotedLabelRefreshIntervalMs = 30_000;
 let lastPromotedLabelRefreshAt = 0;
 let promotedLabelRefresh: Promise<void> | null = null;
+let promotedLabelCursor = 0n;
 
 type FlowDirection = "in" | "out";
 type BridgeDirection = "inbound" | "outbound";
@@ -357,6 +358,54 @@ const upsertBridgeFlowBucket = async ({
     }));
 };
 
+// Operator promotions live in the ops schema so they outlive each deployment's
+// Ponder schema. Copying them in through context.db keeps Ponder's cache and
+// reorg tracking consistent, and a fresh deployment applies them from its first event.
+const syncPromotedLabels = async (context: IndexerContext) => {
+  const labels = await readPromotedAddressLabels(promotedLabelCursor);
+
+  for (const label of labels) {
+    const insertedLabel = await context.db
+      .insert(discoveredAddressLabels)
+      .values({
+        id: getAddressLabelId(label.address),
+        chainId: base.id,
+        address: label.address,
+        entityId: label.entityId,
+        entityName: label.entityName,
+        category: label.category,
+        role: label.role,
+        attributionGroup: label.attributionGroup,
+        countingPolicy: label.countingPolicy,
+        confidence: label.confidence,
+        sourceType: "candidate_review",
+        sourceAddress: label.sourceAddress,
+        sourceEvent: label.sourceEvent,
+        token0: label.token0,
+        token1: label.token1,
+        poolKind: label.poolKind,
+        firstSeenBlock: label.firstSeenBlock,
+        transactionHash: zeroHash,
+        logIndex: 0,
+      })
+      .onConflictDoNothing();
+
+    if (insertedLabel !== null) {
+      discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), label);
+      logDiscoveredLabel({
+        address: label.address,
+        entityName: label.entityName,
+        role: label.role,
+        sourceType: "candidate_review",
+      });
+    }
+
+    if (label.promotedAt > promotedLabelCursor) {
+      promotedLabelCursor = label.promotedAt;
+    }
+  }
+};
+
 const getFlowLabel = async ({
   address,
   context,
@@ -377,33 +426,10 @@ const getFlowLabel = async ({
     return cachedDiscoveredLabel;
   }
 
-  // Operator promotions arrive through a separate database connection. Ponder's
-  // db.find() can cache a missing row, so refresh these labels with raw SQL.
   if (Date.now() - lastPromotedLabelRefreshAt >= promotedLabelRefreshIntervalMs) {
     if (promotedLabelRefresh === null) {
       promotedLabelRefresh = (async () => {
-        const labels = await context.db.sql
-          .select({
-            address: discoveredAddressLabels.address,
-            attributionGroup: discoveredAddressLabels.attributionGroup,
-            category: discoveredAddressLabels.category,
-            countingPolicy: discoveredAddressLabels.countingPolicy,
-            entityId: discoveredAddressLabels.entityId,
-            entityName: discoveredAddressLabels.entityName,
-          })
-          .from(discoveredAddressLabels)
-          .where(eq(discoveredAddressLabels.sourceType, "candidate_review"));
-
-        for (const label of labels) {
-          discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), {
-            attributionGroup: label.attributionGroup,
-            category: label.category as AddressLabel["category"],
-            countingPolicy: label.countingPolicy as AddressLabel["countingPolicy"],
-            entityId: label.entityId,
-            entityName: label.entityName,
-          });
-        }
-
+        await syncPromotedLabels(context);
         lastPromotedLabelRefreshAt = Date.now();
       })();
     }
