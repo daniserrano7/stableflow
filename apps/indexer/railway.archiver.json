@@ -1,0 +1,21 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/indexer/Dockerfile",
+    "watchPatterns": [
+      "/apps/indexer/archive/**",
+      "/apps/indexer/src/storage/**",
+      "/apps/indexer/ponder.schema.ts",
+      "/apps/indexer/package.json",
+      "/apps/indexer/Dockerfile",
+      "/apps/indexer/railway.archiver.json",
+      "/pnpm-lock.yaml"
+    ]
+  },
+  "deploy": {
+    "startCommand": "node dist/archive/archiver.js",
+    "restartPolicyType": "ALWAYS",
+    "drainingSeconds": 15
+  }
+}

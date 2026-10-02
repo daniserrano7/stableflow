@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "types": ["node", "ponder/virtual"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "inspection/**/*.ts",
+    "archive/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "ponder.config.ts",
+    "ponder.schema.ts",
+    "ponder-env.d.ts"
+  ]
+}
