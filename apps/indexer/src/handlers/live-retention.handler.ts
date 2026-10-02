@@ -8,15 +8,23 @@ import {
   usdcTransferVolumeBuckets,
 } from "ponder:schema";
 import { lt } from "drizzle-orm";
+import { getLiveRetentionCutoff } from "../retention/cutoff.js";
 import { liveRetentionSeconds } from "../retention/live-retention.js";
+import { readArchivedThroughTimestamp } from "../storage/archive-db.js";
 
-// The archive keeps history. A deployment only needs recent rows for the live stream and
-// as a buffer while the archiver catches up. Cutoffs follow block time, so re-indexing
-// prunes the same rows, and Ponder tracks these deletes for reorgs.
+// The archive keeps history; a deployment only needs recent rows for the live stream.
+// Pruning never passes what the archive already holds, so a long backfill or an archiver
+// outage only grows these tables until it catches up. Ponder tracks the deletes for
+// reorgs; which rows a re-index prunes may differ, which only affects storage.
 ponder.on("LiveRetention:block", async ({ event, context }) => {
   if (liveRetentionSeconds === undefined) return;
 
-  const cutoff = event.block.timestamp - liveRetentionSeconds;
+  const cutoff = getLiveRetentionCutoff({
+    archivedThroughTimestamp: await readArchivedThroughTimestamp(),
+    blockTimestamp: event.block.timestamp,
+    retentionSeconds: liveRetentionSeconds,
+  });
+  if (cutoff === null) return;
 
   await context.db.sql.delete(usdcTransfers).where(lt(usdcTransfers.blockTimestamp, cutoff));
   await context.db.sql.delete(usdcBridgeEvents).where(lt(usdcBridgeEvents.blockTimestamp, cutoff));

@@ -1,13 +1,10 @@
-import pg from "pg";
-import { env } from "../env/env.js";
+import { queryArchive } from "../storage/archive-db.js";
 import { archiveTables } from "../storage/schemas.js";
 import type {
   AddressCategory,
   AddressConfidence,
   AddressCountingPolicy,
 } from "./base-address-labels.js";
-
-const { Pool } = pg;
 
 type Address = `0x${string}`;
 
@@ -55,20 +52,6 @@ type ArchivedAddressLabelDbRow = {
   transaction_hash: Address;
 };
 
-const undefinedTableErrorCode = "42P01";
-
-let pool: pg.Pool | null = null;
-
-const getPool = () => {
-  pool ??= new Pool({
-    application_name: "stableflow-indexer-archived-labels",
-    connectionString: env.DATABASE_URL,
-    max: 1,
-  });
-
-  return pool;
-};
-
 /**
  * Reads labels archived at or after `archivedAt` (epoch seconds): earlier deployments'
  * discoveries and operator promotions. Returns nothing until the archive exists.
@@ -76,9 +59,8 @@ const getPool = () => {
 export const readArchivedAddressLabels = async (
   archivedAt: bigint,
 ): Promise<ArchivedAddressLabel[]> => {
-  try {
-    const result = await getPool().query<ArchivedAddressLabelDbRow>(
-      `
+  const rows = await queryArchive<ArchivedAddressLabelDbRow>(
+    `
         select
           id,
           address,
@@ -103,35 +85,28 @@ export const readArchivedAddressLabels = async (
         where archived_at >= $1::bigint
         order by archived_at, id
       `,
-      [archivedAt.toString()],
-    );
+    [archivedAt.toString()],
+  );
 
-    return result.rows.map((row) => ({
-      address: row.address,
-      archivedAt: BigInt(row.archived_at),
-      attributionGroup: row.attribution_group,
-      category: row.category,
-      confidence: row.confidence,
-      countingPolicy: row.counting_policy,
-      entityId: row.entity_id,
-      entityName: row.entity_name,
-      firstSeenBlock: BigInt(row.first_seen_block),
-      id: row.id,
-      logIndex: row.log_index,
-      poolKind: row.pool_kind,
-      role: row.role,
-      sourceAddress: row.source_address,
-      sourceEvent: row.source_event,
-      sourceType: row.source_type,
-      token0: row.token0,
-      token1: row.token1,
-      transactionHash: row.transaction_hash,
-    }));
-  } catch (error) {
-    if ((error as { code?: unknown }).code === undefinedTableErrorCode) {
-      return [];
-    }
-
-    throw error;
-  }
+  return (rows ?? []).map((row) => ({
+    address: row.address,
+    archivedAt: BigInt(row.archived_at),
+    attributionGroup: row.attribution_group,
+    category: row.category,
+    confidence: row.confidence,
+    countingPolicy: row.counting_policy,
+    entityId: row.entity_id,
+    entityName: row.entity_name,
+    firstSeenBlock: BigInt(row.first_seen_block),
+    id: row.id,
+    logIndex: row.log_index,
+    poolKind: row.pool_kind,
+    role: row.role,
+    sourceAddress: row.source_address,
+    sourceEvent: row.source_event,
+    sourceType: row.source_type,
+    token0: row.token0,
+    token1: row.token1,
+    transactionHash: row.transaction_hash,
+  }));
 };
