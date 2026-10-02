@@ -100,6 +100,8 @@ export function useLiveTransfers({
     const openStream = () => {
       events?.close();
       const streamUrl = new URL("/events/transfers", window.location.origin);
+      // The server then only sends matching transfers.
+      if (filter !== "all") streamUrl.searchParams.set("filter", filter);
       if (latestCursor !== null) {
         streamUrl.searchParams.set("afterBlockNumber", latestCursor.blockNumber);
         streamUrl.searchParams.set("afterLogIndex", latestCursor.logIndex.toString());

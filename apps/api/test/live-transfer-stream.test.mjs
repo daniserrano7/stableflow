@@ -44,3 +44,23 @@ test("reconnect header takes precedence over the original stream URL cursor", ()
   controller.streamLiveTransfers("10", "2", "invalid");
   assert.deepEqual(receivedCursor, { blockNumber: "10", logIndex: 2 });
 });
+
+test("the stream filter defaults to all and rejects unknown values", () => {
+  let receivedFilter;
+  const controller = new TransfersController({
+    createLiveTransfersStream(_cursor, filter) {
+      receivedFilter = filter;
+    },
+  });
+
+  controller.streamLiveTransfers(undefined, undefined, undefined, undefined);
+  assert.equal(receivedFilter, "all");
+
+  controller.streamLiveTransfers(undefined, undefined, undefined, "whale");
+  assert.equal(receivedFilter, "whale");
+
+  assert.throws(
+    () => controller.streamLiveTransfers(undefined, undefined, undefined, "huge"),
+    (error) => error.getStatus?.() === 400,
+  );
+});

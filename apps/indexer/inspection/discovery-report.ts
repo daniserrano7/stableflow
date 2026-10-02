@@ -1,4 +1,4 @@
-import { opsTables } from "../src/ops/schema.js";
+import { opsTables } from "../src/storage/schemas.js";
 import { parseInspectionArgs } from "./args.js";
 import { createReadOnlyDb } from "./db.js";
 import { printJson } from "./reporting.js";

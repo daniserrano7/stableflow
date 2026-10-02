@@ -1,5 +1,5 @@
 # Production-like local stack: the same images Railway runs, wired the same way
-# (private network by service name, per-service database roles, views schema).
+# (private network by service name, per-service database roles, views and archive).
 #
 #   docker compose up --build        start everything (needs .env, see .env.example)
 #   docker compose down -v           stop and delete all data
@@ -63,6 +63,8 @@ services:
       DATABASE_VIEWS_SCHEMA: stableflow
       PONDER_DISCOVERY_START_BLOCK_8453: ${PONDER_DISCOVERY_START_BLOCK_8453:?Set it in .env}
       PONDER_RPC_URL_8453: ${PONDER_RPC_URL_8453:?Set it in .env}
+      PONDER_DISABLE_CACHE: "true"
+      LIVE_RETENTION_HOURS: ${LIVE_RETENTION_HOURS:-6}
     ports:
       - "4003:42069"
     healthcheck:
@@ -75,18 +77,31 @@ services:
         - -e
         - "fetch('http://localhost:42069/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 
-  worker:
+  # Copies the live indexer views into the archive the API reads.
+  archiver:
     build: *indexer-build
-    command: node dist/inspection/discovery-worker.js
+    command: node dist/archive/archiver.js
     restart: on-failure
     depends_on:
       indexer:
         condition: service_healthy
     environment:
+      DATABASE_URL: postgresql://stableflow_worker:local@postgres:5432/railway
+      DATABASE_LIVE_SCHEMA: stableflow
+      RAW_RETENTION_HOURS: ${RAW_RETENTION_HOURS:-336}
+
+  worker:
+    build: *indexer-build
+    command: node dist/inspection/discovery-worker.js
+    restart: on-failure
+    depends_on:
+      archiver:
+        condition: service_started
+    environment:
       NODE_ENV: production
       LABEL_DISCOVERY_SCHEDULE_ENABLED: "true"
       DATABASE_URL: postgresql://stableflow_worker:local@postgres:5432/railway
-      DATABASE_SCHEMA: stableflow
+      DATABASE_SCHEMA: stableflow_archive
       PONDER_RPC_URL_8453: ${PONDER_RPC_URL_8453:?Set it in .env}
 
   api:
@@ -95,12 +110,13 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: on-failure
     depends_on:
-      indexer:
-        condition: service_healthy
+      archiver:
+        condition: service_started
     environment:
       PORT: "3000"
       DATABASE_URL: postgresql://stableflow_api:local@postgres:5432/railway
-      DATABASE_SCHEMA: stableflow
+      DATABASE_SCHEMA: stableflow_archive
+      DATABASE_LIVE_SCHEMA: stableflow
     ports:
       - "4001:3000"
     healthcheck:

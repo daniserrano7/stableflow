@@ -8,7 +8,7 @@ import {
   Query,
   Sse,
 } from "@nestjs/common";
-import { parseTransferId, parseTransferListParams } from "@stableflow/shared";
+import { parseTransferId, parseTransferListParams, type TransferFilter } from "@stableflow/shared";
 import { parseLiveTransferEventId } from "./live-transfer-event-id.js";
 import { TransfersService } from "./transfers.service.js";
 
@@ -47,7 +47,12 @@ export class TransfersController {
     @Query("afterBlockNumber") afterBlockNumber?: string,
     @Query("afterLogIndex") afterLogIndex?: string,
     @Headers("last-event-id") lastEventId?: string,
+    @Query("filter") filter?: string,
   ) {
+    const transferFilter = filter ?? "all";
+    if (!isTransferFilter(transferFilter)) {
+      throw new BadRequestException("Filter must be all, large, or whale.");
+    }
     const resumedCursor = parseLiveTransferEventId(lastEventId);
     const initialCursor =
       afterBlockNumber !== undefined && afterLogIndex !== undefined
@@ -56,6 +61,7 @@ export class TransfersController {
 
     return this.transfersService.createLiveTransfersStream(
       resumedCursor !== undefined ? resumedCursor : (initialCursor ?? null),
+      transferFilter,
     );
   }
 
@@ -69,3 +75,6 @@ export class TransfersController {
     return transfer;
   }
 }
+
+const isTransferFilter = (value: string): value is TransferFilter =>
+  value === "all" || value === "large" || value === "whale";

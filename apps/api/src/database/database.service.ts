@@ -8,23 +8,38 @@ import type { ApiEnvironment } from "../config/env.js";
 
 const { Pool } = pg;
 
+export type IndexerDatabase = NodePgDatabase<typeof indexerSchema>;
+
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
-  private readonly pool: pg.Pool;
-  readonly db: NodePgDatabase<typeof indexerSchema>;
+  private readonly pools: pg.Pool[] = [];
+  /** History: archived raw transfers, aggregates and labels. */
+  readonly db: IndexerDatabase;
+  /** The newest indexed data, a few seconds ahead of the archive. */
+  readonly liveDb: IndexerDatabase;
 
   constructor(private readonly configService: ConfigService<ApiEnvironment, true>) {
-    this.pool = new Pool({
-      application_name: "stableflow-api",
-      connectionString: this.configService.getOrThrow("DATABASE_URL"),
-      max: 5,
-      options: `-c search_path="${this.configService.getOrThrow("DATABASE_SCHEMA")}"`,
-    });
+    const schema = this.configService.getOrThrow("DATABASE_SCHEMA");
+    const liveSchema = this.configService.get("DATABASE_LIVE_SCHEMA", { infer: true }) ?? schema;
 
-    this.db = drizzle(this.pool, { schema: indexerSchema });
+    this.db = this.createDatabase(schema, "stableflow-api", 5);
+    this.liveDb =
+      liveSchema === schema ? this.db : this.createDatabase(liveSchema, "stableflow-api-live", 2);
+  }
+
+  private createDatabase(schema: string, applicationName: string, max: number) {
+    const pool = new Pool({
+      application_name: applicationName,
+      connectionString: this.configService.getOrThrow("DATABASE_URL"),
+      max,
+      options: `-c search_path="${schema}"`,
+    });
+    this.pools.push(pool);
+
+    return drizzle(pool, { schema: indexerSchema });
   }
 
   async onModuleDestroy() {
-    await this.pool.end();
+    await Promise.all(this.pools.map((pool) => pool.end()));
   }
 }

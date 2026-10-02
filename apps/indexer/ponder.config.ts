@@ -5,9 +5,11 @@ import {
   baseDiscoveryStartBlock,
   baseProtocolContracts,
   baseProtocolFactories,
+  baseRpcCacheDisabled,
   baseRpcUrl,
   baseUsdc,
 } from "./src/chains/base.chain.js";
+import { liveRetentionIntervalBlocks } from "./src/retention/live-retention.js";
 
 const uniswapV3FactoryAbi = parseAbi([
   "event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)",
@@ -47,6 +49,7 @@ export default createConfig({
       rpc: baseRpcUrl,
       pollingInterval: 2000,
       ethGetLogsBlockRange: 500,
+      disableCache: baseRpcCacheDisabled,
     },
   },
   contracts: {
@@ -122,6 +125,12 @@ export default createConfig({
       chain: "base",
       startBlock: baseDiscoveryStartBlock,
       interval: 1800,
+    },
+    // A no-op unless LIVE_RETENTION_HOURS is set.
+    LiveRetention: {
+      chain: "base",
+      startBlock: baseDiscoveryStartBlock,
+      interval: liveRetentionIntervalBlocks,
     },
   },
 });

@@ -67,7 +67,7 @@ test("database pagination preserves same-block events, exact thresholds, and pag
     await insert("below-large", 101, 0, 9_999_999_999n);
     await insert("exact-large", 101, 1, 10_000_000_000n);
     await insert("below-whale", 101, 2, 999_999_999_999n);
-    const service = new TransfersService({ db: drizzle(client) });
+    const service = new TransfersService({ db: drizzle(client), liveDb: drizzle(client) });
     const get = (query = "") =>
       service.listTransfers(parseTransferListParams(new URLSearchParams(query)));
     const first = await get("filter=whale");
@@ -170,7 +170,7 @@ test("transfer detail returns its transaction's transfers and adjusted value", {
         [`${txHash}-${log}`, txHash, log, from, to],
       );
     }
-    const service = new TransfersService({ db: drizzle(client) });
+    const service = new TransfersService({ db: drizzle(client), liveDb: drizzle(client) });
     const detail = await service.getTransfer(parseTransferId(`${hash}-3`));
     assert.equal(detail.data.transfer.id, `${hash}-3`);
     assert.deepEqual(

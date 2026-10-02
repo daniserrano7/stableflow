@@ -1,6 +1,7 @@
 import { env } from "../env/env.js";
 
 export const baseRpcUrl = env.PONDER_RPC_URL_8453;
+export const baseRpcCacheDisabled = env.PONDER_DISABLE_CACHE;
 export const baseDiscoveryStartBlock = env.PONDER_DISCOVERY_START_BLOCK_8453 ?? "latest";
 
 export const baseUsdc = {

@@ -6,7 +6,7 @@ import {
 } from "@stableflow/shared";
 import { ArrowDown, ArrowRight, ExternalLink, Layers, Receipt } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { Link, useLoaderData } from "react-router";
+import { Link, redirect, useLoaderData } from "react-router";
 import { Amount, CopyButton, Panel, PanelHead, PanelTitle, Tag, VisualMark } from "~/components";
 import { AppPage } from "~/components/app-page";
 import { Button } from "~/components/ui/button";
@@ -69,11 +69,9 @@ export async function loader({
     headers: { accept: "application/json" },
     signal: request.signal,
   });
-  if (!response.ok) {
-    throw new Response(response.status === 404 ? "Transfer not found" : "Unable to load transfer", {
-      status: response.status,
-    });
-  }
+  // Raw transfers are kept for 14 days; older ones are only on Basescan.
+  if (response.status === 404) throw redirect(`${basescanUrl}/tx/${parsed.transactionHash}`);
+  if (!response.ok) throw new Response("Unable to load transfer", { status: response.status });
   return response.json();
 }
 

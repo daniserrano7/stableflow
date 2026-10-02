@@ -9,6 +9,7 @@
   "include": [
     "src/**/*.ts",
     "inspection/**/*.ts",
+    "archive/**/*.ts",
     "scripts/**/*.ts",
     "test/**/*.ts",
     "ponder.config.ts",

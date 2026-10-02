@@ -21,6 +21,13 @@ const envSchema = z
       .refine(Number.isSafeInteger, "Must be a safe integer block number")
       .optional(),
     PONDER_RPC_URL_8453: z.string().url(),
+    // Production: skip Ponder's RPC cache. Deployments only backfill a few minutes.
+    PONDER_DISABLE_CACHE: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    // Production: the archive keeps history, so a deployment only keeps recent rows.
+    LIVE_RETENTION_HOURS: z.coerce.number().positive().optional(),
   })
   .superRefine((value, context) => {
     // Each views-pattern deployment indexes into a fresh schema. Starting at

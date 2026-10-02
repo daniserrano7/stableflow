@@ -1,8 +1,9 @@
 import type { Address } from "viem";
 import { base } from "viem/chains";
+import { archivedLabelsTable, ensureArchiveTables } from "../archive/tables.js";
 import { baseUsdc } from "../src/chains/base.chain.js";
 import { baseAddressLabels } from "../src/labels/base-address-labels.js";
-import { opsSchema, opsTables } from "../src/ops/schema.js";
+import { archiveTables, opsSchema, opsTables } from "../src/storage/schemas.js";
 import type { InspectionArgs } from "./args.js";
 import type { OperatorDb, ReadOnlyDb } from "./db.js";
 import { isAutoPromotable } from "./discovery-policy.js";
@@ -106,7 +107,7 @@ const hasLabelOpsTables = async (db: ReadOnlyDb) => {
   const rows = await db.query<{ exists: boolean }>(`
     select
       to_regclass('${opsTables.addressLabelCandidateReviews}') is not null
-      and to_regclass('${opsTables.promotedAddressLabels}') is not null as exists
+      and to_regclass('${archiveTables.discoveredAddressLabels}') is not null as exists
   `);
 
   return rows[0]?.exists ?? false;
@@ -186,33 +187,8 @@ export const ensureLabelOpsTables = async (db: OperatorDb) => {
     on ${opsTables.addressLabelCandidateReviews} (observed_total_value)
   `);
 
-  // The indexer copies these into each deployment's discovered_address_labels.
-  await db.execute(`
-    create table if not exists ${opsTables.promotedAddressLabels} (
-      id text primary key,
-      chain_id integer not null,
-      address text not null,
-      entity_id text not null,
-      entity_name text not null,
-      category text not null,
-      role text not null,
-      attribution_group text not null,
-      counting_policy text not null,
-      confidence text not null,
-      source_address text not null,
-      source_event text not null,
-      token0 text,
-      token1 text,
-      pool_kind text,
-      first_seen_block bigint not null,
-      promoted_at bigint not null
-    )
-  `);
-
-  await db.execute(`
-    create index if not exists promoted_address_labels_promoted_at_idx
-    on ${opsTables.promotedAddressLabels} (promoted_at)
-  `);
+  // Promotions land in the archived labels, which every indexer deployment syncs from.
+  await ensureArchiveTables((sql) => db.execute(sql), [archivedLabelsTable]);
 };
 
 const rowToUnidentifiedCandidate = (row: CandidateDbRow): UnidentifiedAddressCandidate => ({
@@ -281,15 +257,15 @@ export const getUnidentifiedAddressCandidates = async (
         on lower(candidates.address::text) = address_volume.address
     `
     : "";
-  // Promotions can reach the ops table before the indexer copies them into
+  // Promotions reach the archive before the indexer copies them into its
   // discovered_address_labels, so exclude them here as well.
   const candidateFilter = hasCandidateTable
     ? `
         and coalesce(candidates.status, 'candidate') <> 'rejected'
         and not exists (
           select 1
-          from ${opsTables.promotedAddressLabels} promoted
-          where lower(promoted.address) = address_volume.address
+          from ${archiveTables.discoveredAddressLabels} archived
+          where lower(archived.address::text) = address_volume.address
         )
       `
     : "";
@@ -588,8 +564,8 @@ export const getVerifiedMissingLabels = async (
         and suggested_entity_id <> 'unidentified'
         and not exists (
           select 1
-          from ${opsTables.promotedAddressLabels} promoted
-          where promoted.id = reviews.id
+          from ${archiveTables.discoveredAddressLabels} archived
+          where archived.id = reviews.id
         )
       order by observed_total_value desc
       limit $1::integer
@@ -610,7 +586,7 @@ export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) =
     await db.execute(
       `
         with promoted as (
-          insert into ${opsTables.promotedAddressLabels} (
+          insert into ${archiveTables.discoveredAddressLabels} (
             id,
             chain_id,
             address,
@@ -627,7 +603,9 @@ export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) =
             token1,
             pool_kind,
             first_seen_block,
-            promoted_at
+            source_type,
+            transaction_hash,
+            log_index
           )
           values (
             $1,
@@ -646,7 +624,9 @@ export const promoteVerifiedCandidates = async (db: OperatorDb, limit: number) =
             $14,
             $15,
             $16,
-            $17::bigint
+            'candidate_review',
+            '0x0000000000000000000000000000000000000000000000000000000000000000',
+            0
           )
           on conflict (id) do nothing
         )

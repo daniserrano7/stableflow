@@ -1,3 +1,6 @@
+import { Readable } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
+import { constants, createGzip } from "node:zlib";
 import { getApiUrl } from "../../config/api.server";
 
 export async function loader({ request }: { request: Request }) {
@@ -56,11 +59,24 @@ export async function loader({ request }: { request: Request }) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "Content-Type": "text/event-stream",
-    },
+  // "no-transform" keeps the server's compression middleware from buffering events.
+  const streamHeaders = {
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "Content-Type": "text/event-stream",
+  };
+
+  if (!/\bgzip\b/.test(request.headers.get("accept-encoding") ?? "")) {
+    return new Response(stream, { headers: streamHeaders });
+  }
+
+  // One gzip context per connection, flushed after every event: events still arrive
+  // immediately and the repeated JSON shrinks about 10x.
+  const gzip = Readable.fromWeb(stream as NodeReadableStream<Uint8Array>).pipe(
+    createGzip({ flush: constants.Z_SYNC_FLUSH }),
+  );
+
+  return new Response(Readable.toWeb(gzip) as ReadableStream<Uint8Array>, {
+    headers: { ...streamHeaders, "Content-Encoding": "gzip", Vary: "Accept-Encoding" },
   });
 }

@@ -1,4 +1,4 @@
-import { Injectable, type MessageEvent } from "@nestjs/common";
+import { Injectable, Logger, type MessageEvent } from "@nestjs/common";
 import { baseAddressLabels } from "@stableflow/indexer/base-address-labels";
 import { discoveredAddressLabels, usdcTransfers } from "@stableflow/indexer/ponder-schema";
 import type {
@@ -8,19 +8,46 @@ import type {
   LiveTransferRow,
   RecentTransfersResponse,
   TransferDetailResponse,
+  TransferFilter,
   TransferListParams,
   TransferListResponse,
 } from "@stableflow/shared";
 import { transfersPageSize, transferThresholds } from "@stableflow/shared";
 import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
-import { concatMap, filter, from, interval, map, merge, Observable, startWith } from "rxjs";
-import { DatabaseService } from "../database/database.service.js";
+import {
+  catchError,
+  concat,
+  concatMap,
+  defer,
+  EMPTY,
+  filter,
+  from,
+  interval,
+  map,
+  merge,
+  type Observable,
+  share,
+  startWith,
+  tap,
+} from "rxjs";
+import { DatabaseService, type IndexerDatabase } from "../database/database.service.js";
 import { baseUsdc, toTokenAmount } from "../tokens/base-usdc.js";
+import {
+  combineLiveTransferRecords,
+  filterLiveTransferBatch,
+  getTransferFilterMinimum,
+} from "./live-transfer-batch.js";
 import { toLiveTransferEventId } from "./live-transfer-event-id.js";
 
 const defaultRecentTransfersLimit = 20;
 const liveTransfersPollIntervalMs = 1_000;
 const liveTransfersHeartbeatIntervalMs = 15_000;
+// Base indexes ~70 transfers a second. Each poll sends the newest few plus every large
+// one since the last poll, so the stream stays at the chain head and the large and whale
+// filters miss nothing.
+const liveTransfersSampleSize = 20;
+const liveLargeTransfersLimit = 100;
+const liveLargeTransferMinimum = getTransferFilterMinimum("large");
 const maxTransactionTransfers = 100;
 const baseChainId = 8453;
 
@@ -44,14 +71,42 @@ interface TransferRecord {
 
 @Injectable()
 export class TransfersService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  private readonly logger = new Logger(TransfersService.name);
+  /** One database poll per API instance, shared by every connected stream. */
+  private readonly liveBatches: Observable<LiveTransferBatchEvent>;
+
+  constructor(private readonly databaseService: DatabaseService) {
+    this.liveBatches = defer(() => {
+      let cursor: LiveTransferCursor | null = null;
+
+      return interval(liveTransfersPollIntervalMs).pipe(
+        startWith(0),
+        concatMap(() =>
+          from(this.getLiveTransferBatch(cursor)).pipe(
+            tap((batch) => {
+              cursor = batch.cursor;
+            }),
+            // A failed poll skips a tick instead of closing every connected stream.
+            catchError((error: unknown) => {
+              this.logger.warn(
+                `Live transfer poll failed: ${error instanceof Error ? error.message : error}`,
+              );
+              return EMPTY;
+            }),
+          ),
+        ),
+        filter((batch) => batch.transfers.length > 0),
+      );
+    }).pipe(share({ resetOnRefCountZero: true }));
+  }
 
   async listRecentTransfers(limit = defaultRecentTransfersLimit): Promise<RecentTransfersResponse> {
     const normalizedLimit = this.normalizeLimit(limit);
-    const records = await this.getRecentTransferRecords(normalizedLimit);
+    const liveDb = this.databaseService.liveDb;
+    const records = await this.getNewestTransferRecords(liveDb, null, normalizedLimit);
 
     return {
-      data: await this.toLiveTransferRows(records),
+      data: await this.toLiveTransferRows(liveDb, records),
       meta: {
         generatedAt: new Date().toISOString(),
         limit: normalizedLimit,
@@ -94,7 +149,7 @@ export class TransfersService {
     const last = page.at(-1);
     const toCursor = (record: TransferRecord) => `${record.blockNumber}:${record.logIndex}`;
     return {
-      data: await this.toLiveTransferRows(page),
+      data: await this.toLiveTransferRows(this.databaseService.db, page),
       meta: {
         generatedAt: new Date().toISOString(),
         limit,
@@ -105,28 +160,35 @@ export class TransfersService {
     };
   }
 
-  async getTransfer({
-    id,
-    transactionHash,
-  }: {
+  async getTransfer(transfer: {
     id: string;
     transactionHash: string;
   }): Promise<TransferDetailResponse | null> {
+    const { db, liveDb } = this.databaseService;
+    const archived = await this.findTransfer(db, transfer);
+    // The newest transfers reach the archive a few seconds after the live tables.
+    return archived ?? (liveDb === db ? null : this.findTransfer(liveDb, transfer));
+  }
+
+  private async findTransfer(
+    db: IndexerDatabase,
+    { id, transactionHash }: { id: string; transactionHash: string },
+  ): Promise<TransferDetailResponse | null> {
     const hash = transactionHash as `0x${string}`;
     // All lookups hit the transaction hash index; the transfer is one of the siblings.
     const [siblingRecords, transactionTotals] = await Promise.all([
-      this.databaseService.db
+      db
         .select(transferRecordColumns)
         .from(usdcTransfers)
         .where(eq(usdcTransfers.transactionHash, hash))
         .orderBy(asc(usdcTransfers.logIndex))
         .limit(maxTransactionTransfers),
-      this.getTransactionTotals(hash),
+      this.getTransactionTotals(db, hash),
     ]);
     let transferRecord = siblingRecords.find((record) => record.id === id);
     if (transferRecord === undefined) {
       // Transactions with more transfers than the cap may leave this one outside the list.
-      [transferRecord] = await this.databaseService.db
+      [transferRecord] = await db
         .select(transferRecordColumns)
         .from(usdcTransfers)
         .where(eq(usdcTransfers.id, id))
@@ -134,7 +196,7 @@ export class TransfersService {
     }
     if (transferRecord === undefined) return null;
 
-    const rows = await this.toLiveTransferRows([transferRecord, ...siblingRecords]);
+    const rows = await this.toLiveTransferRows(db, [transferRecord, ...siblingRecords]);
     return {
       data: {
         transfer: rows[0] as LiveTransferRow,
@@ -157,8 +219,8 @@ export class TransfersService {
    * Counts every transfer in the transaction and its adjusted value: the sum of each address's
    * positive net change, matching the indexer's TransactionNetValueTracker.
    */
-  private async getTransactionTotals(transactionHash: `0x${string}`) {
-    const result = await this.databaseService.db.execute<{
+  private async getTransactionTotals(db: IndexerDatabase, transactionHash: `0x${string}`) {
+    const result = await db.execute<{
       adjusted_value: string;
       transfer_count: number;
     }>(sql`
@@ -188,19 +250,19 @@ export class TransfersService {
     };
   }
 
-  createLiveTransfersStream(cursor: LiveTransferCursor | null): Observable<MessageEvent> {
+  createLiveTransfersStream(
+    cursor: LiveTransferCursor | null,
+    transferFilter: TransferFilter,
+  ): Observable<MessageEvent> {
     let latestCursor = cursor;
 
-    const transfers = interval(liveTransfersPollIntervalMs).pipe(
-      startWith(0),
-      concatMap(() =>
-        from(
-          this.getLiveTransferBatch(latestCursor).then((batch) => {
-            latestCursor = batch.cursor;
-            return batch;
-          }),
-        ),
-      ),
+    // A new or resumed connection first catches up from its own cursor.
+    const catchUp = defer(() => from(this.getLiveTransferBatch(cursor)));
+    const transfers = concat(catchUp, this.liveBatches).pipe(
+      tap((batch) => {
+        latestCursor = getNewerCursor(latestCursor, batch.cursor);
+      }),
+      map((batch) => filterLiveTransferBatch(batch, transferFilter)),
       filter((batch) => batch.transfers.length > 0),
       map((batch) => ({
         data: batch,
@@ -224,52 +286,64 @@ export class TransfersService {
   private async getLiveTransferBatch(
     cursor: LiveTransferCursor | null,
   ): Promise<LiveTransferBatchEvent> {
-    const records =
+    const liveDb = this.databaseService.liveDb;
+    const [newest, large] = await Promise.all([
+      this.getNewestTransferRecords(liveDb, cursor, liveTransfersSampleSize),
       cursor === null
-        ? await this.getRecentTransferRecords(defaultRecentTransfersLimit)
-        : await this.getTransferRecordsAfterCursor(cursor, defaultRecentTransfersLimit);
-    const rows = await this.toLiveTransferRows(records);
-    const latestRow = cursor === null ? rows.at(0) : rows.at(-1);
+        ? Promise.resolve([])
+        : this.getNewestTransferRecords(
+            liveDb,
+            cursor,
+            liveLargeTransfersLimit,
+            liveLargeTransferMinimum,
+          ),
+    ]);
+    const records = combineLiveTransferRecords(newest, large);
+    const latest = records.at(-1);
 
     return {
-      cursor: latestRow?.cursor ?? cursor,
+      cursor:
+        latest === undefined
+          ? cursor
+          : { blockNumber: latest.blockNumber.toString(), logIndex: latest.logIndex },
       generatedAt: new Date().toISOString(),
-      transfers: rows,
+      transfers: await this.toLiveTransferRows(liveDb, records),
     };
   }
 
-  private async getRecentTransferRecords(limit: number): Promise<TransferRecord[]> {
-    const records = await this.databaseService.db
-      .select(transferRecordColumns)
-      .from(usdcTransfers)
-      .orderBy(desc(usdcTransfers.blockNumber), desc(usdcTransfers.logIndex))
-      .limit(limit);
-
-    return records;
-  }
-
-  private async getTransferRecordsAfterCursor(
-    cursor: LiveTransferCursor,
+  /** Newest first, optionally only after a cursor and above a minimum value. */
+  private async getNewestTransferRecords(
+    db: IndexerDatabase,
+    cursor: LiveTransferCursor | null,
     limit: number,
+    minimumValue?: bigint,
   ): Promise<TransferRecord[]> {
-    return this.databaseService.db
+    return db
       .select(transferRecordColumns)
       .from(usdcTransfers)
       .where(
-        or(
-          gt(usdcTransfers.blockNumber, BigInt(cursor.blockNumber)),
-          and(
-            eq(usdcTransfers.blockNumber, BigInt(cursor.blockNumber)),
-            gt(usdcTransfers.logIndex, cursor.logIndex),
-          ),
+        and(
+          cursor === null
+            ? undefined
+            : or(
+                gt(usdcTransfers.blockNumber, BigInt(cursor.blockNumber)),
+                and(
+                  eq(usdcTransfers.blockNumber, BigInt(cursor.blockNumber)),
+                  gt(usdcTransfers.logIndex, cursor.logIndex),
+                ),
+              ),
+          minimumValue === undefined ? undefined : gte(usdcTransfers.value, minimumValue),
         ),
       )
-      .orderBy(asc(usdcTransfers.blockNumber), asc(usdcTransfers.logIndex))
+      .orderBy(desc(usdcTransfers.blockNumber), desc(usdcTransfers.logIndex))
       .limit(limit);
   }
 
-  private async toLiveTransferRows(records: TransferRecord[]): Promise<LiveTransferRow[]> {
-    const labels = await this.getLabelsForTransferRecords(records);
+  private async toLiveTransferRows(
+    db: IndexerDatabase,
+    records: TransferRecord[],
+  ): Promise<LiveTransferRow[]> {
+    const labels = await this.getLabelsForTransferRecords(db, records);
 
     return records.map((record) => {
       const from = this.toTransferParty(record.fromAddress, labels);
@@ -294,6 +368,7 @@ export class TransfersService {
   }
 
   private async getLabelsForTransferRecords(
+    db: IndexerDatabase,
     records: TransferRecord[],
   ): Promise<Map<string, AddressLabel>> {
     const labelsByAddress = new Map<string, AddressLabel>();
@@ -315,7 +390,7 @@ export class TransfersService {
       return labelsByAddress;
     }
 
-    const discoveredLabels = await this.databaseService.db
+    const discoveredLabels = await db
       .select({
         address: discoveredAddressLabels.address,
         category: discoveredAddressLabels.category,
@@ -364,6 +439,17 @@ export class TransfersService {
     return Math.min(Math.max(Math.trunc(limit), 1), defaultRecentTransfersLimit);
   }
 }
+
+const getNewerCursor = (
+  current: LiveTransferCursor | null,
+  next: LiveTransferCursor | null,
+): LiveTransferCursor | null => {
+  if (current === null || next === null) return next ?? current;
+  const currentBlock = BigInt(current.blockNumber);
+  const nextBlock = BigInt(next.blockNumber);
+  if (nextBlock !== currentBlock) return nextBlock > currentBlock ? next : current;
+  return next.logIndex > current.logIndex ? next : current;
+};
 
 const cropAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
 

@@ -1,4 +1,4 @@
-import { opsTables } from "../src/ops/schema.js";
+import { opsTables } from "../src/storage/schemas.js";
 import type { InspectionArgs } from "./args.js";
 import { verifyCandidate } from "./candidate-verifiers.js";
 import {

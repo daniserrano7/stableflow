@@ -10,6 +10,8 @@
       "/apps/indexer/package.json",
       "/apps/indexer/Dockerfile",
       "/apps/indexer/scripts/start-production.sh",
+      "/apps/indexer/scripts/resolve-start-block.ts",
+      "/apps/indexer/scripts/start-block.ts",
       "/apps/indexer/railway.json"
     ]
   },

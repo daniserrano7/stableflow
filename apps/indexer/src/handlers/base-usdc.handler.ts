@@ -17,13 +17,13 @@ import {
   resolveCctpRemoteNetwork,
 } from "../chains/external-networks.js";
 import { TransactionNetValueTracker } from "../flows/transaction-net-value.js";
+import { readArchivedAddressLabels } from "../labels/archived-address-labels.js";
 import {
   type AddressLabel,
   type DiscoveredAddressLabelInput,
   getBaseAddressLabel,
   isFlowBoundaryLabel,
 } from "../labels/base-address-labels.js";
-import { readPromotedAddressLabels } from "../labels/promoted-address-labels.js";
 
 const bucketSize = "1m";
 const bucketSizeSeconds = 60n;
@@ -41,10 +41,13 @@ type BlockStats = {
 
 const blockStats = new Map<bigint, BlockStats>();
 const discoveredFlowLabelsByAddress = new Map<string, FlowLabel>();
-const promotedLabelRefreshIntervalMs = 30_000;
-let lastPromotedLabelRefreshAt = 0;
-let promotedLabelRefresh: Promise<void> | null = null;
-let promotedLabelCursor = 0n;
+const archivedLabelRefreshIntervalMs = 30_000;
+// Archive rows can commit out of archived_at order, so each sync re-reads a short overlap.
+const archivedLabelCursorOverlapSeconds = 60n;
+const archivedLabelLogLimit = 10;
+let lastArchivedLabelRefreshAt = 0;
+let archivedLabelRefresh: Promise<void> | null = null;
+let archivedLabelCursor = 0n;
 
 type FlowDirection = "in" | "out";
 type BridgeDirection = "inbound" | "outbound";
@@ -358,11 +361,17 @@ const upsertBridgeFlowBucket = async ({
     }));
 };
 
-// Operator promotions live in the ops schema so they outlive each deployment's
-// Ponder schema. Copying them in through context.db keeps Ponder's cache and
-// reorg tracking consistent, and a fresh deployment applies them from its first event.
-const syncPromotedLabels = async (context: IndexerContext) => {
-  const labels = await readPromotedAddressLabels(promotedLabelCursor);
+// Labels from earlier deployments (pools created before this deployment's start block)
+// and operator promotions live in the archive. Copying them in through context.db keeps
+// Ponder's cache and reorg tracking consistent, and a fresh deployment applies them from
+// its first event.
+const syncArchivedLabels = async (context: IndexerContext) => {
+  const labels = await readArchivedAddressLabels(
+    archivedLabelCursor > archivedLabelCursorOverlapSeconds
+      ? archivedLabelCursor - archivedLabelCursorOverlapSeconds
+      : 0n,
+  );
+  const insertedLabels: typeof labels = [];
 
   for (const label of labels) {
     const insertedLabel = await context.db
@@ -378,31 +387,40 @@ const syncPromotedLabels = async (context: IndexerContext) => {
         attributionGroup: label.attributionGroup,
         countingPolicy: label.countingPolicy,
         confidence: label.confidence,
-        sourceType: "candidate_review",
+        sourceType: label.sourceType,
         sourceAddress: label.sourceAddress,
         sourceEvent: label.sourceEvent,
         token0: label.token0,
         token1: label.token1,
         poolKind: label.poolKind,
         firstSeenBlock: label.firstSeenBlock,
-        transactionHash: zeroHash,
-        logIndex: 0,
+        transactionHash: label.transactionHash,
+        logIndex: label.logIndex,
       })
       .onConflictDoNothing();
 
     if (insertedLabel !== null) {
       discoveredFlowLabelsByAddress.set(label.address.toLowerCase(), label);
-      logDiscoveredLabel({
-        address: label.address,
-        entityName: label.entityName,
-        role: label.role,
-        sourceType: "candidate_review",
-      });
+      insertedLabels.push(label);
     }
 
-    if (label.promotedAt > promotedLabelCursor) {
-      promotedLabelCursor = label.promotedAt;
+    if (label.archivedAt > archivedLabelCursor) {
+      archivedLabelCursor = label.archivedAt;
     }
+  }
+
+  if (insertedLabels.length > archivedLabelLogLimit) {
+    console.log(`[discovery] synced ${insertedLabels.length} archived labels`);
+    return;
+  }
+
+  for (const label of insertedLabels) {
+    logDiscoveredLabel({
+      address: label.address,
+      entityName: label.entityName,
+      role: label.role,
+      sourceType: label.sourceType,
+    });
   }
 };
 
@@ -426,25 +444,25 @@ const getFlowLabel = async ({
     return cachedDiscoveredLabel;
   }
 
-  if (Date.now() - lastPromotedLabelRefreshAt >= promotedLabelRefreshIntervalMs) {
-    if (promotedLabelRefresh === null) {
-      promotedLabelRefresh = (async () => {
-        await syncPromotedLabels(context);
-        lastPromotedLabelRefreshAt = Date.now();
+  if (Date.now() - lastArchivedLabelRefreshAt >= archivedLabelRefreshIntervalMs) {
+    if (archivedLabelRefresh === null) {
+      archivedLabelRefresh = (async () => {
+        await syncArchivedLabels(context);
+        lastArchivedLabelRefreshAt = Date.now();
       })();
     }
 
     try {
-      await promotedLabelRefresh;
+      await archivedLabelRefresh;
     } finally {
-      promotedLabelRefresh = null;
+      archivedLabelRefresh = null;
     }
   }
 
-  const promotedLabel = discoveredFlowLabelsByAddress.get(normalizedAddress);
+  const archivedLabel = discoveredFlowLabelsByAddress.get(normalizedAddress);
 
-  if (promotedLabel !== undefined) {
-    return promotedLabel;
+  if (archivedLabel !== undefined) {
+    return archivedLabel;
   }
 
   const discoveredLabel = await context.db.find(discoveredAddressLabels, {
