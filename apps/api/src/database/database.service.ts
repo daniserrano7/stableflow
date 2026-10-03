@@ -31,6 +31,7 @@ export class DatabaseService implements OnModuleDestroy {
     const pool = new Pool({
       application_name: applicationName,
       connectionString: this.configService.getOrThrow("DATABASE_URL"),
+      connectionTimeoutMillis: 10_000,
       max,
       options: `-c search_path="${schema}"`,
     });

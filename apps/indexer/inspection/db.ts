@@ -29,6 +29,7 @@ const createPool = (applicationName: string) =>
   new Pool({
     application_name: applicationName,
     connectionString: env.DATABASE_URL,
+    connectionTimeoutMillis: 10_000,
     max: 1,
     options: searchPathOption,
   });
@@ -51,6 +52,7 @@ export const createOperatorDb = (): OperatorDb => {
   const pool = new Pool({
     application_name: "stableflow-indexer-label-operator",
     connectionString: env.DATABASE_URL,
+    connectionTimeoutMillis: 10_000,
     max: 2,
     options: searchPathOption,
   });

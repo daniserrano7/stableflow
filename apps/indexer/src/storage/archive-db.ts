@@ -16,6 +16,7 @@ export const queryArchive = async <Row extends pg.QueryResultRow>(
   pool ??= new Pool({
     application_name: "stableflow-indexer-archive",
     connectionString: env.DATABASE_URL,
+    connectionTimeoutMillis: 10_000,
     max: 1,
   });
 

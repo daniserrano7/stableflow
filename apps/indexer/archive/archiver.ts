@@ -1,6 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import { z } from "zod";
+import { describeError } from "../src/utils/describe-error.js";
 import { type ArchiveCycleReport, expireArchivedEvents, runArchiveCycle } from "./cycle.js";
 import { ensureArchiveTables } from "./tables.js";
 
@@ -25,8 +26,17 @@ const labelSyncIntervalMs = 30_000;
 const retentionIntervalMs = 60 * 60_000;
 const reportIntervalMs = 60_000;
 
-const log = (fields: Record<string, unknown>) =>
-  console.log(JSON.stringify({ kind: "archive", timestamp: new Date().toISOString(), ...fields }));
+// Railway displays the `message` and `level` fields of JSON log lines.
+const log = (fields: { status: string } & Record<string, unknown>) =>
+  console.log(
+    JSON.stringify({
+      level: fields.status === "failed" || fields.status === "pool_error" ? "error" : "info",
+      message: `Archive ${fields.status}${typeof fields.error === "string" ? `: ${fields.error}` : ""}`,
+      kind: "archive",
+      timestamp: new Date().toISOString(),
+      ...fields,
+    }),
+  );
 
 const addCounts = (total: Record<string, number>, counts: Record<string, number>) => {
   for (const [table, count] of Object.entries(counts)) {
@@ -42,12 +52,12 @@ const run = async () => {
   const pool = new Pool({
     application_name: "stableflow-archiver",
     connectionString: env.DATABASE_URL,
+    connectionTimeoutMillis: 10_000,
     max: 2,
   });
-  pool.on("error", (error) => log({ status: "pool_error", error: error.message }));
+  pool.on("error", (error) => log({ status: "pool_error", error: describeError(error) }));
 
-  await ensureArchiveTables((sql) => pool.query(sql));
-  log({ status: "started", liveSchema: env.DATABASE_LIVE_SCHEMA });
+  let tablesReady = false;
 
   let lastLabelSyncAt = 0;
   let lastRetentionAt = 0;
@@ -60,6 +70,13 @@ const run = async () => {
     const startedAt = Date.now();
 
     try {
+      // Inside the loop: the database can be unreachable for a while after a start.
+      if (!tablesReady) {
+        await ensureArchiveTables((sql) => pool.query(sql));
+        tablesReady = true;
+        log({ status: "started", liveSchema: env.DATABASE_LIVE_SCHEMA });
+      }
+
       const client = await pool.connect();
 
       try {
@@ -88,7 +105,7 @@ const run = async () => {
         client.release();
       }
     } catch (error) {
-      log({ status: "failed", error: error instanceof Error ? error.message : String(error) });
+      log({ status: "failed", error: describeError(error) });
     }
 
     if (Date.now() - lastReportAt >= reportIntervalMs) {
@@ -111,6 +128,6 @@ const run = async () => {
 };
 
 run().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
+  log({ status: "failed", error: describeError(error) });
   process.exitCode = 1;
 });

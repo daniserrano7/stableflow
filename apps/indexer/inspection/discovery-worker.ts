@@ -1,5 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
+import { describeError } from "../src/utils/describe-error.js";
 import type { InspectionArgs } from "./args.js";
 import { createOperatorDb } from "./db.js";
 import { runDiscovery } from "./discovery.js";
@@ -35,15 +36,25 @@ const run = async () => {
       const report = await runDiscovery(db, args, {
         checkedCooldownMinutes: settings.LABEL_DISCOVERY_COOLDOWN_MINUTES,
       });
-      console.log(JSON.stringify(report));
+      // Railway displays the `message` and `level` fields of JSON log lines.
+      console.log(
+        JSON.stringify({
+          level: "info",
+          message: `Label discovery ${report.status}: ${report.promotedCount} promoted`,
+          ...report,
+        }),
+      );
       if (report.status !== "completed") {
         waitMinutes = settings.LABEL_DISCOVERY_RETRY_MINUTES;
       }
     } catch (error) {
       waitMinutes = settings.LABEL_DISCOVERY_RETRY_MINUTES;
+      const message = describeError(error);
       console.error(
         JSON.stringify({
-          error: error instanceof Error ? error.message : String(error),
+          level: "error",
+          message: `Label discovery failed: ${message}`,
+          error: message,
           kind: "label_discovery",
           status: "failed",
           timestamp: new Date().toISOString(),
