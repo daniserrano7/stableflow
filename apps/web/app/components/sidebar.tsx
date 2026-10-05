@@ -1,15 +1,17 @@
 import { ArrowLeftRight, Blocks, BookOpen, Coins, Network, Palette } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useRouteLoaderData } from "react-router";
+import { assetsPagePath } from "../features/assets/assets.config";
 import type { ThemeMode } from "../styles/tokens";
 import { cn } from "../utils/cn";
+import { BrandMark } from "./brand-mark";
 import { ThemeToggle } from "./theme-toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 const sidebarItems = [
   { href: "/", icon: Network, label: "Overview" },
   { href: "/entities", icon: Blocks, label: "Entities" },
-  { href: "/assets", icon: Coins, label: "Assets" },
+  { href: assetsPagePath, icon: Coins, label: "Assets" },
   { href: "/transfers", icon: ArrowLeftRight, label: "Transfers" },
   { href: "/methodology", icon: BookOpen, label: "Methodology" },
 ];
@@ -28,7 +30,7 @@ export function AppSidebar() {
         to="/"
         aria-label="Stableflow home"
       >
-        <img alt="" className="block size-full" height="32" src="/brand-icon.svg" width="32" />
+        <BrandMark className="block size-full" />
       </Link>
 
       <nav className="flex w-full flex-col items-center gap-1">
@@ -65,7 +67,10 @@ function isSidebarItemActive(pathname: string, href: string, label: string) {
     return label === "Overview" && pathname === "/";
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  // Compare without a trailing slash: the assets page lives at "/assets/".
+  const path = pathname.replace(/\/$/, "");
+  const target = href.replace(/\/$/, "");
+  return path === target || path.startsWith(`${target}/`);
 }
 
 export function SidebarItem({
@@ -83,7 +88,6 @@ export function SidebarItem({
     <Tooltip>
       <TooltipTrigger asChild>
         <Link
-          aria-label={label}
           aria-current={isActive ? "page" : undefined}
           className={cn(
             "relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-surface-2 hover:text-foreground",
@@ -93,6 +97,8 @@ export function SidebarItem({
           to={to}
         >
           {icon}
+          {/* Real link text rather than aria-label: crawlers read it as the link's anchor text. */}
+          <span className="sr-only">{label}</span>
         </Link>
       </TooltipTrigger>
       <TooltipContent side="right">{label}</TooltipContent>

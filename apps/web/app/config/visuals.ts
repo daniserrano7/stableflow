@@ -72,6 +72,21 @@ function getCatalogIdentity(scope: VisualScope, id: string): VisualIdentity | un
   return scopeCatalog?.[id];
 }
 
+/**
+ * Image URL for a mark drawn at `size` CSS pixels. DefiLlama's icon CDN resizes protocol logos on
+ * request; the originals run to ~50KB for a 20px logo. 2x covers high-density screens. Chain icons
+ * are already small, and resizing them pads the artwork, so they are left alone.
+ */
+export function getSizedImageUrl(imageUrl: string, size: number) {
+  if (!imageUrl.startsWith("https://icons.llamao.fi/icons/protocols/")) return imageUrl;
+
+  const url = new URL(imageUrl);
+  const pixels = String(Math.ceil(size * 2));
+  url.searchParams.set("w", pixels);
+  url.searchParams.set("h", pixels);
+  return url.toString();
+}
+
 function protocolVisual(slug: string, name: string): VisualIdentity {
   return {
     imageUrl: `https://icons.llamao.fi/icons/protocols/${slug}`,

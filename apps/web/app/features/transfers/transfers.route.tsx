@@ -2,10 +2,12 @@ import {
   type LiveTransferParty,
   type LiveTransferRow,
   parseTransferListParams,
+  type TransferFilter,
   type TransferListResponse,
+  transferThresholds,
 } from "@stableflow/shared";
 import { ArrowRight } from "lucide-react";
-import { Link, useLoaderData, useNavigation } from "react-router";
+import { Link, type Location, useLoaderData, useNavigation } from "react-router";
 import { Amount, Panel, PanelActions, PanelHead, PanelTitle } from "~/components";
 import { AppPage } from "~/components/app-page";
 import { PageHeader } from "~/components/page-header";
@@ -21,6 +23,7 @@ import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { getApiUrl } from "~/config/api.server";
 import { useRowLink } from "~/hooks/use-row-link";
 import { fmtUSDC, fmtUtcTimestamp } from "~/utils/format";
+import { seo } from "~/utils/seo";
 import { getTransferAmount, getTransferMagnitude } from "../live-transfers/live-transfers.utils";
 import { TransferEntity } from "../live-transfers/live-transfers-table";
 import {
@@ -29,14 +32,39 @@ import {
 } from "../live-transfers/use-live-transfers";
 import { getTransferPath, TransferRowLink } from "./transfer-link";
 
-export function meta() {
-  return [
-    { title: "Transfers | Stableflow" },
-    {
-      name: "description",
-      content: "Explore indexed USDC transfers on Base, including large and whale transfers.",
-    },
-  ];
+const formatThreshold = (value: number) => value.toLocaleString("en-US");
+
+const filterSeo: Record<TransferFilter, { description: string; title: string }> = {
+  all: {
+    description:
+      "Live feed of every native USDC transfer on Base, newest first: amount, sender and receiver entities, and the full transaction behind each transfer.",
+    title: "USDC Transfers on Base · Live Feed",
+  },
+  large: {
+    description: `Native USDC transfers of ${formatThreshold(transferThresholds.large)} USDC or more on Base, streamed live with the protocols, exchanges and bridges on each side.`,
+    title: "Large USDC Transfers on Base (≥ 10K)",
+  },
+  whale: {
+    description: `USDC whale alerts for Base: every native USDC transfer of ${formatThreshold(transferThresholds.whale)} USDC or more, live, with the entities on each side and the full transaction.`,
+    title: "USDC Whale Transfers on Base (≥ 1M)",
+  },
+};
+
+export function meta({ data, location }: { data?: TransferListResponse; location: Location }) {
+  const filter = data?.meta.filter ?? "all";
+  const path = filter === "all" ? "/transfers" : `/transfers?filter=${filter}`;
+
+  return seo({
+    ...filterSeo[filter],
+    breadcrumbs: [
+      { name: "Transfers", path: "/transfers" },
+      ...(filter === "all" ? [] : [{ name: filterSeo[filter].title, path }]),
+    ],
+    // Older pages are a moving window over history; the first page is the one worth indexing.
+    noindex: new URLSearchParams(location.search).has("cursor"),
+    pageType: "CollectionPage",
+    path,
+  });
 }
 
 export async function loader({ request }: { request: Request }): Promise<TransferListResponse> {

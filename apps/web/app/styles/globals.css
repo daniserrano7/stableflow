@@ -5,7 +5,8 @@
    utilities. Component-level styling lives in Tailwind classes.
    ───────────────────────────────────────────────────────────────────────── */
 
-@import "tailwindcss";
+/* Sources are declared once, in tokens.css. */
+@import "tailwindcss" source(none);
 
 @layer base {
   *,

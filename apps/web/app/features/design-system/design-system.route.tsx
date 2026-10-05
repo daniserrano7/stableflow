@@ -21,6 +21,7 @@ import { SidebarItem } from "~/components/sidebar";
 import { Button } from "~/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { ASSET, CATEGORY, type Category, CHAIN } from "~/styles/tokens";
+import { seo } from "~/utils/seo";
 
 const semanticTokens = [
   "background",
@@ -94,13 +95,13 @@ const typeScale = [
 const categories = Object.keys(CATEGORY) as Category[];
 
 export function meta() {
-  return [
-    { title: "Stableflow Design System" },
-    {
-      content: "Stableflow design tokens, component primitives, and usage guidelines.",
-      name: "description",
-    },
-  ];
+  return seo({
+    description: "Stableflow design tokens, component primitives, and usage guidelines.",
+    // Internal reference for building the app, not something searchers are looking for.
+    noindex: true,
+    path: "/design-system",
+    title: "Design System",
+  });
 }
 
 export default function DesignSystemRoute() {

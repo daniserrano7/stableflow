@@ -25,8 +25,11 @@ import {
 } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { getApiUrl } from "~/config/api.server";
+import { absoluteUrl } from "~/config/site";
+import { useHydrated } from "~/hooks/use-hydrated";
 import { CATEGORY, type Category } from "~/styles/tokens";
 import { cn } from "~/utils/cn";
+import { itemListNode, seo } from "~/utils/seo";
 
 type ViewMode = "cards" | "table";
 
@@ -44,14 +47,37 @@ interface SourceSummary {
   sourceType: string;
 }
 
-export function meta() {
-  return [
-    { title: "Entities | Stableflow" },
-    {
-      content: "Known and discovered entities tracked by Stableflow.",
-      name: "description",
-    },
-  ];
+export function meta({ data }: { data?: EntitiesLoaderData }) {
+  const path = "/entities";
+  const entities = data?.entities.data ?? [];
+  const labelledCount = entities.filter((entity) => entity.entityId !== "unidentified").length;
+
+  return seo({
+    breadcrumbs: [{ name: "Entities", path }],
+    description: `${labelledCount > 0 ? `${labelledCount} protocols, exchanges, bridges and issuers` : "Protocols, exchanges, bridges and issuers"} on Base, with their labelled addresses and 24h net USDC flow. Open one for its inflow, outflow and counterparties.`,
+    nodes:
+      entities.length > 0
+        ? [
+            itemListNode(
+              `${absoluteUrl(path)}#entities`,
+              entities.map((entity) => ({
+                name: entity.entityName,
+                path: `/entities/${encodeURIComponent(entity.entityId)}`,
+              })),
+            ),
+          ]
+        : [],
+    page:
+      entities.length > 0
+        ? {
+            dateModified: data?.entities.meta.generatedAt,
+            mainEntity: { "@id": `${absoluteUrl(path)}#entities` },
+          }
+        : undefined,
+    pageType: "CollectionPage",
+    path,
+    title: "Base Entities: Protocols, Exchanges & Bridges",
+  });
 }
 
 export async function loader(): Promise<EntitiesLoaderData> {
@@ -385,6 +411,7 @@ function RegistryRail({
   sourceSummaries: SourceSummary[];
   totalAddresses: number;
 }) {
+  const hydrated = useHydrated();
   const maxCategoryLabels = Math.max(
     1,
     ...entities.meta.categories.map((category) => category.labelCount),
@@ -421,7 +448,10 @@ function RegistryRail({
           <RailMetric label="Labels / entity" value={formatRatio(avgLabelsPerEntity)} />
           <RailMetric label="Addr / entity" value={formatRatio(avgAddressesPerEntity)} />
           <RailMetric label="Sources" value={sourceSummaries.length.toString()} />
-          <RailMetric label="Generated" value={formatGeneratedAt(entities.meta.generatedAt)} />
+          <RailMetric
+            label="Generated"
+            value={formatGeneratedAt(entities.meta.generatedAt, hydrated)}
+          />
         </PanelBody>
       </Panel>
 
@@ -661,7 +691,8 @@ const formatRatio = (value: number) =>
     minimumFractionDigits: value > 0 && value < 10 ? 1 : 0,
   }).format(value);
 
-const formatGeneratedAt = (value: string) => {
+/** In the viewer's timezone once hydrated; the server (and hydration) render it in UTC. */
+const formatGeneratedAt = (value: string, hydrated: boolean) => {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
@@ -671,6 +702,7 @@ const formatGeneratedAt = (value: string) => {
   return new Intl.DateTimeFormat("en-US", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: hydrated ? undefined : "UTC",
   }).format(date);
 };
 

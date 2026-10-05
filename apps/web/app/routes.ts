@@ -22,4 +22,7 @@ export default [
   route("events/transfers", "features/live-transfers/transfers.stream.ts"),
   route("api/flows/top-entities", "features/top-entity-flows/top-entity-flows.resource.ts"),
   route("health", "features/health/health.resource.ts"),
+  route("robots.txt", "features/seo/robots.resource.ts"),
+  route("sitemap.xml", "features/seo/sitemap.resource.ts"),
+  route("llms.txt", "features/seo/llms.resource.ts"),
 ] satisfies RouteConfig;
