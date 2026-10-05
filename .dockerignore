@@ -12,9 +12,4 @@
 .github
 .claude
 .pnpm-store
-claude-design
-design-system
-docs
-# Embedded by the web app's methodology page.
-!docs/usdc-flow-attribution-strategy.md
 repo-images

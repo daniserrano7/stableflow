@@ -1,582 +1,206 @@
-# StableFlow
+<div align="center">
 
-StableFlow is a public stablecoin flow explorer focused on making on-chain stablecoin activity easier to understand.
+<img src="apps/web/public/brand-icon.svg" width="56" alt="" />
 
-The project tracks how stablecoins move across chains, protocols, and assets, starting with a deliberately small scope and evolving into a richer analytics product.
+# Stableflow
 
-StableFlow is not a wallet, portfolio tracker, trading tool, or yield optimizer. It does not manage user funds or provide investment recommendations. Its goal is to turn raw on-chain data into clear visual insights.
+**Live USDC flows on Base.** See which protocols, exchanges and bridges stablecoins are moving into and out of, as it happens.
 
-Possible future name: **StablePulse**.
+[**stableflow.dev**](https://stableflow.dev) · [Methodology](https://stableflow.dev/methodology) · [Connect your AI chat](#ask-it-from-your-ai-chat)
 
----
+</div>
 
-## Product Goal
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="repo-images/overview-light.png" />
+  <img src="repo-images/overview-dark.png" alt="Stableflow overview: KPIs, a live flow graph between wallets, DEXs, lending markets and other chains, and a ranking of entity net flows" />
+</picture>
 
-StableFlow helps users answer questions like:
+## The problem
 
-- Where is stablecoin liquidity moving?
-- Which protocols are receiving or losing stablecoin flows?
-- Which stablecoins are most active?
-- Which chains are gaining activity?
-- What large or unusual transfers happened recently?
-- Are there spikes, drops, or anomalies in protocol-level activity?
+About 200,000 USDC transfers happen on Base every hour. All of them are public, and almost none of them are readable. An ERC-20 `Transfer` event only says:
 
-The project is also intended as a technical portfolio project demonstrating:
-
-- EVM data indexing
-- Backend architecture
-- PostgreSQL data modeling
-- Aggregation pipelines
-- GraphQL/REST APIs
-- Analytics dashboards
-- SSR frontend development
-- Deployment and DevOps discipline
-
----
-
-## Initial Product Scope
-
-The project should start small and avoid trying to become a full DefiLlama replacement.
-
-The initial scope should be:
-
-- Chain: Base
-- Asset: USDC
-- Protocols: Aave and Morpho
-- Core data:
-  - ERC-20 transfers
-  - protocol inflows
-  - protocol outflows
-  - net flow
-  - daily volume
-  - active addresses
-  - large transfers
-  - simple anomalies
-
-The architecture should be designed to support multiple chains, stablecoins, and protocols later, but the first implementation should focus on finishing a clean, working MVP.
-
----
-
-## Core Concepts
-
-### State vs Flow
-
-StableFlow distinguishes between two different types of data:
-
-#### State
-
-State answers:
-
-> How much exists or is currently held somewhere?
-
-Examples:
-
-- total USDC supply on Base
-- USDC balance held by a protocol contract
-- current liquidity in a protocol market
-- stablecoin supply distribution by chain
-
-State can come from:
-
-- direct contract reads
-- periodic snapshots
-- external APIs such as DefiLlama
-
-#### Flow
-
-Flow answers:
-
-> What moved?
-
-Examples:
-
-- 2.4M USDC moved into Aave on Base
-- 800k USDC flowed out of Morpho
-- USDC protocol inflows increased 220% over the 30-day average
-
-Flow comes mainly from indexed blockchain events.
-
----
-
-## Architecture Overview
-
-```txt
-                ┌────────────────────┐
-                │    Frontend SSR     │
-                │ React Router + UI   │
-                └─────────┬──────────┘
-                          │
-                          ▼
-                ┌────────────────────┐
-                │     API Server      │
-                │ Nest.js GraphQL/API │
-                └─────────┬──────────┘
-                          │
-                          ▼
-                ┌────────────────────┐
-                │     PostgreSQL      │
-                │ normalized data     │
-                └─────────▲──────────┘
-                          │
-          ┌───────────────┴────────────────┐
-          │                                │
-          ▼                                ▼
-┌────────────────────┐          ┌────────────────────┐
-│   EVM Indexer       │          │ Background Jobs     │
-│ transfers/events    │          │ aggregates/anomalies │
-└────────────────────┘          └────────────────────┘
-          │
-          ▼
-┌────────────────────┐
-│   RPC Provider      │
-│ Base / Ethereum     │
-└────────────────────┘
+```
+0x787f…35e4 → 0xb2cc…dc59   268,700 USDC
 ```
 
----
+It doesn't say *"someone sold into Aerodrome"* or *"USDC left Base for Solana through CCTP"*. Worse, one swap emits several transfers (user → router → pool → user), so adding them up counts the same dollars more than once. Block explorers show raw rows. Analytics dashboards show daily snapshots. Neither answers the simple question: **where is the money going right now?**
 
-## Recommended Tech Stack
+Stableflow indexes every native USDC transfer on Base, works out which entity is on each side, and turns the stream into live inflow, outflow and net flow per protocol, without double counting.
 
-### Monorepo
+## What you can do
 
-- pnpm workspaces
-- Turborepo or Nx
-- TypeScript
-- Biome for linting/formatting
+- **Watch the flow graph** as USDC moves between wallets, DEXs, lending markets and other chains, streamed live.
+- **Rank entities** by inflow, outflow or net flow over windows from 5 minutes to 24 hours.
+- **Follow bridges.** See USDC entering and leaving Base through Circle CCTP and Across, by remote chain.
+- **Inspect any entity** down to the addresses behind it, with each label's role, source and confidence.
+- **Browse every transfer**, filter large (≥10k) and whale (≥1M) moves, and open a transaction to see all its hops.
+- **Search** entities, addresses and transactions with ⌘K.
+- **Ask your AI chat** through a public MCP server.
 
-Suggested structure:
+## Architecture
 
-```txt
-stableflow/
-  apps/
-    web/
-    api/
-    indexer/
-    jobs/
-  packages/
-    db/
-    domain/
-    config/
-    ui/
-  infra/
-    docker/
-    nginx/
-  docs/
+```mermaid
+flowchart LR
+  rpc{{"Base RPC"}}
+
+  subgraph private [Private]
+    indexer["Indexer<br/>Ponder"]
+    worker["Label worker"]
+    subgraph pg [PostgreSQL]
+      live[("Live index<br/>recent hours")]
+      archive[("Archive<br/>raw 14 days · per-minute flows forever")]
+    end
+    archiver["Archiver"]
+    api["API<br/>NestJS"]
+  end
+
+  subgraph public [Public]
+    web["Web<br/>React Router SSR"]
+    mcp["MCP server"]
+  end
+
+  rpc --> indexer --> live
+  live --> archiver --> archive
+  rpc --> worker -- "promoted labels" --> archive
+  archive -- "labels" --> indexer
+  archive --> api
+  live -- "live stream" --> api
+  api --> web --> browser([Browser])
+  api --> mcp --> ai([Claude · ChatGPT])
 ```
 
-### Frontend
-
-Recommended stack:
-
-- React
-- React Router with SSR
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- TanStack Query
-- Recharts or Visx
-- Zod
-- Playwright
-- Vitest
-
-Main pages:
-
-| Route | Purpose |
+| Service | Role |
 | --- | --- |
-| `/` | Market overview |
-| `/stablecoins/usdc` | USDC analytics |
-| `/protocols/aave` | Aave stablecoin flows |
-| `/protocols/morpho` | Morpho stablecoin flows |
-| `/chains/base` | Base stablecoin activity |
-| `/transfers` | Relevant transfer feed |
-| `/methodology` | Data methodology and limitations |
+| **Indexer** | Reads USDC transfers plus factory, CCTP and Across events. Labels both sides of each transfer and writes per-minute flow aggregates. |
+| **Archiver** | Copies settled rows into the archive every two seconds and expires old raw events. |
+| **Label worker** | Every six hours, finds the busiest unknown addresses and labels the ones it can prove on-chain. |
+| **API** | Read-only REST plus one server-sent event (SSE) stream for live transfers. |
+| **Web** | Server-rendered app. Proxies the API and the live stream, so the API never needs a public domain. |
+| **MCP** | Nine read-only tools for AI clients, backed by the same API. |
 
-### Backend
+Key decisions:
 
-Recommended stack:
+- **Hot and cold storage.** The indexer keeps only recent hours. The archive holds raw transfers for 14 days and per-minute aggregates forever, so queries stay fast and storage stays flat.
+- **Reindex in minutes, not days.** Each indexer deployment writes to its own schema and starts a few minutes before the archive's newest block. Once it reaches the chain head, Ponder points the public views at it. Changing the schema or the classification logic causes no downtime and needs no full resync.
+- **Least privilege.** Every service has its own Postgres role. The API's role is read-only, with a 30-second statement timeout.
+- **One poll, many viewers.** The live stream polls the database once per API instance and fans out to every connected browser with RxJS.
 
-- Nest.js
-- TypeScript
-- GraphQL
-- PostgreSQL
-- Drizzle ORM or Prisma
-- Pino for logging
-- Zod or class-validator
-- Docker
+## Counting flows without double counting
 
-The API should expose data for:
-
-- overview metrics
-- stablecoin pages
-- protocol pages
-- chain pages
-- relevant transfers
-- rankings
-- anomalies
-
-### Indexer
-
-The indexer is responsible for reading blockchain data and storing it in a queryable format.
-
-Initial indexing scope:
-
-- Base chain
-- USDC ERC-20 Transfer events
-- known Aave and Morpho contract addresses
-- protocol inflow/outflow classification
-
-Possible options:
-
-#### Option A: Ponder
-
-Best initial option for speed and TypeScript integration.
-
-Use Ponder to index EVM events and write structured data into PostgreSQL.
-
-#### Option B: Custom Viem Indexer
-
-Better for learning and demonstrating low-level backend/indexing skills.
-
-Responsibilities would include:
-
-- block range processing
-- log fetching
-- ABI decoding
-- checkpointing
-- retries
-- deduplication
-- reorg protection
-- database writes
-
-### Recommended Approach
-
-Start with Ponder unless the goal is specifically to build the indexer from scratch.
-
-Keep classification logic independent from the framework so it can be tested and migrated later.
-
----
-
-## Data Model
-
-Initial tables may include:
-
-- `chains`
-- `stablecoins`
-- `stablecoin_contracts`
-- `protocols`
-- `protocol_contracts`
-- `token_transfers`
-- `transfer_classifications`
-- `daily_asset_metrics`
-- `daily_protocol_metrics`
-- `daily_chain_metrics`
-- `anomalies`
-- `indexer_checkpoints`
-- `external_market_snapshots`
-- `protocol_state_snapshots`
-
----
-
-## Transfer Classification
-
-A transfer classification is a semantic interpretation of a raw transfer.
-
-Examples:
-
-```txt
-wallet -> protocol contract = protocol_inflow
-protocol contract -> wallet = protocol_outflow
-wallet -> wallet = token_transfer
-```
-
-Suggested classification fields:
+Every known address carries a label that says who owns it and how to count it:
 
 ```ts
-type TransferKind =
-  | "token_transfer"
-  | "protocol_inflow"
-  | "protocol_outflow"
-  | "protocol_deposit"
-  | "protocol_withdrawal";
-
-type TransferDirection =
-  | "inflow"
-  | "outflow"
-  | "neutral";
-
-type ClassificationConfidence =
-  | "low"
-  | "medium"
-  | "high";
+{ entity: "Aerodrome", category: "dex", role: "pool_instance",
+  attributionGroup: "aerodrome", countingPolicy: "boundary", confidence: "high" }
 ```
 
-Important: do not label a transfer as a deposit or withdrawal unless the indexed event proves it. A token transfer into a known protocol contract should initially be called protocol_inflow.
+Flows are counted **where USDC crosses an entity's boundary**, not at every hop:
 
----
-
-## External Data
-
-StableFlow may use external APIs for macro-level context.
-
-For example:
-
-- global stablecoin supply
-- stablecoin market share
-- supply by chain
-- protocol TVL
-
-This data should be stored separately from internally indexed data and marked with a source field.
-
-Example:
-
-```txt
-source = "defillama"
-source = "contract_read"
-source = "stableflow_indexer"
+```mermaid
+flowchart LR
+  u1([User]) -- "inflow ✓" --> router["Aerodrome router"]
+  router -- "internal, ignored" --> pool["Aerodrome pool"]
+  pool -- "outflow ✓" --> u2([User])
 ```
 
-The core value of the project should come from StableFlow's own indexed flow data.
+On top of that:
 
----
+- **Volume counts each dollar once.** A transaction's value is the sum of every address's positive net change, so the router hop adds nothing. On early data, raw transfer sums ran about 18% higher.
+- **Bridge direction comes from bridge events.** CCTP `DepositForBurn` / `MessageReceived` and Across deposits and fills give the true direction and remote chain, which an ERC-20 transfer alone can't.
+- **Unknown stays unknown.** Wallets with no label are grouped as *Unidentified* rather than guessed.
 
-## Phase 1: Visual MVP
+## Entity discovery and promotion
 
-Goal: build the public product shell with mock or seeded data.
+Labels come from three sources, from most to least trusted:
 
-Features:
+1. **Curated registry.** Core contracts (routers, factories, lending markets, bridges) taken from official docs and repositories, each with its source and confidence.
+2. **Event discovery.** The indexer listens for new Uniswap, PancakeSwap and Aerodrome pools and new MetaMorpho vaults, and re-reads Aave's reserve tokens every hour. New pools get labeled in the block they're created.
+3. **Activity discovery.** A worker ranks the highest-volume *unidentified* addresses and tries to prove who they belong to.
 
-- homepage overview
-- USDC page
-- Aave page
-- Morpho page
-- Base page
-- transfer feed
-- basic charts
-- responsive layout
-- methodology page
+```mermaid
+flowchart LR
+  t[("Indexed transfers")] --> c["Top unidentified<br/>addresses, 24 h"]
+  c --> v{"On-chain proof?<br/>pool.factory() · token0/1<br/>factory.getPool() / isPool()"}
+  v -- "proven" --> p["Promote label"]
+  v -- "not proven" --> q["Review queue"]
+  p --> l[("Archive labels")]
+  l -- "within 30 s" --> i["Indexer classifies<br/>new transfers"]
+```
 
-No real indexer required yet.
+The promotion gate is strict on purpose: **only on-chain evidence promotes a label.** The address must provably belong to a supported factory, sit on a flow boundary and map to a specific entity. Patterns like "mostly trades with Aerodrome" stay in review, because a wrong label is worse than an unknown one. Each run records how much unidentified volume it resolved, so coverage is measurable. A Postgres advisory lock keeps runs from overlapping.
 
-Success criteria:
+<img src="repo-images/entity-detail.png" alt="Aerodrome entity page: label count, roles, inflow, outflow and net flow, a counterparty flow graph and label evidence" />
 
-- the product looks real
-- the navigation is clear
-- the dashboard communicates the intended value
-- mock data can later be replaced with real API data
+## Ask it from your AI chat
 
----
+```
+https://mcp.stableflow.dev/mcp
+```
 
-## Phase 2: Real Data MVP
+Add it as a custom connector in Claude, or in ChatGPT's developer mode. No Stableflow account or API key needed. Then ask things like *"Which protocols had the largest net USDC outflow in the last hour?"* or *"Compare Aave V3 and Morpho Blue today."*
 
-Goal: connect the app to real indexed data.
+The server exposes nine read-only tools: transfers, transfer history, flow KPIs, top entity flows, the flow graph, the entity catalog, search, entity detail and entity comparison. It calls the private API, never the database, and every call is bounded by input schemas, request and response size caps, an upstream timeout, per-IP rate limits and a global concurrency cap. Results include the indexed time window, so answers can say when coverage is partial.
 
-Scope:
+## Design system
 
-- Base
-- USDC
-- Aave
-- Morpho
+<img src="repo-images/design-system.png" alt="Design system page showing semantic color tokens and the type scale" />
 
-Features:
+Built for dense, real-time financial data:
 
-- index USDC transfers on Base
-- classify transfers involving known protocol contracts
-- store transfers in PostgreSQL
-- compute daily aggregates
-- expose data through Nest.js API
-- connect frontend via TanStack Query
-- show real protocol inflows/outflows
-- show relevant large transfers
-- add basic anomaly rules
+- **Tokens first.** OKLCH color tokens in Tailwind 4's `@theme`, with shadcn-compatible names and a typed TypeScript copy for SVG drawing. Light and dark themes share the same tokens.
+- **Color carries meaning.** Green is inflow, amber is outflow, pink flags whales. DEX, lending, bridge and CEX each keep one hue across tags, graph nodes and legends.
+- **Type for numbers.** Geist for UI. Geist Mono with tabular numerals for amounts, addresses and hashes. A 13 px body, because this is a dashboard.
+- **Hand-built visuals.** The flow graph, sparklines and bars are custom SVG in React, with no chart library.
 
-Success criteria:
-
-- StableFlow can show real USDC transfer data on Base
-- Aave and Morpho have protocol flow pages
-- homepage is powered by real indexed metrics
-- the system can recover from restarts using checkpoints
-
----
-
-## Phase 3: Expanded Analytics
-
-Goal: evolve StableFlow into a richer analytics tool.
-
-Possible additions:
-
-- more stablecoins:
-  - USDT
-  - DAI / USDS
-- more chains:
-  - Ethereum
-  - Arbitrum
-  - Optimism
-- more protocols:
-  - Uniswap
-  - Curve
-  - Compound
-  - Maker/Sky
-  - Pendle
-- protocol state snapshots
-- supply snapshots
-- better anomaly detection
-- weekly brief
-- comparison pages
-- known address labeling
-- richer methodology documentation
-
-Success criteria:
-
-- users can compare flows across assets, protocols, and chains
-- the system supports additional integrations without major rewrites
-- StableFlow becomes a credible public Web3 analytics portfolio project
-
----
-
-## Anomaly Detection
-
-Initial anomaly detection should be simple and explainable.
-
-Examples:
-
-- current daily inflow is more than 2.5x the 30-day average
-- transfer amount is above the 95th percentile
-- protocol net outflow is unusually negative
-- daily transfer count drops sharply
-- stablecoin activity spikes compared to previous periods
-
-Avoid complex machine learning in the initial version.
-
----
+Every token is on show at [/design-system](https://stableflow.dev/design-system).
 
 ## Deployment
 
-Recommended deployment model:
+Stableflow runs on Railway as a single project: Postgres and six services. Railway suits this workload:
 
-- Cloudflare
-  - DNS
-  - CDN
-  - frontend SSR
-  - caching
+- **Always-on processes.** An indexer polling every two seconds, an archiver loop, a scheduled worker and long-lived SSE connections don't fit serverless time limits. Railway runs plain containers.
+- **Private by default.** Services talk over a private network. Only the web app and the MCP server have public domains. Postgres, the indexer and the API can't be reached from the internet.
+- **Safe rollouts.** A new deployment only takes over once its health check passes. For the indexer, that means it has caught up to the chain head, so the old one keeps serving until then.
+- **Same images locally.** Each app has its own Dockerfile. `compose.yaml` runs the same stack, roles and wiring on a laptop.
+- **Pay for what runs.** Usage-based pricing fits a small always-on app: no idle cluster to pay for, no infrastructure to operate.
 
-- VPS or AWS EC2
-  - Nest.js API
-  - indexer
-  - background jobs
-  - PostgreSQL
-  - Docker Compose
+GitHub Actions runs Biome, type checks and builds on every pull request.
 
-Alternative managed setup:
+## Tech stack
 
-- Frontend: Cloudflare
-- Backend: Render, Fly.io, Railway, or EC2
-- Database: Neon, Supabase, RDS, or self-hosted PostgreSQL
+| Layer | Tools |
+| --- | --- |
+| Indexing | Ponder, viem |
+| Data | PostgreSQL 17, Drizzle ORM |
+| API | NestJS 11, RxJS, Zod |
+| Web | React 19, React Router 7 (SSR), TanStack Query, Tailwind CSS 4, shadcn/ui, Radix |
+| AI | Model Context Protocol TypeScript SDK |
+| Tooling | TypeScript, pnpm workspaces, Biome, `node:test`, GitHub Actions |
+| Infra | Docker, Docker Compose, Railway |
 
-For a portfolio project, a Docker-based backend deployment is preferred because it demonstrates more infrastructure knowledge.
-
----
-
-## Testing Strategy
-
-Recommended tests:
-
-- unit tests for classification rules
-- unit tests for formatting and amount normalization
-- integration tests for database repositories
-- API tests for overview/protocol/stablecoin queries
-- indexer tests for transfer processing
-- frontend tests for main pages and filters
-- Playwright tests for critical user flows
-
----
-
-## Methodology Requirements
-
-StableFlow should include a public methodology page explaining:
-
-- tracked chains
-- tracked stablecoins
-- tracked protocol contracts
-- how inflow/outflow is defined
-- what data comes from the indexer
-- what data comes from external APIs
-- known limitations
-- update frequency
-- confidence levels
-
-This is important because analytics products can easily become misleading if definitions are unclear.
-
----
-
-## Non-Goals
-
-StableFlow should not include these in the initial version:
-
-- wallet connection
-- trading
-- swaps
-- investment advice
-- yield optimization
-- transaction execution
-- portfolio tracking
-- tax reporting
-- personal alerts
-- complex AI assistant
-- broad multi-chain support from day one
-
-The initial goal is a focused stablecoin flow explorer, not a full DeFi platform.
-
----
-
-## Portfolio Positioning
-
-Short description:
-
-StableFlow is a visual stablecoin flow explorer that indexes USDC transfers on Base, classifies protocol inflows and outflows across Aave and Morpho, computes historical metrics and anomalies, and exposes the data through a public React SSR analytics dashboard.
-
-Technical description:
-
-Built an end-to-end Web3 data product with EVM indexing, protocol-aware transfer classification, PostgreSQL aggregation pipelines, GraphQL APIs, anomaly detection rules, and a public SSR dashboard deployed with Cloudflare and Docker-based backend infrastructure.
-
----
-
-## Development Principles
-
-- Start narrow.
-- Finish each phase before expanding.
-- Prefer accurate limited data over broad unreliable data.
-- Clearly separate indexed data from external data.
-- Do not overclaim what a transfer means.
-- Keep methodology transparent.
-- Optimize for a polished public demo.
-- Build the architecture for extension, but keep the initial scope small.
-
-
-## Public product pages
-
-- `/`: live native USDC transfers and flow analytics on Base.
-- `/entities` and `/entities/:entityId`: searchable registry and shared entity detail pages, including Aave and Morpho.
-- `/transfers`: indexed transfer history with 50 rows per page, UTC timestamps, address/transaction explorer links, and URL-backed filters. Large includes transfers of at least 10,000 USDC; whale includes transfers of at least 1,000,000 USDC. Filters apply in the database before pagination.
-- `/methodology`: scope, counting rules, attribution, bridge semantics, and coverage limits, adapted from `docs/usdc-flow-attribution-strategy.md`. `/methodology/attribution` serves that source document directly.
-
-The header identifies Base mainnet / native USDC as the current scope and links to coverage details. The design system remains available at `/design-system` as a development reference.
-
-### Transfer API and validation
-
-`GET /v1/transfers?filter=all|large|whale&cursor=<blockNumber>:<logIndex>&direction=older|newer`
-
-The initial request omits the cursor and direction. Responses include `olderCursor` and `newerCursor` (null at the corresponding end), with at most 50 rows in descending block/log order. Use the returned cursor with the matching direction. Changing filters starts a new page. Cursor pagination avoids offset shifts when newer transfers arrive; reorgs or historical reindexing can still change results. Invalid parameters return HTTP 400. Existing `/v1/transfers/recent` and `/v1/transfers/live` endpoints remain available.
-
-`GET /v1/transfers/:transferId` returns one transfer, where the ID is the indexer key `<transactionHash>-<logIndex>`. The response also describes its transaction: the transfer count, up to 100 of its transfers, and its adjusted value. Malformed IDs return 400; unknown IDs return 404. The web app serves it at `/transfers/:transferId`, and old `/movements` URLs redirect there.
-
-### Volume and double counting
-
-A transaction can emit several USDC transfers. A routed swap, for example, moves the same USDC through a router and a pool, producing one transfer per hop. `usdc_transfer_volume_buckets.totalValue` sums every transfer. `adjustedValue` counts each transaction once, as the sum of every address's positive net change within it. The 24h volume KPI uses the adjusted value. On early indexed data, raw volume was about 18% higher than adjusted.
-
-`pnpm test` includes transfer parameter validation. To also run PostgreSQL pagination and amount-boundary integration tests, supply `TEST_DATABASE_URL` for a local test database:
+## Run it locally
 
 ```bash
-TEST_DATABASE_URL=postgresql://localhost/stableflow_test pnpm --filter @stableflow/api test
+cp .env.example .env   # a Base RPC URL and a recent start block
+docker compose up --build
 ```
 
-The database test creates connection-local temporary tables and covers same-block ordering, forward/backward traversal, new inserts between pages, inclusive thresholds, and empty results.
+Web runs on `localhost:4000`, the API on `:4001/v1` and MCP on `:4002/mcp`.
+
+```
+apps/
+  indexer/   Ponder indexer, archiver and label worker
+  api/       NestJS API and live stream
+  web/       React Router app and design system
+  mcp/       MCP server
+  shared/    Types shared by the API and web
+infra/postgres/roles.sql   Database roles and grants
+```
+
+---
+
+<div align="center">
+
+Built by [@daniserrano7](https://github.com/daniserrano7)
+
+</div>

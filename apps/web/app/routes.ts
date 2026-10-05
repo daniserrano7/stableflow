@@ -10,7 +10,8 @@ export default [
   route("movements/:transferId", "features/transfers/movements-redirect.ts", {
     id: "movement-redirect",
   }),
-  route("methodology/attribution", "features/methodology/attribution.resource.ts"),
+  // Pre-README URL of the attribution strategy document.
+  route("methodology/attribution", "features/methodology/attribution-redirect.ts"),
   route("methodology", "features/methodology/methodology.route.tsx"),
   route("entities", "features/entities/entities.route.tsx"),
   route("assets", "features/assets/assets.route.tsx"),

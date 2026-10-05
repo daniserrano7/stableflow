@@ -61,8 +61,7 @@ export async function loader({ request }: { request: Request }) {
     [
       "## Optional",
       "",
-      `- [Attribution strategy](${absoluteUrl("/methodology/attribution")}): the full flow attribution design as plain text, including per-protocol edge cases.`,
-      `- [Source code](${site.repositoryUrl})`,
+      `- [Source code](${site.repositoryUrl}): the README describes the architecture, flow attribution and label discovery.`,
     ].join("\n"),
   );
 

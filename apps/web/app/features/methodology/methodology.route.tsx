@@ -260,10 +260,12 @@ export default function Methodology() {
           </PanelHead>
           <MethodologyQuestions />
           <p className="m-0 border-border border-t px-4 py-3 text-muted-foreground text-xs">
-            Per-protocol edge cases are in the full attribution strategy, which also lists work that
-            isn't live yet.{" "}
-            <a className="text-accent underline underline-offset-2" href="/methodology/attribution">
-              Read it as plain text
+            The indexing pipeline and label discovery are described in the project README.{" "}
+            <a
+              className="text-accent underline underline-offset-2"
+              href={`${site.repositoryUrl}#readme`}
+            >
+              Read it on GitHub
             </a>
           </p>
         </Panel>
