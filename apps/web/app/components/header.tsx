@@ -4,6 +4,7 @@ import { Link, useRouteLoaderData } from "react-router";
 import { useSearchDialog } from "~/features/search/search-dialog-context";
 import { McpConnectWidget } from "./mcp-connect-widget";
 import { ScopeBadges } from "./scope-badges";
+import { SocialLinks } from "./social-links";
 
 export interface HeaderBreadcrumb {
   label: string;
@@ -95,6 +96,7 @@ export function AppHeader({
       <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
         <ScopeBadges />
         <McpConnectWidget mcpUrl={mcpUrl ?? null} />
+        <SocialLinks />
       </div>
     </header>
   );

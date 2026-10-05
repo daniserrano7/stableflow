@@ -16,6 +16,11 @@ export const site = {
   locale: "en_US",
   language: "en",
   repositoryUrl: "https://github.com/daniserrano7/stableflow",
+  /** The author's profiles, linked from the header. */
+  author: {
+    githubUrl: "https://github.com/daniserrano7",
+    linkedinUrl: "https://www.linkedin.com/in/daniel-serrano-g/",
+  },
   image: {
     alt: "Stableflow: live USDC flows on Base",
     height: 630,
