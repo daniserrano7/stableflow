@@ -8,6 +8,8 @@ import { useState } from "react";
 import type { ShouldRevalidateFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { AppPage } from "~/components/app-page";
+import { site } from "~/config/site";
+import { seo } from "~/utils/seo";
 import { getApiUrl } from "../../config/api.server";
 import { FlowKpis } from "../flow-kpis/flow-kpis";
 import {
@@ -28,14 +30,13 @@ import {
 
 const maxVisibleTransferRows = 20;
 
-export function meta() {
-  return [
-    { title: "Stableflow" },
-    {
-      content: "USDC flow intelligence on Base.",
-      name: "description",
-    },
-  ];
+export function meta({ data }: { data?: HomeLoaderData }) {
+  return seo({
+    description: site.description,
+    fullTitle: `${site.name} · Real-Time USDC Flow Tracker on Base`,
+    page: data ? { dateModified: data.flowKpis.meta.generatedAt } : undefined,
+    path: "/",
+  });
 }
 
 interface HomeLoaderData {

@@ -10,7 +10,8 @@ export default [
   route("movements/:transferId", "features/transfers/movements-redirect.ts", {
     id: "movement-redirect",
   }),
-  route("methodology/attribution", "features/methodology/attribution.resource.ts"),
+  // Pre-README URL of the attribution strategy document.
+  route("methodology/attribution", "features/methodology/attribution-redirect.ts"),
   route("methodology", "features/methodology/methodology.route.tsx"),
   route("entities", "features/entities/entities.route.tsx"),
   route("assets", "features/assets/assets.route.tsx"),
@@ -22,4 +23,7 @@ export default [
   route("events/transfers", "features/live-transfers/transfers.stream.ts"),
   route("api/flows/top-entities", "features/top-entity-flows/top-entity-flows.resource.ts"),
   route("health", "features/health/health.resource.ts"),
+  route("robots.txt", "features/seo/robots.resource.ts"),
+  route("sitemap.xml", "features/seo/sitemap.resource.ts"),
+  route("llms.txt", "features/seo/llms.resource.ts"),
 ] satisfies RouteConfig;

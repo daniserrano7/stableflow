@@ -5,18 +5,67 @@ import { Link } from "react-router";
 import { Amount, Panel, PanelBody, PanelHead, PanelTitle, Tag } from "~/components";
 import { AppPage } from "~/components/app-page";
 import { PageHeader } from "~/components/page-header";
+import { absoluteUrl, site } from "~/config/site";
+import { seo } from "~/utils/seo";
 import { FlowExample } from "./flow-example";
-import { MethodologyQuestions } from "./methodology-questions";
+import { MethodologyQuestions, methodologyQuestions } from "./methodology-questions";
 
 export function meta() {
-  return [
-    { title: "Methodology | Stableflow" },
-    {
-      name: "description",
-      content:
-        "How Stableflow measures native USDC transfers on Base, attributes entity flows, and handles coverage limitations.",
+  const path = "/methodology";
+  const url = absoluteUrl(path);
+
+  return seo({
+    breadcrumbs: [{ name: "Methodology", path }],
+    description:
+      "How Stableflow measures native USDC on Base: address labels, entity boundaries, inflow, outflow and net flow, multi-hop swaps, bridges, and coverage limits.",
+    nodes: [
+      {
+        "@type": "Dataset",
+        "@id": `${url}#dataset`,
+        name: "Stableflow: native USDC transfers and entity flows on Base",
+        description:
+          "Live native USDC transfers on Base mainnet, attributed to labelled entities (decentralized exchanges, lending protocols, bridges and issuers) to measure each entity's USDC inflow, outflow and net flow, with large and whale transfer classification.",
+        url,
+        creator: { "@id": `${site.url}/#organization` },
+        publisher: { "@id": `${site.url}/#organization` },
+        isAccessibleForFree: true,
+        keywords: [
+          "USDC",
+          "Base",
+          "stablecoin flows",
+          "on-chain data",
+          "token transfers",
+          "entity flows",
+          "whale transfers",
+          "DeFi",
+        ],
+        measurementTechnique:
+          "Indexing ERC-20 Transfer events of the native USDC contract on Base, attributing addresses to entities from a labelled address registry, and detecting bridge flows from bridge protocol events.",
+        variableMeasured: ["USDC volume", "Inflow", "Outflow", "Net flow", "Transfer count"],
+      },
+      {
+        "@type": "DefinedTermSet",
+        "@id": `${url}#terms`,
+        name: "Stableflow key terms",
+        hasDefinedTerm: terms.map(({ definition, term }) => ({
+          "@type": "DefinedTerm",
+          name: term,
+          description: definition,
+        })),
+      },
+    ],
+    page: {
+      about: { "@id": `${url}#dataset` },
+      mainEntity: methodologyQuestions.map(({ answer, question }) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: { "@type": "Answer", text: answer },
+      })),
     },
-  ];
+    pageType: "FAQPage",
+    path,
+    title: "Methodology: How USDC Flows Are Measured",
+  });
 }
 
 const usdcContract = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -46,7 +95,7 @@ const included: ReactNode[] = [
   "Bridge activity from Circle CCTP and Across events",
   <>
     Labelled protocols, bridges and issuers.{" "}
-    <Link className="text-accent hover:underline" to="/entities">
+    <Link className="text-accent underline underline-offset-2" to="/entities">
       See entities
     </Link>
   </>,
@@ -211,10 +260,12 @@ export default function Methodology() {
           </PanelHead>
           <MethodologyQuestions />
           <p className="m-0 border-border border-t px-4 py-3 text-muted-foreground text-xs">
-            Per-protocol edge cases are in the full attribution strategy, which also lists work that
-            isn't live yet.{" "}
-            <a className="text-accent hover:underline" href="/methodology/attribution">
-              Read it as plain text
+            The indexing pipeline and label discovery are described in the project README.{" "}
+            <a
+              className="text-accent underline underline-offset-2"
+              href={`${site.repositoryUrl}#readme`}
+            >
+              Read it on GitHub
             </a>
           </p>
         </Panel>

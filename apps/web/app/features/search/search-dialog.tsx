@@ -26,7 +26,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router";
-import { selectedAssetChain } from "~/features/assets/assets.config";
+import { assetsPagePath, selectedAssetChain } from "~/features/assets/assets.config";
 import { getTransferPath } from "~/features/transfers/transfer-link";
 import { cn } from "~/utils/cn";
 import { fetchSearchResults, searchQueryKey } from "./search.query";
@@ -66,7 +66,7 @@ const navigationItems: SearchItem[] = [
   },
   {
     group: "Navigation",
-    href: "/assets",
+    href: assetsPagePath,
     id: "page:assets",
     keywords: "tokens stablecoins coins catalog",
     kind: "page",
@@ -77,7 +77,7 @@ const navigationItems: SearchItem[] = [
 
 const assetItems: SearchItem[] = selectedAssetChain.assets.map((asset) => ({
   group: "Assets",
-  href: `/assets?q=${encodeURIComponent(asset.symbol)}`,
+  href: `${assetsPagePath}?q=${encodeURIComponent(asset.symbol)}`,
   id: `asset:${asset.symbol.toLowerCase()}`,
   keywords: `${asset.symbol} ${asset.name} ${asset.contract ?? ""} ${asset.status}`,
   kind: "asset",

@@ -3,105 +3,73 @@ import { type ReactNode, useEffect } from "react";
 import { Link } from "react-router";
 
 interface Question {
-  answer: ReactNode;
+  /** The answer as plain prose; it is also published as FAQ structured data. */
+  answer: string;
+  /** Diagram shown above the answer. */
+  illustration?: ReactNode;
+  /** Link shown below the answer. */
+  link?: ReactNode;
   /** Stable anchor, so other pages can link straight to an answer (it opens on arrival). */
   id: string;
   question: string;
 }
 
-const questions: Question[] = [
+export const methodologyQuestions: Question[] = [
   {
-    answer: (
-      <p>
-        Each entity is measured at its own boundary. A transfer between two entities is outflow for
-        one and inflow for the other, and moves inside an entity count for neither. Volume counts
-        each transaction once, so adding up entity totals won't recreate it.
-      </p>
-    ),
+    answer:
+      "Each entity is measured at its own boundary. A transfer between two entities is outflow for one and inflow for the other, and moves inside an entity count for neither. Volume counts each transaction once, so adding up entity totals won't recreate it.",
     id: "entity-totals",
     question: "Why don't entity flows add up to total volume?",
   },
   {
-    answer: (
-      <>
-        <HopChain />
-        <p>
-          A routed swap emits one transfer per hop, so the same USDC shows up more than once. Volume
-          adds up each address's positive net change in the transaction, which counts that USDC
-          once.
-        </p>
-      </>
-    ),
+    answer:
+      "A routed swap emits one transfer per hop, so the same USDC shows up more than once. Volume adds up each address's positive net change in the transaction, which counts that USDC once.",
     id: "multi-hop",
+    illustration: <HopChain />,
     question: "How are swaps with several hops counted?",
   },
   {
-    answer: (
-      <>
-        <StepChain steps={["Label the address", "Group it into an entity", "Count what crosses"]} />
-        <p>
-          Each known address gets an entity, a role, a confidence level and a source. Addresses of
-          the same entity share one boundary, and only transfers crossing it change that entity's
-          flows. An identity label on its own adds nothing to inflow or outflow.
-        </p>
-        <Link className="inline-flex items-center gap-1 text-accent hover:underline" to="/entities">
-          Browse entities and their labels
-          <ArrowRight aria-hidden size={13} />
-        </Link>
-      </>
-    ),
+    answer:
+      "Each known address gets an entity, a role, a confidence level and a source. Addresses of the same entity share one boundary, and only transfers crossing it change that entity's flows. An identity label on its own adds nothing to inflow or outflow.",
     id: "labels",
+    illustration: (
+      <StepChain steps={["Label the address", "Group it into an entity", "Count what crosses"]} />
+    ),
+    link: (
+      <Link className="inline-flex items-center gap-1 text-accent hover:underline" to="/entities">
+        Browse entities and their labels
+        <ArrowRight aria-hidden size={13} />
+      </Link>
+    ),
     question: "How do addresses get labelled?",
   },
   {
-    answer: (
-      <p>
-        No label is known for the address yet. It could be a person, a contract or a service with
-        many users, so read it as unknown rather than as a kind of wallet.
-      </p>
-    ),
+    answer:
+      "No label is known for the address yet. It could be a person, a contract or a service with many users, so read it as unknown rather than as a kind of wallet.",
     id: "unidentified",
     question: "What does Unidentified mean?",
   },
   {
-    answer: (
-      <p>
-        From the bridge protocol's own events, such as Circle CCTP messages or Across deposits and
-        fills, not from a transfer to a bridge address. The supported protocols don't cover every
-        cross-chain route.
-      </p>
-    ),
+    answer:
+      "From the bridge protocol's own events, such as Circle CCTP messages or Across deposits and fills, not from a transfer to a bridge address. The supported protocols don't cover every cross-chain route.",
     id: "bridges",
     question: "How are bridge flows detected?",
   },
   {
-    answer: (
-      <p>
-        A transfer from the zero address is a mint, and one to the zero address is a burn. Both
-        appear in Transfers and are tracked as supply changes, separately from entity flows.
-      </p>
-    ),
+    answer:
+      "A transfer from the zero address is a mint, and one to the zero address is a burn. Both appear in Transfers and are tracked as supply changes, separately from entity flows.",
     id: "supply",
     question: "Where do mints and burns show up?",
   },
   {
-    answer: (
-      <p>
-        Transfers stream in live. The latest numbers can shift briefly while the indexer catches up
-        or a block is reorganized. History starts at the block the indexer was set to begin from,
-        not at Base's first block.
-      </p>
-    ),
+    answer:
+      "Transfers stream in live. The latest numbers can shift briefly while the indexer catches up or a block is reorganized. History starts at the block the indexer was set to begin from, not at Base's first block.",
     id: "freshness",
     question: "How fresh and complete is the data?",
   },
   {
-    answer: (
-      <p>
-        No. A transfer only shows USDC moving between two addresses. Stableflow labels who is
-        involved, not why the USDC moved.
-      </p>
-    ),
+    answer:
+      "No. A transfer only shows USDC moving between two addresses. Stableflow labels who is involved, not why the USDC moved.",
     id: "intent",
     question: "Can a transfer tell me if it was a deposit, a swap or a repayment?",
   },
@@ -112,7 +80,7 @@ export function MethodologyQuestions() {
 
   return (
     <div className="divide-y divide-border">
-      {questions.map((item) => (
+      {methodologyQuestions.map((item) => (
         <details className="details-animated group scroll-mt-4" id={item.id} key={item.id}>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-medium text-md transition-colors duration-fast hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
             {item.question}
@@ -123,7 +91,9 @@ export function MethodologyQuestions() {
             />
           </summary>
           <div className="grid max-w-3xl justify-items-start gap-3 px-4 pt-1.5 pb-4 text-muted-foreground text-sm leading-relaxed [&_p]:m-0">
-            {item.answer}
+            {item.illustration}
+            <p>{item.answer}</p>
+            {item.link}
           </div>
         </details>
       ))}

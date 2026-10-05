@@ -26,23 +26,38 @@ import {
 } from "~/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { getApiUrl } from "~/config/api.server";
+import { absoluteUrl } from "~/config/site";
 import { getVisualIdentity } from "~/config/visuals";
 import { fmtUSD, shortAddr } from "~/utils/format";
+import { itemListNode, seo } from "~/utils/seo";
 import {
   fetchFlowKpis,
   flowKpisQueryKey,
   flowKpisRefreshIntervalMs,
 } from "../flow-kpis/flow-kpis.query";
-import { selectedAssetChain as chain } from "./assets.config";
+import { assetsPagePath, selectedAssetChain as chain } from "./assets.config";
 
 export function meta() {
-  return [
-    { title: "Assets | Stableflow" },
-    {
-      name: "description",
-      content: "Explore assets and tracked stablecoin activity on Base.",
-    },
-  ];
+  const path = assetsPagePath;
+  const listId = `${absoluteUrl(path)}#assets`;
+
+  return seo({
+    breadcrumbs: [{ name: "Assets", path }],
+    description: `Stablecoins on ${chain.name} and what Stableflow indexes for each: native USDC is tracked live with 24h volume and hourly transfers; ${chain.assets
+      .filter((asset) => asset.status === "preview")
+      .map((asset) => asset.symbol)
+      .join(" and ")} are listed as previews.`,
+    nodes: [
+      itemListNode(
+        listId,
+        chain.assets.map((asset) => ({ name: `${asset.name} (${asset.symbol})` })),
+      ),
+    ],
+    page: { mainEntity: { "@id": listId } },
+    pageType: "CollectionPage",
+    path,
+    title: `Stablecoins on ${chain.name}: ${chain.assets.map((asset) => asset.symbol).join(", ")}`,
+  });
 }
 
 export async function loader({ request }: { request: Request }) {
@@ -323,6 +338,7 @@ function AssetVisual({ color, symbol }: { color: string; symbol: string }) {
       className="size-9 rounded-full border border-border font-mono font-medium"
       fallback="$"
       imageName={visual?.name}
+      imageSize={36}
       imageUrl={visual?.imageUrl}
       style={{ color }}
     />
@@ -337,6 +353,7 @@ function ChainVisual() {
       className="size-5 rounded-full"
       fallback={chain.name.slice(0, 1)}
       imageName={visual?.name}
+      imageSize={20}
       imageUrl={visual?.imageUrl}
     />
   );

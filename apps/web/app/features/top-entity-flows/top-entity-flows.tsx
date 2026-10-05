@@ -9,6 +9,7 @@ import { Link, useSearchParams } from "react-router";
 import { Entity, FlowBar, Panel, PanelActions, PanelHead, PanelTitle } from "~/components";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { CATEGORY, type Category } from "~/styles/tokens";
+import { cn } from "~/utils/cn";
 import {
   normalizeTopEntityFlowMode,
   normalizeTopEntityFlowWindow,
@@ -116,9 +117,8 @@ export function TopEntityFlows({ initialFlows }: TopEntityFlowsProps) {
         </PanelActions>
       </PanelHead>
 
-      <div
-        className={isRefreshing ? "divide-y divide-border opacity-75" : "divide-y divide-border"}
-      >
+      {/* Rows keep a minimum width and scroll sideways when the panel sits in the narrow column. */}
+      <div className={cn("divide-y divide-border overflow-x-auto", isRefreshing && "opacity-75")}>
         {flows.data.map((flow) => (
           <TopEntityFlowItem key={flow.entityId} flow={flow} mode={flows.meta.mode} />
         ))}
@@ -140,7 +140,7 @@ function TopEntityFlowItem({ flow, mode }: { flow: TopEntityFlowRow; mode: TopEn
   const trend = getFlowTrend(flow, mode);
 
   return (
-    <div className="grid min-h-20 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 md:grid-cols-[2rem_minmax(10rem,1fr)_minmax(8rem,1.4fr)_minmax(7rem,auto)] md:gap-4">
+    <div className="grid min-h-20 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 md:min-w-[600px] md:grid-cols-[2rem_minmax(10rem,1fr)_minmax(8rem,1.4fr)_minmax(7rem,auto)] md:gap-4">
       <span className="font-mono text-sm text-muted-foreground">
         {flow.rank.toString().padStart(2, "0")}
       </span>

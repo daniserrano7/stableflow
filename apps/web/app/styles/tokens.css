@@ -15,7 +15,11 @@
    future palettes. The hue line is 254 (cool slate / electric blue family).
    ───────────────────────────────────────────────────────────────────────── */
 
-@import "tailwindcss";
+/* Scan only app/ for class names. Automatic detection relies on .gitignore to skip build output,
+   and Docker builds have none: the SSR build then scanned build/client and emitted a stylesheet
+   with a different hash than the client's, breaking hydration on the <link> in <head>. */
+@import "tailwindcss" source(none);
+@source "..";
 
 /* Map shadcn semantic vars + Stableflow vars into Tailwind v4's @theme so
    utilities like `bg-background` and `text-inflow` Just Work. */
@@ -93,9 +97,11 @@
   --color-asset-usds: var(--asset-usds);
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --font-display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:
+    "Geist Mono", "Geist Mono Fallback", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas,
+    monospace;
+  --font-display: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
 
   /* Type scale — dense, data-oriented (closer to Linear than marketing) */
   /* 11px floor: 10px uppercase mono labels were below comfortable legibility. */

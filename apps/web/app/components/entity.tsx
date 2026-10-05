@@ -40,6 +40,7 @@ function Entity({
         )}
         fallback={walletAvatar ? null : glyph}
         imageName={visual?.name}
+        imageSize={20}
         imageUrl={visual?.imageUrl}
         style={{ background: walletAvatar ?? color ?? `var(--cat-${category ?? "wallet"})` }}
       />

@@ -60,6 +60,8 @@ import { useRowLink } from "~/hooks/use-row-link";
 import { CATEGORY, type Category } from "~/styles/tokens";
 import { cn } from "~/utils/cn";
 import { shortAddr } from "~/utils/format";
+import { seo } from "~/utils/seo";
+import { describeEntityCategory, withIndefiniteArticle } from "../seo/entity-copy";
 import { getTransferPath, TransferRowLink } from "../transfers/transfer-link";
 import {
   appendEntityDetailSearchParams,
@@ -79,14 +81,57 @@ type FlowMode = "net";
 
 const entityTransferFreshDurationMs = 900;
 
-export function meta() {
-  return [
-    { title: "Entity Detail | Stableflow" },
-    {
-      content: "Entity-level USDC flow intelligence on Base.",
-      name: "description",
+const organizationCategories = new Set(["bridge", "cex", "dex", "lending", "stablecoin_issuer"]);
+
+export function meta({
+  data,
+  params,
+}: {
+  data?: EntityDetailResponse;
+  params: { entityId?: string };
+}) {
+  const entity = data?.data.entity;
+  const path = `/entities/${encodeURIComponent(entity?.entityId ?? params.entityId ?? "")}`;
+
+  if (!entity) {
+    return seo({
+      description: "USDC inflow, outflow and net flow for an entity on Base.",
+      path,
+      title: "Entity USDC Flows on Base",
+    });
+  }
+
+  // Amounts stay out of the description: search results keep it for days, so live numbers would
+  // read as stale facts there.
+  const isUnidentified = entity.entityId === "unidentified";
+  const description = isUnidentified
+    ? "Pooled USDC flow on Base for wallets without an entity label: inflow, outflow and net flow, the entities they trade with most, and their latest transfers."
+    : `Live USDC flows for ${entity.entityName}, ${withIndefiniteArticle(describeEntityCategory(entity.category))} on Base: inflow, outflow and net flow, top counterparties, recent transfers and its ${formatInteger(entity.addressCount)} labelled ${entity.addressCount === 1 ? "address" : "addresses"}.`;
+
+  return seo({
+    breadcrumbs: [
+      { name: "Entities", path: "/entities" },
+      { name: entity.entityName, path },
+    ],
+    description,
+    page: {
+      dateModified: data.meta.generatedAt,
+      ...(isUnidentified
+        ? {}
+        : {
+            about: {
+              "@type": organizationCategories.has(entity.category) ? "Organization" : "Thing",
+              name: entity.entityName,
+              description: `${entity.entityName} is ${withIndefiniteArticle(describeEntityCategory(entity.category))} on Base.`,
+            },
+          }),
     },
-  ];
+    pageType: "ItemPage",
+    path,
+    title: isUnidentified
+      ? "Unidentified Wallets: USDC Flows on Base"
+      : `${entity.entityName} USDC Flows on Base`,
+  });
 }
 
 export async function loader({
@@ -329,6 +374,7 @@ function EntityHero({ entity, flow }: { entity: EntityDetailSummary; flow: Entit
         className="size-14 rounded-lg font-mono text-xl font-semibold text-background shadow-sm"
         fallback={glyph}
         imageName={visual?.name}
+        imageSize={56}
         imageUrl={visual?.imageUrl}
         style={{ background: `var(--cat-${category ?? "wallet"})` }}
       />

@@ -12,8 +12,6 @@ RUN pnpm install --frozen-lockfile --filter "@stableflow/web..."
 COPY tsconfig.base.json ./
 COPY apps/web apps/web
 COPY apps/shared apps/shared
-# The methodology page embeds this document at build time.
-COPY docs/usdc-flow-attribution-strategy.md docs/
 RUN pnpm --filter "@stableflow/web..." build
 
 FROM base AS prod-deps

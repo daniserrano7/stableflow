@@ -24,6 +24,7 @@ import { useRowLink } from "~/hooks/use-row-link";
 import { getAddressAvatarBackground } from "~/utils/address-avatar";
 import { cn } from "~/utils/cn";
 import { fmtTokenAmount, fmtUSDC, fmtUtcTimestamp, timeAgo } from "~/utils/format";
+import { seo } from "~/utils/seo";
 import {
   getEntityGlyph,
   getPartyCategory,
@@ -38,21 +39,34 @@ const relativeTimeRefreshMs = 30_000;
 
 type TransactionSummary = TransferDetailResponse["data"]["transaction"];
 
-export function meta({ data }: { data?: TransferDetailResponse }) {
+export function meta({
+  data,
+  params,
+}: {
+  data?: TransferDetailResponse;
+  params: { transferId?: string };
+}) {
   const transfer = data?.data.transfer;
-  return [
-    {
-      title: transfer
-        ? `${fmtTokenAmount(transfer.amount.formatted)} USDC transfer | Stableflow`
-        : "Transfer | Stableflow",
-    },
-    {
-      name: "description",
-      content: transfer
-        ? `USDC transfer from ${transfer.from.displayName} to ${transfer.to.displayName} on Base.`
-        : "USDC transfer detail on Base.",
-    },
-  ];
+  const path = getTransferPath(transfer?.id ?? params.transferId ?? "");
+  const title = transfer
+    ? `${fmtTokenAmount(transfer.amount.formatted)} USDC Transfer on Base`
+    : "USDC Transfer on Base";
+
+  return seo({
+    breadcrumbs: [
+      { name: "Transfers", path: "/transfers" },
+      { name: title, path },
+    ],
+    description: transfer
+      ? `${fmtTokenAmount(transfer.amount.formatted)} USDC sent from ${transfer.from.displayName} to ${transfer.to.displayName} on Base at ${fmtUtcTimestamp(transfer.blockTimestamp)} UTC, block ${Number(transfer.blockNumber).toLocaleString("en-US")}, transaction ${shortHex(transfer.transactionHash)}.`
+      : "A native USDC transfer on Base: amount, sender, receiver and the rest of its transaction.",
+    // Raw transfers expire after 14 days (the page then redirects to Basescan), so these
+    // short-lived pages stay out of the index while their links are still followed.
+    noindex: true,
+    pageType: "ItemPage",
+    path,
+    title,
+  });
 }
 
 export async function loader({
@@ -183,6 +197,7 @@ function PartyBlock({ label, party }: { label: "From" | "To"; party: LiveTransfe
           )}
           fallback={party.isIdentified ? getEntityGlyph(party, category) : null}
           imageName={visual?.name}
+          imageSize={40}
           imageUrl={visual?.imageUrl}
           style={{
             background: party.isIdentified

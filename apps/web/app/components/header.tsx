@@ -42,6 +42,8 @@ export function AppHeader({
         <div className="min-w-0">
           <Brand id={headingId} className="m-0 text-md font-semibold leading-none tracking-normal">
             Stableflow
+            {/* As the page's <h1>, the name alone says little about the page. */}
+            {brandAsHeading && <span className="sr-only">: live USDC flows on Base</span>}
           </Brand>
           <nav
             aria-label="Breadcrumb"

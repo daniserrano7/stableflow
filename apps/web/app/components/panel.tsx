@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { Card, CardContent, CardTitle } from "~/components/ui/card";
+import { Card, CardContent, cardTitleClasses } from "~/components/ui/card";
 import { cn } from "~/utils/cn";
 
 export interface PanelProps extends React.ComponentPropsWithoutRef<typeof Card> {
@@ -34,14 +34,19 @@ function PanelHead({ className, ...props }: React.HTMLAttributes<HTMLDivElement>
   );
 }
 
-export interface PanelTitleProps extends React.ComponentPropsWithoutRef<typeof CardTitle> {
+export interface PanelTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
   live?: boolean;
 }
 
+/**
+ * A panel is a section of the page, so its title is the section's <h2> under the page <h1>. The
+ * classes are CardTitle's plus the panel look; preflight already removes heading margins and size.
+ */
 function PanelTitle({ children, className, live, ...props }: PanelTitleProps) {
   return (
-    <CardTitle
+    <h2
       className={cn(
+        cardTitleClasses,
         "flex items-center gap-2 font-medium text-foreground text-md tracking-normal [&>svg]:text-muted-foreground",
         className,
       )}
@@ -54,7 +59,7 @@ function PanelTitle({ children, className, live, ...props }: PanelTitleProps) {
         />
       )}
       {children}
-    </CardTitle>
+    </h2>
   );
 }
 
