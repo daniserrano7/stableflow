@@ -80,6 +80,8 @@
   --color-cat-mint-soft: var(--cat-mint-soft);
   --color-cat-wallet: var(--cat-wallet);
   --color-cat-wallet-soft: var(--cat-wallet-soft);
+  --color-cat-network: var(--cat-network);
+  --color-cat-network-soft: var(--cat-network-soft);
 
   /* ── Chain accents (room for multi-chain) ────────────────────────────── */
   --color-chain-base: var(--chain-base);
@@ -268,6 +270,9 @@
   --cat-mint-soft: oklch(0.74 0.16 245 / 0.15);
   --cat-wallet: oklch(0.68 0.013 254);
   --cat-wallet-soft: oklch(0.68 0.013 254 / 0.12);
+  /* External networks reached over bridges; violet keeps clear of the bridge amber beside it. */
+  --cat-network: oklch(0.68 0.19 295);
+  --cat-network-soft: oklch(0.68 0.19 295 / 0.15);
 
   /* chains (room to grow) */
   --chain-base: oklch(0.62 0.2 255);
@@ -353,6 +358,8 @@
   --cat-mint-soft: oklch(0.52 0.145 250 / 0.1);
   --cat-wallet: oklch(0.46 0.013 254);
   --cat-wallet-soft: oklch(0.46 0.013 254 / 0.08);
+  --cat-network: oklch(0.5 0.2 295);
+  --cat-network-soft: oklch(0.5 0.2 295 / 0.1);
 
   --chain-base: oklch(0.55 0.22 255);
   --chain-ethereum: oklch(0.5 0.13 280);

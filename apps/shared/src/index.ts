@@ -95,9 +95,13 @@ export interface EntityCounterpartyFlow {
   category: EntityCategory;
   entityId: string;
   entityName: string;
+  /** Flow from the counterparty into the entity. */
   inflow: EntityDetailAmount;
+  inflowTransferCount: number;
   net: EntityDetailAmount;
+  /** Flow from the entity out to the counterparty. */
   outflow: EntityDetailAmount;
+  outflowTransferCount: number;
   rank: number;
   relativeShare: number;
   transferCount: number;

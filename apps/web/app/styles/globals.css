@@ -183,6 +183,21 @@
     opacity: 0;
   }
 }
+/* Flow graph: streaks travel along a ribbon (dash + gap = 36px), cards settle in on mount. */
+@keyframes sf-flow-dash {
+  from {
+    stroke-dashoffset: 36;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sf-graph-node-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
+}
 @keyframes sf-shimmer {
   from {
     background-position: -200% 0;
@@ -206,6 +221,9 @@
 }
 @utility animate-fade-in {
   animation: sf-fade-in 0.2s var(--ease-out-quart);
+}
+@utility animate-flow-dash {
+  animation: sf-flow-dash 1s linear infinite;
 }
 
 /* <details> whose content slides and fades open and closed. Needs interpolate-size to tween to
@@ -262,7 +280,8 @@
   .animate-slide-in,
   .animate-fade-in,
   .animate-row-in,
-  .animate-shimmer {
+  .animate-shimmer,
+  .animate-flow-dash {
     animation: none;
   }
   * {

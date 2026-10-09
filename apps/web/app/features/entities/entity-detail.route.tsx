@@ -19,7 +19,6 @@ import {
   Database,
   ExternalLink,
   Hash,
-  Network,
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -76,6 +75,7 @@ import {
   fetchEntityDetail,
   getMatchingInitialEntityDetail,
 } from "./entity-detail.query";
+import { EntityFlowGraph } from "./entity-flow-graph";
 
 type FlowMode = "net";
 
@@ -255,12 +255,18 @@ export default function EntityDetail() {
 
         <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.65fr)]">
           <EntityFlowGraph
+            actions={
+              <WindowToggle
+                ariaLabel="Entity graph window"
+                onWindowChange={updateWindow}
+                windowMinutes={windowMinutes}
+              />
+            }
             counterparties={detail.data.counterparties}
             entity={entity}
             flow={flow}
-            mode={mode}
-            onWindowChange={updateWindow}
-            windowMinutes={windowMinutes}
+            freshTransferIds={freshTransferIds}
+            recentTransfers={detail.data.recentTransfers}
           />
 
           <div className="grid min-w-0 gap-3.5 md:grid-cols-2 xl:h-full xl:grid-cols-1">
@@ -566,223 +572,6 @@ function KpiCell({
       </p>
       <p className="m-0 mt-1 font-mono text-2xs text-muted-foreground">{sub}</p>
     </div>
-  );
-}
-
-function EntityFlowGraph({
-  counterparties,
-  entity,
-  flow,
-  mode,
-  onWindowChange,
-  windowMinutes,
-}: {
-  counterparties: EntityCounterpartyFlow[];
-  entity: EntityDetailSummary;
-  flow: EntityFlowSummary;
-  mode: FlowMode;
-  onWindowChange: (windowMinutes: EntityDetailWindow) => void;
-  windowMinutes: EntityDetailWindow;
-}) {
-  const graphEdges = buildGraphEdges(counterparties, mode);
-  const maxEdge = Math.max(...graphEdges.map((edge) => Math.abs(edge.value)), 1);
-  const category = getKnownCategory(entity.category);
-
-  return (
-    <Panel className="flex min-h-[34rem] flex-col">
-      <PanelHead className="flex-wrap gap-3">
-        <PanelTitle>
-          <Network size={14} />
-          Entity Flow Graph
-        </PanelTitle>
-        <PanelActions className="flex-wrap">
-          <WindowToggle
-            ariaLabel="Entity graph window"
-            onWindowChange={onWindowChange}
-            windowMinutes={windowMinutes}
-          />
-        </PanelActions>
-      </PanelHead>
-
-      <div className="relative min-h-[28rem] flex-1 overflow-hidden">
-        {graphEdges.length === 0 ? (
-          <div className="flex h-full min-h-[28rem] items-center justify-center gap-2 font-mono text-muted-foreground text-xs">
-            <CircleDotDashed size={14} />
-            No counterparty flow for this window yet.
-          </div>
-        ) : (
-          <svg
-            className="absolute inset-0 size-full"
-            role="img"
-            viewBox="0 0 820 440"
-            aria-label={`${entity.entityName} counterparty flow graph`}
-          >
-            <defs>
-              <marker
-                id="entity-arrow-inflow"
-                markerHeight="8"
-                markerWidth="8"
-                orient="auto"
-                refX="7"
-                refY="4"
-              >
-                <path d="M0,0 L8,4 L0,8 z" fill="var(--inflow)" />
-              </marker>
-              <marker
-                id="entity-arrow-outflow"
-                markerHeight="8"
-                markerWidth="8"
-                orient="auto"
-                refX="7"
-                refY="4"
-              >
-                <path d="M0,0 L8,4 L0,8 z" fill="var(--outflow)" />
-              </marker>
-            </defs>
-
-            {graphEdges.map((edge) => {
-              const width = 1.5 + (Math.abs(edge.value) / maxEdge) * 5;
-              const stroke = edge.direction === "in" ? "var(--inflow)" : "var(--outflow)";
-              const marker =
-                edge.direction === "in"
-                  ? "url(#entity-arrow-inflow)"
-                  : "url(#entity-arrow-outflow)";
-              const start = edge.direction === "in" ? edge.point : centerPoint;
-              const end = edge.direction === "in" ? centerPoint : edge.point;
-              const midX = (start.x + end.x) / 2;
-              const midY = (start.y + end.y) / 2;
-
-              return (
-                <g key={edge.entityId}>
-                  <path
-                    d={`M ${start.x} ${start.y} Q ${midX} ${midY - 32} ${end.x} ${end.y}`}
-                    fill="none"
-                    markerEnd={marker}
-                    opacity="0.78"
-                    stroke={stroke}
-                    strokeLinecap="round"
-                    strokeWidth={width}
-                  />
-                  <text
-                    className="fill-muted-foreground font-mono text-[10px]"
-                    textAnchor="middle"
-                    x={midX}
-                    y={midY - 38}
-                  >
-                    {formatCompact(edge.value)}
-                  </text>
-                </g>
-              );
-            })}
-
-            <g>
-              <circle
-                cx={centerPoint.x}
-                cy={centerPoint.y}
-                fill={`var(--cat-${category ?? "wallet"}-soft)`}
-                r="68"
-                stroke={`var(--cat-${category ?? "wallet"})`}
-                strokeWidth="2"
-              />
-              <circle
-                cx={centerPoint.x}
-                cy={centerPoint.y}
-                fill={`var(--cat-${category ?? "wallet"})`}
-                r="30"
-              />
-              <text
-                className="fill-background font-mono text-[15px] font-semibold"
-                textAnchor="middle"
-                x={centerPoint.x}
-                y={centerPoint.y + 5}
-              >
-                {getEntityGlyph(entity.entityName)}
-              </text>
-              <text
-                className="fill-foreground font-mono text-[13px] font-medium"
-                textAnchor="middle"
-                x={centerPoint.x}
-                y={centerPoint.y + 58}
-              >
-                {truncate(entity.entityName, 18)}
-              </text>
-              <text
-                className="fill-muted-foreground font-mono text-[9px] uppercase tracking-[0.1em]"
-                textAnchor="middle"
-                x={centerPoint.x}
-                y={centerPoint.y + 74}
-              >
-                {formatCategory(entity.category)}
-              </text>
-            </g>
-
-            {graphEdges.map((edge) => {
-              const edgeCategory = getKnownCategory(edge.category);
-
-              return (
-                <a href={`/entities/${edge.entityId}`} key={edge.entityId}>
-                  <g className="cursor-pointer">
-                    <circle
-                      cx={edge.point.x}
-                      cy={edge.point.y}
-                      fill={`var(--cat-${edgeCategory ?? "wallet"})`}
-                      r="22"
-                    />
-                    <text
-                      className="fill-background font-mono text-[10px] font-semibold"
-                      textAnchor="middle"
-                      x={edge.point.x}
-                      y={edge.point.y + 4}
-                    >
-                      {getEntityGlyph(edge.entityName)}
-                    </text>
-                    <text
-                      className="fill-foreground font-mono text-[11px] font-medium"
-                      textAnchor="middle"
-                      x={edge.point.x}
-                      y={edge.point.y + 38}
-                    >
-                      {truncate(edge.entityName, 16)}
-                    </text>
-                    <text
-                      className="fill-muted-foreground font-mono text-[8px] uppercase tracking-[0.1em]"
-                      textAnchor="middle"
-                      x={edge.point.x}
-                      y={edge.point.y + 52}
-                    >
-                      {formatCategory(edge.category)}
-                    </text>
-                  </g>
-                </a>
-              );
-            })}
-          </svg>
-        )}
-
-        <div className="absolute bottom-3.5 left-3.5 flex gap-3 rounded-md border border-border bg-card px-3 py-2 font-mono text-2xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-inflow" />
-            Inflow
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-outflow" />
-            Outflow
-          </span>
-        </div>
-
-        <div className="absolute top-3.5 right-3.5 rounded-md border border-border bg-card px-3 py-2 text-right font-mono text-2xs text-muted-foreground">
-          <div>
-            <span className="text-foreground">{counterparties.length}</span> counterparties
-          </div>
-          <div>
-            <span className="text-foreground">
-              {formatCompact(amountToNumber(flow.inflow) + amountToNumber(flow.outflow))}
-            </span>{" "}
-            USDC moved
-          </div>
-        </div>
-      </div>
-    </Panel>
   );
 }
 
@@ -1470,37 +1259,6 @@ function ExternalHashLink({ hash }: { hash: string }) {
   );
 }
 
-const centerPoint = { x: 410, y: 220 };
-
-const graphPoints = [
-  { x: 150, y: 95 },
-  { x: 650, y: 90 },
-  { x: 135, y: 325 },
-  { x: 665, y: 320 },
-  { x: 410, y: 58 },
-  { x: 410, y: 382 },
-];
-const fallbackGraphPoint = { x: 150, y: 95 };
-
-function buildGraphEdges(counterparties: EntityCounterpartyFlow[], _mode: FlowMode) {
-  return counterparties.slice(0, 6).flatMap((counterparty, index) => {
-    const value = amountToNumber(counterparty.net);
-
-    if (value === 0) {
-      return [];
-    }
-
-    return [
-      {
-        ...counterparty,
-        direction: value >= 0 ? ("in" as const) : ("out" as const),
-        point: graphPoints[index] ?? fallbackGraphPoint,
-        value,
-      },
-    ];
-  });
-}
-
 function amountToNumber(amount: Pick<EntityDetailAmount, "formatted">) {
   const value = Number(amount.formatted);
 
@@ -1697,25 +1455,6 @@ function countBy<T extends string>(
   );
 }
 
-function formatCompact(value: number) {
-  const sign = value < 0 ? "-" : "";
-  const absolute = Math.abs(value);
-
-  if (absolute >= 1_000_000_000) {
-    return `${sign}${(absolute / 1_000_000_000).toFixed(1)}B`;
-  }
-
-  if (absolute >= 1_000_000) {
-    return `${sign}${(absolute / 1_000_000).toFixed(1)}M`;
-  }
-
-  if (absolute >= 1_000) {
-    return `${sign}${(absolute / 1_000).toFixed(0)}K`;
-  }
-
-  return `${sign}${absolute.toFixed(0)}`;
-}
-
 function formatInteger(value: number) {
   return Math.trunc(value).toLocaleString("en-US");
 }
@@ -1745,10 +1484,6 @@ function formatUtcTime(value: string) {
     .getUTCMinutes()
     .toString()
     .padStart(2, "0")} UTC`;
-}
-
-function truncate(value: string, maxLength: number) {
-  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
 }
 
 const getSearchWithoutEntityDetailParams = (url: URL) => {
