@@ -1,4 +1,4 @@
-export type VisualScope = "asset" | "chain" | "entity" | "protocol";
+export type VisualScope = "asset" | "chain" | "entity" | "network" | "protocol";
 
 export interface VisualIdentity {
   imageUrl: string;
@@ -38,6 +38,43 @@ const catalog = {
   entity: {
     circle: protocolVisual("circle", "Circle"),
     "circle-cctp": protocolVisual("circle", "Circle CCTP"),
+  },
+  // External networks reached over bridges, keyed by the indexer's network id. Ids with no
+  // DefiLlama icon (arc-testnet, edge, starknet) are left out and fall back to a glyph.
+  network: {
+    arbitrum: chainVisual("arbitrum", "Arbitrum"),
+    avalanche: chainVisual("avalanche", "Avalanche"),
+    base: chainVisual("base", "Base"),
+    blast: chainVisual("blast", "Blast"),
+    "bnb-smart-chain": chainVisual("binance", "BNB Smart Chain"),
+    codex: chainVisual("codex", "Codex"),
+    ethereum: chainVisual("ethereum", "Ethereum"),
+    hyperevm: chainVisual("hyperevm", "HyperEVM"),
+    ink: chainVisual("ink", "Ink"),
+    "injective-testnet": chainVisual("injective", "Injective"),
+    lens: chainVisual("lens", "Lens"),
+    linea: chainVisual("linea", "Linea"),
+    lisk: chainVisual("lisk", "Lisk"),
+    megaeth: chainVisual("megaeth", "MegaETH"),
+    mode: chainVisual("mode", "Mode"),
+    monad: chainVisual("monad", "Monad"),
+    morph: chainVisual("morph", "Morph"),
+    optimism: chainVisual("optimism", "OP Mainnet"),
+    "pharos-testnet": chainVisual("pharos", "Pharos"),
+    plasma: chainVisual("plasma", "Plasma"),
+    plume: chainVisual("plume", "Plume"),
+    polygon: chainVisual("polygon", "Polygon PoS"),
+    sei: chainVisual("sei", "Sei"),
+    solana: chainVisual("solana", "Solana"),
+    soneium: chainVisual("soneium", "Soneium"),
+    sonic: chainVisual("sonic", "Sonic"),
+    stellar: chainVisual("stellar", "Stellar"),
+    tempo: chainVisual("tempo", "Tempo"),
+    unichain: chainVisual("unichain", "Unichain"),
+    "world-chain": chainVisual("world-chain", "World Chain"),
+    xdc: chainVisual("xdc", "XDC"),
+    zksync: chainVisual("zksync%20era", "ZKsync Era"),
+    zora: chainVisual("zora", "Zora"),
   },
 } satisfies Partial<Record<VisualScope, Record<string, VisualIdentity>>>;
 
@@ -90,6 +127,13 @@ export function getSizedImageUrl(imageUrl: string, size: number) {
 function protocolVisual(slug: string, name: string): VisualIdentity {
   return {
     imageUrl: `https://icons.llamao.fi/icons/protocols/${slug}`,
+    name,
+  };
+}
+
+function chainVisual(slug: string, name: string): VisualIdentity {
+  return {
+    imageUrl: `https://icons.llamao.fi/icons/chains/rsz_${slug}.jpg`,
     name,
   };
 }

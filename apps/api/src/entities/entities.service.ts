@@ -106,8 +106,9 @@ interface CounterpartyDraft {
   entityId: string;
   entityName: string;
   inflow: bigint;
+  inflowTransferCount: bigint;
   outflow: bigint;
-  transferCount: bigint;
+  outflowTransferCount: bigint;
 }
 
 interface TransferRecord {
@@ -483,11 +484,13 @@ export class EntitiesService {
         entityId: draft.entityId,
         entityName: draft.entityName,
         inflow: toTokenAmount(draft.inflow),
+        inflowTransferCount: Number(draft.inflowTransferCount),
         net: toTokenAmount(net),
         outflow: toTokenAmount(draft.outflow),
+        outflowTransferCount: Number(draft.outflowTransferCount),
         rank: index + 1,
         relativeShare: topMagnitude === 0n ? 0 : Number((abs(net) * 10_000n) / topMagnitude) / 100,
-        transferCount: Number(draft.transferCount),
+        transferCount: Number(draft.inflowTransferCount + draft.outflowTransferCount),
       };
     });
   }
@@ -747,7 +750,7 @@ const reduceCounterpartyRows = (entityId: string, rows: EntityPairFlowAggregateR
       });
 
       draft.inflow += amount;
-      draft.transferCount += transferCount;
+      draft.inflowTransferCount += transferCount;
     }
 
     if (row.fromEntityId === entityId && row.toEntityId !== entityId) {
@@ -758,7 +761,7 @@ const reduceCounterpartyRows = (entityId: string, rows: EntityPairFlowAggregateR
       });
 
       draft.outflow += amount;
-      draft.transferCount += transferCount;
+      draft.outflowTransferCount += transferCount;
     }
   }
 
@@ -780,8 +783,9 @@ const upsertCounterpartyDraft = (
     entityId: identity.entityId,
     entityName: identity.entityName,
     inflow: 0n,
+    inflowTransferCount: 0n,
     outflow: 0n,
-    transferCount: 0n,
+    outflowTransferCount: 0n,
   };
 
   draftsByEntityId.set(identity.entityId, draft);
