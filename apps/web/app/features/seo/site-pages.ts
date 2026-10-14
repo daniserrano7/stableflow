@@ -3,7 +3,7 @@ import { assetsPagePath } from "../assets/assets.config";
 /**
  * Indexable pages that exist regardless of data, for the sitemap and llms.txt. Entity pages are
  * added from the registry. Transfer detail pages are left out on purpose: raw transfers expire
- * after 14 days and those pages are noindex.
+ * after 3 days and those pages are noindex.
  */
 export const sitePages: {
   /** Data on the page changes continuously (its lastmod is "now"). */

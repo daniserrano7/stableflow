@@ -60,7 +60,7 @@ export function meta({
     description: transfer
       ? `${fmtTokenAmount(transfer.amount.formatted)} USDC sent from ${transfer.from.displayName} to ${transfer.to.displayName} on Base at ${fmtUtcTimestamp(transfer.blockTimestamp)} UTC, block ${Number(transfer.blockNumber).toLocaleString("en-US")}, transaction ${shortHex(transfer.transactionHash)}.`
       : "A native USDC transfer on Base: amount, sender, receiver and the rest of its transaction.",
-    // Raw transfers expire after 14 days (the page then redirects to Basescan), so these
+    // Raw transfers expire after 3 days (the page then redirects to Basescan), so these
     // short-lived pages stay out of the index while their links are still followed.
     noindex: true,
     pageType: "ItemPage",
@@ -83,7 +83,7 @@ export async function loader({
     headers: { accept: "application/json" },
     signal: request.signal,
   });
-  // Raw transfers are kept for 14 days; older ones are only on Basescan.
+  // Raw transfers are kept for 3 days; older ones are only on Basescan.
   if (response.status === 404) throw redirect(`${basescanUrl}/tx/${parsed.transactionHash}`);
   if (!response.ok) throw new Response("Unable to load transfer", { status: response.status });
   return response.json();

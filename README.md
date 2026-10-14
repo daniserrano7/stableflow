@@ -48,7 +48,7 @@ flowchart LR
     worker["Label worker"]
     subgraph pg [PostgreSQL]
       live[("Live index<br/>recent hours")]
-      archive[("Archive<br/>raw 14 days · per-minute flows forever")]
+      archive[("Archive<br/>raw 3 days · per-minute flows forever")]
     end
     archiver["Archiver"]
     api["API<br/>NestJS"]
@@ -80,7 +80,7 @@ flowchart LR
 
 Key decisions:
 
-- **Hot and cold storage.** The indexer keeps only recent hours. The archive holds raw transfers for 14 days and per-minute aggregates forever, so queries stay fast and storage stays flat.
+- **Hot and cold storage.** The indexer keeps only recent hours. The archive holds raw transfers for 3 days and per-minute aggregates forever, so queries stay fast and storage stays flat.
 - **Reindex in minutes, not days.** Each indexer deployment writes to its own schema and starts a few minutes before the archive's newest block. Once it reaches the chain head, Ponder points the public views at it. Changing the schema or the classification logic causes no downtime and needs no full resync.
 - **Least privilege.** Every service has its own Postgres role. The API's role is read-only, with a 30-second statement timeout.
 - **One poll, many viewers.** The live stream polls the database once per API instance and fans out to every connected browser with RxJS.

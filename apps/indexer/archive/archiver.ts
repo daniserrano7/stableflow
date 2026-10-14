@@ -17,7 +17,7 @@ const env = z
     RAW_RETENTION_HOURS: z.coerce
       .number()
       .positive()
-      .default(14 * 24),
+      .default(3 * 24),
   })
   .parse(process.env);
 
