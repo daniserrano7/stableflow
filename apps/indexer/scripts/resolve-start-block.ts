@@ -1,12 +1,13 @@
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import { z } from "zod";
-import { archiveTables, indexerStateSchema, indexerStateTables } from "../src/storage/schemas.js";
+import { archiveTables } from "../src/storage/schemas.js";
 import { describeError } from "../src/utils/describe-error.js";
 import { chooseStartBlock } from "./start-block.js";
 
-// Prints the start block for this deployment's schema. A restart must reuse the block the
-// deployment was created with, or Ponder sees a different app and refuses the schema.
+// Prints the start block for a new deployment schema. Every start gets a fresh schema
+// (see start-production.sh), so this also empties Ponder's sync tables: with the RPC
+// cache disabled Ponder writes backfilled blocks there but never reads them again.
 // Logs go to stderr as JSON with `level` and `message`, which Railway displays; stdout only
 // carries the result for the start script.
 
@@ -14,6 +15,16 @@ const connectTimeoutMs = 5_000;
 const connectRetryMs = 2_000;
 const connectAttempts = 30;
 const undefinedTableErrorCode = "42P01";
+
+/** Backfill data only; factory addresses and intervals are small and left alone. */
+const ponderSyncCacheTables = [
+  "blocks",
+  "transactions",
+  "transaction_receipts",
+  "logs",
+  "traces",
+  "rpc_request_results",
+].map((table) => `ponder_sync.${table}`);
 
 const log = (level: "info" | "warn" | "error", message: string, fields = {}) =>
   console.error(JSON.stringify({ level, message, ...fields }));
@@ -26,6 +37,7 @@ const envSchema = z.object({
     .regex(/^\d+$/, "Must be a block number")
     .transform((value) => BigInt(value))
     .optional(),
+  PONDER_RPC_URL_8453: z.string().url(),
 });
 
 const readEnv = () => {
@@ -57,6 +69,18 @@ const connect = async (connectionString: string) => {
   }
 };
 
+const readHeadBlock = async (rpcUrl: string) => {
+  const response = await fetch(rpcUrl, {
+    body: JSON.stringify({ id: 1, jsonrpc: "2.0", method: "eth_blockNumber", params: [] }),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = (await response.json()) as { result?: string };
+  if (body.result === undefined) throw new Error(`eth_blockNumber failed: ${response.status}`);
+  return BigInt(body.result);
+};
+
 const readArchivedMaxBlock = async (client: pg.Client) => {
   try {
     const result = await client.query<{ max: string | null }>(
@@ -70,13 +94,16 @@ const readArchivedMaxBlock = async (client: pg.Client) => {
   }
 };
 
-const readRecordedStartBlock = async (client: pg.Client, schemaName: string) => {
-  const result = await client.query<{ start_block: string }>(
-    `select start_block::text from ${indexerStateTables.deployments} where schema_name = $1`,
-    [schemaName],
-  );
-  const startBlock = result.rows[0]?.start_block;
-  return startBlock === undefined ? null : BigInt(startBlock);
+const clearPonderSyncCache = async (client: pg.Client) => {
+  try {
+    // A previous deployment may still hold these tables; don't wait on it.
+    await client.query("set lock_timeout = '10s'");
+    await client.query(`truncate ${ponderSyncCacheTables.join(", ")}`);
+    log("info", "Cleared Ponder's sync cache");
+  } catch (error) {
+    // Missing on a fresh database, or locked: the next start tries again.
+    log("warn", `Kept Ponder's sync cache: ${describeError(error)}`);
+  }
 };
 
 const run = async () => {
@@ -84,51 +111,17 @@ const run = async () => {
   const client = await connect(env.DATABASE_URL);
 
   try {
-    await client.query(`
-      do $$
-      begin
-        if to_regnamespace('${indexerStateSchema}') is null then
-          create schema ${indexerStateSchema};
-        end if;
-      end
-      $$
-    `);
-    await client.query(`
-      create table if not exists ${indexerStateTables.deployments} (
-        schema_name text primary key,
-        start_block bigint not null,
-        created_at timestamptz not null default now()
-      )
-    `);
-
-    const recorded = await readRecordedStartBlock(client, env.DATABASE_SCHEMA);
-    if (recorded !== null) {
-      log("info", `Resuming from recorded start block ${recorded}`, {
-        schema: env.DATABASE_SCHEMA,
-      });
-      console.log(recorded.toString());
-      return;
-    }
+    await clearPonderSyncCache(client);
 
     const choice = chooseStartBlock({
       archivedMaxBlock: await readArchivedMaxBlock(client),
+      headBlock: await readHeadBlock(env.PONDER_RPC_URL_8453),
       initialStartBlock: env.PONDER_DISCOVERY_START_BLOCK_8453,
     });
-    await client.query(
-      `
-        insert into ${indexerStateTables.deployments} (schema_name, start_block)
-        values ($1, $2)
-        on conflict (schema_name) do nothing
-      `,
-      [env.DATABASE_SCHEMA, choice.startBlock.toString()],
-    );
-    // Another starting instance may have won the insert; its block is the one to use.
-    const startBlock =
-      (await readRecordedStartBlock(client, env.DATABASE_SCHEMA)) ?? choice.startBlock;
-    log("info", `New deployment starts at block ${startBlock} (${choice.source})`, {
+    log("info", `New deployment starts at block ${choice.startBlock} (${choice.source})`, {
       schema: env.DATABASE_SCHEMA,
     });
-    console.log(startBlock.toString());
+    console.log(choice.startBlock.toString());
   } finally {
     await client.end();
   }

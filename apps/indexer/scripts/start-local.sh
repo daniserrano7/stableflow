@@ -1,8 +1,7 @@
 #!/bin/sh
 # Local stand-in for Railway (see compose.yaml): there is no RAILWAY_DEPLOYMENT_ID,
-# so derive one from everything that feeds Ponder's build ID. A restart then
-# resumes from its checkpoint, while a code or start-block change gets a fresh
-# schema and takes over the views once ready, like a new Railway deployment.
+# so derive one from everything that feeds Ponder's build ID. Like on Railway, every
+# start indexes into a fresh schema and takes over the views once ready.
 set -eu
 
 RAILWAY_DEPLOYMENT_ID=$(

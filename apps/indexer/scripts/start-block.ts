@@ -5,25 +5,39 @@
  */
 export const archiveOverlapBlocks = 150n;
 
+/**
+ * A deployment never backfills more than 10 minutes of Base blocks. When the archive is
+ * further behind (the indexer was down), the data in between is skipped: a gap is cheaper
+ * than hours of RPC backfill and the database load that comes with it.
+ */
+export const maxBackfillBlocks = 300n;
+
 export type StartBlockChoice = {
-  source: "archive" | "initial";
+  source: "archive" | "head" | "initial";
   startBlock: bigint;
 };
 
 export const chooseStartBlock = ({
   archivedMaxBlock,
+  headBlock,
   initialStartBlock,
 }: {
   archivedMaxBlock: bigint | null;
+  headBlock: bigint;
   initialStartBlock: bigint | undefined;
 }): StartBlockChoice => {
+  const earliestBlock = headBlock - maxBackfillBlocks;
+
   if (archivedMaxBlock !== null) {
-    return { source: "archive", startBlock: archivedMaxBlock - archiveOverlapBlocks };
+    const afterArchive = archivedMaxBlock - archiveOverlapBlocks;
+    return afterArchive >= earliestBlock
+      ? { source: "archive", startBlock: afterArchive }
+      : { source: "head", startBlock: earliestBlock };
   }
 
-  if (initialStartBlock === undefined) {
-    throw new Error("PONDER_DISCOVERY_START_BLOCK_8453 is required until the archive has data");
+  if (initialStartBlock !== undefined) {
+    return { source: "initial", startBlock: initialStartBlock };
   }
 
-  return { source: "initial", startBlock: initialStartBlock };
+  return { source: "head", startBlock: earliestBlock };
 };

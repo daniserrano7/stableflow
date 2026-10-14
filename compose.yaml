@@ -88,7 +88,7 @@ services:
     environment:
       DATABASE_URL: postgresql://stableflow_worker:local@postgres:5432/railway
       DATABASE_LIVE_SCHEMA: stableflow
-      RAW_RETENTION_HOURS: ${RAW_RETENTION_HOURS:-336}
+      RAW_RETENTION_HOURS: ${RAW_RETENTION_HOURS:-72}
 
   worker:
     build: *indexer-build

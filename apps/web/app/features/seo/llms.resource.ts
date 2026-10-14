@@ -23,7 +23,7 @@ export async function loader({ request }: { request: Request }) {
       "- Flows are measured at each entity's boundary: inflow is USDC entering an entity, outflow is USDC leaving it, net flow is inflow minus outflow. Moves inside an entity count for neither side.",
       "- Volume counts each transaction once, so multi-hop swaps are not double counted.",
       `- A large transfer is ${format(transferThresholds.large)} USDC or more; a whale transfer is ${format(transferThresholds.whale)} USDC or more.`,
-      "- Data streams in live. Individual transfers are kept for 14 days; history starts at the block indexing began, not at Base's first block.",
+      "- Data streams in live. Individual transfers are kept for 3 days; history starts at the block indexing began, not at Base's first block.",
       "- All times are UTC.",
     ].join("\n"),
     [
