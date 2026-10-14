@@ -18,6 +18,8 @@ export const queryArchive = async <Row extends pg.QueryResultRow>(
     connectionString: env.DATABASE_URL,
     connectionTimeoutMillis: 10_000,
     max: 1,
+    // These reads run inside indexing; a slow archive must not stall the indexer.
+    statement_timeout: 10_000,
   });
 
   try {
