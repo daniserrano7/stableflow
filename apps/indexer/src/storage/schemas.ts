@@ -22,10 +22,3 @@ export const archiveTables = {
   discoveredAddressLabels: `${archiveSchema}.discovered_address_labels`,
   usdcTransfers: `${archiveSchema}.usdc_transfers`,
 } as const;
-
-/** Indexer bookkeeping: the start block each deployment schema was created with. */
-export const indexerStateSchema = "stableflow_indexer";
-
-export const indexerStateTables = {
-  deployments: `${indexerStateSchema}.deployments`,
-} as const;

@@ -14,7 +14,6 @@
 --   stableflow            Ponder views of the live deployment; read by the stream and archiver
 --   stableflow_archive    history the API reads; written by the archiver (stableflow_worker)
 --   stableflow_ops        label workflow state; owned by stableflow_worker
---   stableflow_indexer    each deployment's start block; owned by stableflow_indexer
 --   ponder_sync           Ponder's RPC bookkeeping; owned by stableflow_indexer
 
 \set ON_ERROR_STOP on
@@ -48,8 +47,7 @@ ALTER ROLE stableflow_api_dev SET default_transaction_read_only = on;
 ALTER ROLE stableflow_api_dev SET statement_timeout = '30s';
 ALTER ROLE stableflow_api_dev CONNECTION LIMIT 10;
 
--- Indexer: creates a schema per deployment, the views schema, ponder_sync and its
--- start-block bookkeeping.
+-- Indexer: creates a schema per deployment, the views schema and ponder_sync.
 SELECT format('GRANT CREATE ON DATABASE %I TO stableflow_indexer', current_database()) \gexec
 
 -- Views schema: Ponder drops and recreates the views on every deployment, so

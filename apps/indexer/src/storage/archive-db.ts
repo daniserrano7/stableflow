@@ -27,7 +27,10 @@ export const queryArchive = async <Row extends pg.QueryResultRow>(
   }
 };
 
-/** Block time of the newest archived transfer, or null while the archive is empty. */
+/**
+ * Block time of the newest archived transfer, or null while the archive is empty or
+ * unreachable: pruning then waits for the next run instead of crashing the indexer.
+ */
 export const readArchivedThroughTimestamp = async () => {
   const rows = await queryArchive<{ block_timestamp: string }>(
     `
@@ -36,7 +39,16 @@ export const readArchivedThroughTimestamp = async () => {
       order by block_number desc
       limit 1
     `,
-  );
+  ).catch((error: unknown) => {
+    console.warn(
+      JSON.stringify({
+        kind: "live_retention",
+        status: "skipped",
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return null;
+  });
   const timestamp = rows?.[0]?.block_timestamp;
 
   return timestamp === undefined ? null : BigInt(timestamp);
