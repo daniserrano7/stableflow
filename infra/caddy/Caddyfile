@@ -1,0 +1,16 @@
+# HTTPS in front of the web app and the MCP server (compose.prod.yaml). Hostnames come
+# from .env so the VPS can be tested on its own subdomains before DNS moves:
+#   WEB_HOSTS="vps.stableflow.dev"          later "stableflow.dev, vps.stableflow.dev"
+#   MCP_HOSTS="mcp-vps.stableflow.dev"      later "mcp.stableflow.dev, mcp-vps.stableflow.dev"
+
+{$WEB_HOSTS} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+{$MCP_HOSTS} {
+	reverse_proxy mcp:3000 {
+		# The MCP server only answers its public hostname (MCP_ALLOWED_HOST).
+		header_up Host mcp.stableflow.dev
+	}
+}

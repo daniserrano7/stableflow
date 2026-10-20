@@ -1,0 +1,27 @@
+{
+  "name": "stableflow",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.16.0",
+  "engines": {
+    "node": ">=22.14.0",
+    "pnpm": ">=10.16.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "check": "biome check . && pnpm typecheck",
+    "check:env": "pnpm --filter @stableflow/indexer check:env",
+    "check:write": "biome check --write .",
+    "dev": "pnpm --parallel -r --filter @stableflow/web --filter @stableflow/api --filter @stableflow/mcp --filter @stableflow/shared dev",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "@types/node": "^25.6.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - master
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholders: the env check validates their shape and never connects.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      PONDER_RPC_URL_8453: https://mainnet.base.org
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: pnpm check
+
+      - name: Check env
+        run: pnpm check:env
+
+      - name: Build
+        run: pnpm build

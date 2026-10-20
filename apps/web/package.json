@@ -1,0 +1,37 @@
+{
+  "name": "@stableflow/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "react-router build",
+    "check": "pnpm typecheck",
+    "dev": "react-router dev",
+    "start": "react-router-serve build/server/index.js",
+    "test": "echo \"No tests yet for web\"",
+    "typecheck": "react-router typegen && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@react-router/node": "^7.15.0",
+    "@react-router/serve": "^7.15.0",
+    "@stableflow/shared": "workspace:*",
+    "@tanstack/react-query": "^5.100.10",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "isbot": "^5.1.40",
+    "lucide-react": "^1.14.0",
+    "radix-ui": "^1.4.3",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router": "^7.15.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@react-router/dev": "^7.15.0",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "tailwindcss": "^4.3.0",
+    "vite": "^8.0.12"
+  }
+}

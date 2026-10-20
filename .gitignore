@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.turbo/
+.vite/
+.next/
+.cache/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+apps/indexer/.ponder
+apps/web/.react-router

@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/build
+**/.react-router
+**/.ponder
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/.DS_Store
+.git
+.github
+.claude
+.pnpm-store
+repo-images

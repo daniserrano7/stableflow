@@ -1,0 +1,211 @@
+# Production stack on the VPS. GitHub Actions (.github/workflows/deploy.yml) copies this
+# file, infra/postgres/roles.sql and infra/caddy/Caddyfile (into caddy/) to
+# /opt/stableflow and runs
+#
+#   docker compose -f compose.prod.yaml pull && docker compose -f compose.prod.yaml up -d
+#
+# Compose only recreates the services whose image changed. Secrets and hostnames live in
+# /opt/stableflow/.env (template: infra/vps/env.example). Only Caddy publishes ports:
+# ports published by Docker bypass the host firewall.
+
+name: stableflow
+
+x-indexer-image: &indexer-image ghcr.io/daniserrano7/stableflow-indexer:${IMAGE_TAG:-latest}
+
+x-app: &app
+  restart: unless-stopped
+
+x-healthcheck: &healthcheck
+  interval: 10s
+  timeout: 3s
+  retries: 3
+  start_period: 60s
+  start_interval: 2s
+
+services:
+  postgres:
+    # Same major version as Railway, so its dumps restore as they are.
+    image: postgres:18
+    restart: unless-stopped
+    shm_size: 256mb
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set it in .env}
+      POSTGRES_DB: stableflow
+    # Sized for 8 GB of RAM: the apps use about 1.3 GB, the page cache gets the rest.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=5GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - checkpoint_timeout=15min
+      - -c
+      - wal_compression=on
+    volumes:
+      # Postgres 18 images keep PGDATA in a versioned directory below this mount.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stableflow"]
+
+  # Applies the roles and passwords; idempotent, so it runs on every deploy.
+  db-roles:
+    image: postgres:18
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./roles.sql:/roles.sql:ro
+    command: >
+      psql -h postgres -U postgres -d stableflow -q
+      -v indexer_password=${INDEXER_DB_PASSWORD:?Set it in .env}
+      -v worker_password=${WORKER_DB_PASSWORD:?Set it in .env}
+      -v api_password=${API_DB_PASSWORD:?Set it in .env}
+      -v api_dev_password=${API_DEV_DB_PASSWORD:?Set it in .env}
+      -f /roles.sql
+
+  indexer:
+    <<: *app
+    image: *indexer-image
+    mem_limit: 1536m
+    # Ponder must release its schema lock before a replacement starts.
+    stop_grace_period: 30s
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    environment:
+      PORT: "42069"
+      DATABASE_URL: postgresql://stableflow_indexer:${INDEXER_DB_PASSWORD}@postgres:5432/stableflow
+      DATABASE_VIEWS_SCHEMA: stableflow
+      PONDER_RPC_URL_8453: ${PONDER_RPC_URL_8453:?Set it in .env}
+      PONDER_DISABLE_CACHE: "true"
+      LIVE_RETENTION_HOURS: "6"
+    healthcheck:
+      <<: *healthcheck
+      start_period: 1h
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:42069/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+  # Copies the live indexer views into the archive the API reads.
+  archiver:
+    <<: *app
+    image: *indexer-image
+    command: node dist/archive/archiver.js
+    mem_limit: 256m
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://stableflow_worker:${WORKER_DB_PASSWORD}@postgres:5432/stableflow
+      DATABASE_LIVE_SCHEMA: stableflow
+      RAW_RETENTION_HOURS: "72"
+
+  label-worker:
+    <<: *app
+    image: *indexer-image
+    command: node dist/inspection/discovery-worker.js
+    mem_limit: 256m
+    stop_grace_period: 30s
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      LABEL_DISCOVERY_SCHEDULE_ENABLED: "true"
+      DATABASE_URL: postgresql://stableflow_worker:${WORKER_DB_PASSWORD}@postgres:5432/stableflow
+      DATABASE_SCHEMA: stableflow_archive
+      PONDER_RPC_URL_8453: ${PONDER_RPC_URL_8453}
+
+  api:
+    <<: *app
+    image: ghcr.io/daniserrano7/stableflow-api:${IMAGE_TAG:-latest}
+    mem_limit: 512m
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgresql://stableflow_api:${API_DB_PASSWORD}@postgres:5432/stableflow
+      DATABASE_SCHEMA: stableflow_archive
+      DATABASE_LIVE_SCHEMA: stableflow
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/v1/health/readiness').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+  web:
+    <<: *app
+    image: ghcr.io/daniserrano7/stableflow-web:${IMAGE_TAG:-latest}
+    mem_limit: 512m
+    environment:
+      PORT: "3000"
+      STABLEFLOW_API_URL: http://api:3000/v1
+      STABLEFLOW_MCP_PUBLIC_URL: https://mcp.stableflow.dev/mcp
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+  mcp:
+    <<: *app
+    image: ghcr.io/daniserrano7/stableflow-mcp:${IMAGE_TAG:-latest}
+    mem_limit: 256m
+    environment:
+      PORT: "3000"
+      HOST: 0.0.0.0
+      MCP_ALLOWED_HOST: mcp.stableflow.dev
+      # Caddy is the only proxy in front of it.
+      TRUST_PROXY_HOPS: "1"
+      STABLEFLOW_API_URL: http://api:3000/v1
+    healthcheck:
+      <<: *healthcheck
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
+  # HTTPS for the site and the MCP server; certificates live in the caddy-data volume.
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    mem_limit: 128m
+    environment:
+      WEB_HOSTS: ${WEB_HOSTS:?Set it in .env}
+      MCP_HOSTS: ${MCP_HOSTS:?Set it in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      # A directory mount, so a replaced Caddyfile shows up inside the container.
+      - ./caddy:/etc/caddy:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
