@@ -12,12 +12,12 @@
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="repo-images/overview-light.png" />
-  <img src="repo-images/overview-dark.png" alt="Stableflow overview: KPIs, a live flow graph between wallets, DEXs, lending markets and other chains, and a ranking of entity net flows" />
+  <img src="repo-images/overview-dark.png" alt="Stableflow overview: KPIs, a live flow graph from wallets through DEXs, lending markets and bridges to other chains, a ranking of entity net flows and the live transfer feed" />
 </picture>
 
 ## The problem
 
-About 200,000 USDC transfers happen on Base every hour. All of them are public, and almost none of them are readable. An ERC-20 `Transfer` event only says:
+Over 150,000 USDC transfers happen on Base every hour. All of them are public, and almost none of them are readable. An ERC-20 `Transfer` event only says:
 
 ```
 0x787f…35e4 → 0xb2cc…dc59   268,700 USDC
@@ -29,7 +29,7 @@ Stableflow indexes every native USDC transfer on Base, works out which entity is
 
 ## What you can do
 
-- **Watch the flow graph** as USDC moves between wallets, DEXs, lending markets and other chains, streamed live.
+- **Watch the flow graph** as USDC moves from wallets through DEXs and lending markets, and across bridges to other chains. Columns follow the money, link width scales with volume, and live transfers run along the links as particles.
 - **Rank entities** by inflow, outflow or net flow over windows from 5 minutes to 24 hours.
 - **Follow bridges.** See USDC entering and leaving Base through Circle CCTP and Across, by remote chain.
 - **Inspect any entity** down to the addresses behind it, with each label's role, source and confidence.
@@ -81,7 +81,7 @@ flowchart LR
 Key decisions:
 
 - **Hot and cold storage.** The indexer keeps only recent hours. The archive holds raw transfers for 3 days and per-minute aggregates forever, so queries stay fast and storage stays flat.
-- **Reindex in minutes, not days.** Each indexer deployment writes to its own schema and starts a few minutes before the archive's newest block. Once it reaches the chain head, Ponder points the public views at it. Changing the schema or the classification logic causes no downtime and needs no full resync.
+- **Reindex in minutes, not days.** Each indexer start writes to a fresh schema that begins five minutes before the archive's newest block, and never more than ten minutes behind the chain head. Once it catches up, Ponder points the public views at it and old schemas are pruned. Changing the schema or the classification logic causes no downtime and needs no full resync; if the indexer was down for longer, the gap is skipped rather than backfilled for hours.
 - **Least privilege.** Every service has its own Postgres role. The API's role is read-only, with a 30-second statement timeout.
 - **One poll, many viewers.** The live stream polls the database once per API instance and fans out to every connected browser with RxJS.
 
@@ -129,7 +129,7 @@ flowchart LR
 
 The promotion gate is strict on purpose: **only on-chain evidence promotes a label.** The address must provably belong to a supported factory, sit on a flow boundary and map to a specific entity. Patterns like "mostly trades with Aerodrome" stay in review, because a wrong label is worse than an unknown one. Each run records how much unidentified volume it resolved, so coverage is measurable. A Postgres advisory lock keeps runs from overlapping.
 
-<img src="repo-images/entity-detail.png" alt="Aerodrome entity page: label count, roles, inflow, outflow and net flow, a counterparty flow graph and label evidence" />
+<img src="repo-images/entity-detail.png" alt="Aerodrome entity page over 24 hours: label count and roles, inflow, outflow and net flow, a counterparty flow graph, top counterparties and label evidence" />
 
 ## Ask it from your AI chat
 
@@ -156,16 +156,35 @@ Every token is on show at [/design-system](https://stableflow.dev/design-system)
 
 ## Deployment
 
-The production stack is defined in [`compose.prod.yaml`](compose.prod.yaml) for a VPS, with PostgreSQL 18, the application containers and Caddy for HTTPS. Only Caddy publishes ports; the database and API stay on the internal Docker network.
+Stableflow ran first on **Railway** and now runs on a **single VPS** with Docker Compose. Both setups deploy automatically on every push to `master`.
 
-- **Container images.** Each app has its own Dockerfile. The deployment workflow builds images in GitHub Container Registry when the repository's VPS configuration is enabled.
+### Railway (first production setup)
+
+The first release ran as seven Railway services in one project: managed PostgreSQL plus the indexer, archiver, label worker, API, web app and MCP server, each built from its own Dockerfile.
+
+- **Private networking.** Only the web app and the MCP server had public domains; the API and the database were reachable only on Railway's internal network.
+- **Zero-downtime rollouts.** Health checks gated each deployment (the indexer only counted as ready once it reached the chain head), with draining time so Ponder could release its schema lock before the replacement took over.
+- **Per-service configuration** through Railway variables, with references to the shared Postgres credentials.
+
+The indexer's start script still reads `RAILWAY_DEPLOYMENT_ID`, so the same images run on either platform.
+
+### Why it moved to a VPS
+
+Railway bills memory per GB. PostgreSQL uses spare RAM as page cache, which is what keeps queries fast, so the database alone was about 90% of the bill. Capping its memory starved it of I/O and took the indexer down. A flat-price VPS (4 vCores, 8 GB RAM, NVMe, on OVHcloud) gives Postgres the whole machine for about a quarter of the cost.
+
+### VPS (current)
+
+The production stack is defined in [`compose.prod.yaml`](compose.prod.yaml): PostgreSQL 18, the application containers and [Caddy](infra/caddy/Caddyfile) for HTTPS, with Cloudflare for DNS.
+
+- **Continuous deployment.** [`deploy.yml`](.github/workflows/deploy.yml) builds one image per app into GitHub Container Registry, then copies the stack definition to the server over SSH and runs `docker compose pull && up -d`. Builds are reproducible, so an app whose code didn't change keeps its image digest and its containers keep running.
+- **Small attack surface.** Only Caddy publishes ports; the database and the API stay on the internal Docker network. SSH is key-only and the firewall allows only SSH, HTTP and HTTPS. Deployments run as a dedicated `deploy` user.
+- **Sized for the box.** Postgres is tuned for 8 GB of RAM (the apps use about 1.3 GB, the page cache gets the rest) and every app container has a memory limit.
 - **Health checks.** The indexer is ready once it has caught up to the chain head. The API, web app and MCP server expose their own health endpoints.
-- **Database roles.** The indexer, background workers and API use separate PostgreSQL roles; the API is read-only.
-- **Local development.** [`compose.yaml`](compose.yaml) builds the same applications locally, with PostgreSQL 17 and development credentials.
+- **Database roles.** Applied idempotently on every deploy from [`roles.sql`](infra/postgres/roles.sql). The indexer, background workers and API use separate roles; the API is read-only.
 
-For a production setup, use [`infra/vps/env.example`](infra/vps/env.example) as the server environment template. The deployment workflow expects the repository variables `VPS_HOST` and `VPS_KNOWN_HOSTS`, and the secret `VPS_SSH_KEY`. Until `VPS_HOST` is configured, image publishing and deployment are skipped.
+To run your own, use [`infra/vps/env.example`](infra/vps/env.example) as the server's `.env` and set the repository variables `VPS_HOST` and `VPS_KNOWN_HOSTS` and the secret `VPS_SSH_KEY`. Without `VPS_HOST`, the deploy workflow is skipped.
 
-GitHub Actions runs Biome, type checks and builds on pushes to `master` and `develop`, and on pull requests.
+GitHub Actions also runs Biome, type checks and builds on pushes to `master` and `develop`, and on pull requests.
 
 ## Tech stack
 
@@ -177,7 +196,7 @@ GitHub Actions runs Biome, type checks and builds on pushes to `master` and `dev
 | Web | React 19, React Router 7 (SSR), TanStack Query, Tailwind CSS 4, shadcn/ui, Radix |
 | AI | Model Context Protocol TypeScript SDK |
 | Tooling | TypeScript, pnpm workspaces, Biome, `node:test`, GitHub Actions |
-| Infra | Docker, Docker Compose, Caddy, GitHub Container Registry |
+| Infra | Docker, Docker Compose, Caddy, GitHub Container Registry, OVHcloud VPS, Cloudflare DNS; previously Railway |
 
 ## Run it locally
 
