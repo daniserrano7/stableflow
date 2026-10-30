@@ -3,6 +3,8 @@ name: stableflow-envio
 description: Live USDC flows on Base (HyperIndex port of apps/indexer, the Ponder indexer)
 # Single chain; ids stay exactly as in the Ponder indexer.
 disable_default_cross_chain: true
+# Ponder stores hex columns lowercase; so do we.
+address_format: lowercase
 contracts:
   - name: BaseUsdc
     events:

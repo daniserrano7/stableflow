@@ -1,7 +1,7 @@
 import { type EvmOnBlockContext, type EvmOnEventContext, indexer } from "envio";
 import { type ResolvedBridgeRemoteNetwork, resolveAcrossRemoteNetwork, resolveCctpRemoteNetwork } from "../chains/external-networks";
 import { TransactionNetValueTracker } from "../flows/transaction-net-value";
-import { BASE_CHAIN_ID, baseUsdc, bucketSize, getBucketStart, isBaseUsdcToken } from "../lib/constants";
+import { BASE_CHAIN_ID, baseUsdc, baseUsdcColumn, bucketSize, getBucketStart, isBaseUsdcToken } from "../lib/constants";
 import { recordBlockTimestamp } from "../lib/clock";
 import { getEntityFlowUpdates, getEntityPairFlowUpdate } from "../lib/flows";
 import { discoverAaveReserveLabels, getFlowLabel } from "../lib/labels";
@@ -79,7 +79,7 @@ const upsertBridgeFlowBucket = async ({
     block_timestamp: blockTimestamp,
     transaction_hash: event.transaction.hash,
     log_index: event.logIndex,
-    token_address: baseUsdc.address,
+    token_address: baseUsdcColumn,
     bridge_id: bridgeId,
     bridge_name: bridgeName,
     direction,
@@ -111,7 +111,7 @@ const upsertBridgeFlowBucket = async ({
   context.Usdc_bridge_flow_buckets.set({
     id,
     chain_id: BASE_CHAIN_ID,
-    token_address: baseUsdc.address,
+    token_address: baseUsdcColumn,
     bucket_size: bucketSize,
     bucket_start: bucketStart,
     bridge_id: bridgeId,
@@ -176,7 +176,7 @@ indexer.onEvent(
     context.Usdc_transfer_volume_buckets.set({
       id: bucketId,
       chain_id: BASE_CHAIN_ID,
-      token_address: baseUsdc.address,
+      token_address: baseUsdcColumn,
       bucket_size: bucketSize,
       bucket_start: bucketStart,
       transfer_count: (volumeBucket?.transfer_count ?? 0n) + 1n,
@@ -197,7 +197,7 @@ indexer.onEvent(
       context.Usdc_entity_flow_buckets.set({
         id,
         chain_id: BASE_CHAIN_ID,
-        token_address: baseUsdc.address,
+        token_address: baseUsdcColumn,
         bucket_size: bucketSize,
         bucket_start: bucketStart,
         entity_id: label.entityId,
@@ -223,7 +223,7 @@ indexer.onEvent(
       context.Usdc_entity_pair_flow_buckets.set({
         id,
         chain_id: BASE_CHAIN_ID,
-        token_address: baseUsdc.address,
+        token_address: baseUsdcColumn,
         bucket_size: bucketSize,
         bucket_start: bucketStart,
         from_entity_id: pair.fromLabel.entityId,

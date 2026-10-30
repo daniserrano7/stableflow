@@ -1,13 +1,15 @@
 -- Compatibility views for the Stableflow API and archiver.
 --
--- They read Ponder's tables through a schema (DATABASE_VIEWS_SCHEMA, `stableflow` in
--- compose.yaml) whose tables have Ponder's column types: `hex` columns are bytea and
--- `bigint` columns are numeric(78). HyperIndex stores addresses and hashes as text, so
--- these views cast them back. Names and column order match apps/indexer/ponder.schema.ts.
+-- Both read Ponder's tables through a schema (`stableflow` in compose.yaml:
+-- DATABASE_VIEWS_SCHEMA for the indexer, DATABASE_LIVE_SCHEMA for the API and archiver).
+-- Ponder's column types are `text` for hex (lowercase) and `numeric(78)` for bigint. The
+-- port writes lowercase text already, so these views only cast bigint columns and add the
+-- `_ponder_checkpoint` table the archiver reads. Names and column order match
+-- apps/indexer/ponder.schema.ts.
 --
 --   psql "$DATABASE_URL" -v views_schema=stableflow -f sql/stableflow-compat-views.sql
 --
--- `views_schema` defaults to `stableflow`. Re-running replaces the views.
+-- Re-running replaces the views. Run it after a reset (`envio start -r`), which drops them.
 \if :{?views_schema}
 \else
   \set views_schema stableflow
@@ -20,17 +22,17 @@ create or replace view :"views_schema".usdc_transfers as select
   chain_id,
   block_number::numeric(78) as block_number,
   block_timestamp::numeric(78) as block_timestamp,
-  decode(substr(transaction_hash, 3), 'hex') as transaction_hash,
+  transaction_hash,
   log_index,
-  decode(substr(from_address, 3), 'hex') as from_address,
-  decode(substr(to_address, 3), 'hex') as to_address,
+  from_address,
+  to_address,
   value::numeric(78) as value
 from public.usdc_transfers;
 
 create or replace view :"views_schema".usdc_transfer_volume_buckets as select
   id,
   chain_id,
-  decode(substr(token_address, 3), 'hex') as token_address,
+  token_address,
   bucket_size,
   bucket_start::numeric(78) as bucket_start,
   transfer_count::numeric(78) as transfer_count,
@@ -41,7 +43,7 @@ from public.usdc_transfer_volume_buckets;
 create or replace view :"views_schema".usdc_entity_flow_buckets as select
   id,
   chain_id,
-  decode(substr(token_address, 3), 'hex') as token_address,
+  token_address,
   bucket_size,
   bucket_start::numeric(78) as bucket_start,
   entity_id,
@@ -55,7 +57,7 @@ from public.usdc_entity_flow_buckets;
 create or replace view :"views_schema".usdc_entity_pair_flow_buckets as select
   id,
   chain_id,
-  decode(substr(token_address, 3), 'hex') as token_address,
+  token_address,
   bucket_size,
   bucket_start::numeric(78) as bucket_start,
   from_entity_id,
@@ -71,7 +73,7 @@ from public.usdc_entity_pair_flow_buckets;
 create or replace view :"views_schema".usdc_bridge_flow_buckets as select
   id,
   chain_id,
-  decode(substr(token_address, 3), 'hex') as token_address,
+  token_address,
   bucket_size,
   bucket_start::numeric(78) as bucket_start,
   bridge_id,
@@ -93,9 +95,9 @@ create or replace view :"views_schema".usdc_bridge_events as select
   chain_id,
   block_number::numeric(78) as block_number,
   block_timestamp::numeric(78) as block_timestamp,
-  decode(substr(transaction_hash, 3), 'hex') as transaction_hash,
+  transaction_hash,
   log_index,
-  decode(substr(token_address, 3), 'hex') as token_address,
+  token_address,
   bridge_id,
   bridge_name,
   direction,
@@ -113,7 +115,7 @@ from public.usdc_bridge_events;
 create or replace view :"views_schema".discovered_address_labels as select
   id,
   chain_id,
-  decode(substr(address, 3), 'hex') as address,
+  address,
   entity_id,
   entity_name,
   category,
@@ -122,12 +124,30 @@ create or replace view :"views_schema".discovered_address_labels as select
   counting_policy,
   confidence,
   source_type,
-  decode(substr(source_address, 3), 'hex') as source_address,
+  source_address,
   source_event,
-  decode(substr(token0, 3), 'hex') as token0,
-  decode(substr(token1, 3), 'hex') as token1,
+  token0,
+  token1,
   pool_kind,
   first_seen_block::numeric(78) as first_seen_block,
-  decode(substr(transaction_hash, 3), 'hex') as transaction_hash,
+  transaction_hash,
   log_index
 from public.discovered_address_labels;
+
+-- The archiver (apps/indexer/archive/cycle.ts) reads the finalized block and its time from
+-- Ponder's checkpoint string: 10 digits of timestamp, 16 of chain id, 16 of block number,
+-- then 33 more it ignores. Blocks within max_reorg_depth of the indexed tip are not final.
+create or replace view :"views_schema"._ponder_checkpoint as
+with chain as (
+  select id,
+         case when end_block is not null and progress_block >= end_block then progress_block
+              else greatest(progress_block - max_reorg_depth, start_block) end as finalized_block
+  from public.envio_chains
+)
+select id as chain_id,
+       lpad(coalesce((select max(block_timestamp) from public.usdc_transfers t
+                      where t.block_number <= chain.finalized_block), 0)::text, 10, '0')
+         || lpad(id::text, 16, '0')
+         || lpad(finalized_block::text, 16, '0')
+         || repeat('0', 33) as finalized_checkpoint
+from chain;

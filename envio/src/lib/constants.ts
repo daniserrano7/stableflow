@@ -10,6 +10,9 @@ export const baseProtocolContracts = {
   aaveV3Pool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
 } as const;
 
+/** Ponder's `hex` columns are lowercase text; ids keep the checksummed form. */
+export const baseUsdcColumn = baseUsdc.address.toLowerCase();
+
 export const bucketSize = "1m";
 export const bucketSizeSeconds = 60n;
 
