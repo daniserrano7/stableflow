@@ -106,7 +106,7 @@ is noisy and comes from one run. Time is "Starting indexing" to "Ready".
 
 | Window              | Blocks | Transfers  | Time   |
 | ------------------- | ------ | ---------- | ------ |
-| 53,270,000 – 53,271,799 | 1,800  | 170,029    | 6.0 s  |
+| 53,270,000 – 53,271,799 | 1,800  | 170,029    | 5.8 s  |
 | 53,260,000 – 53,270,799 | 10,800 | 1,281,622  | 42.3 s |
 
 An interrupted run (stopped at block 53,267,797 of the six-hour window) resumed
