@@ -116,7 +116,13 @@ RPC requests during the six-hour run, counted by a forwarding proxy: **6
 `eth_call`s and nothing else**. They are the Aave reads, one per 1,800 blocks. All
 log and block data came from HyperSync.
 
-The Ponder indexer on the same window: **not measured yet**.
+The Ponder indexer (`ponder start`, cache disabled, `endBlock` added in a scratch
+worktree) on the same window, same machine, through base-rpc.publicnode.com and the
+same counting proxy: **ready after 5,484 s**, **16,659 RPC requests** (10,877
+`eth_getBlockByNumber`, 5,774 `eth_getLogs`, 6 `eth_call`, 1 `eth_chainId`). Public
+RPC is what Ponder's own docs advise against, and its log shows the provider
+rate-limiting, so this time reflects the endpoint as much as Ponder. A paid RPC
+would be faster and was not measured.
 
 ## Parity
 
@@ -139,9 +145,12 @@ Ponder handler, and compares row by row (count and value per bucket, plus
 Both scripts were written by the same author as the port, from the same reading of
 the Ponder code, so they catch indexing mistakes but not a shared misreading.
 
-Not yet done: a comparison with the Ponder indexer's own output on the same
-window. Until that run, "identical to Ponder" is a claim about the rules, not a
-measurement.
+Against Ponder's own output on the same window (`ponder start` on its own Postgres,
+every column of both sides cast to text and diffed, ordered by id): **0 differing
+lines** in all seven tables: `usdc_transfers` 1,281,622, `usdc_transfer_volume_buckets`
+361, `usdc_entity_flow_buckets` 3,684, `usdc_entity_pair_flow_buckets` 3,323,
+`usdc_bridge_flow_buckets` 1,243, `usdc_bridge_events` 1,520,
+`discovered_address_labels` 8.
 
 ## Compatibility with the API and archiver
 
