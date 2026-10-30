@@ -156,7 +156,13 @@ lines** in all seven tables: `usdc_transfers` 1,281,622, `usdc_transfer_volume_b
 
 `sql/stableflow-api-smoke.sql` runs, with psql, the queries the archiver
 (`archive/cycle.ts`: checkpoint read, upserts for all seven tables, removal and
-expiry) and the API services (grouped flow aggregates, keyset-paged transfers, the
-transaction-totals CTE, label and hash search) issue, transcribed by hand from the
-source. All run against the compat views without errors. The API itself, which builds
-its queries with drizzle, was not started.
+expiry) and the API services issue, transcribed by hand from the source. All run
+against the compat views without errors.
+
+The NestJS API itself, unmodified, was built and started against the views
+(`DATABASE_SCHEMA=stableflow_archive`, `DATABASE_LIVE_SCHEMA=stableflow`) on the port's
+six-hour data. All nine routes returned 200 with non-empty bodies: `/v1/health`,
+`/v1/health/readiness`, `/v1/transfers/recent`, `/v1/transfers`, `/v1/flows/kpis`,
+`/v1/flows/top-entities`, `/v1/entities` and `/v1/search` (by address and by name).
+Response contents were not compared with a Ponder-backed API. The archiver process
+was not run, only its SQL.
