@@ -1,5 +1,5 @@
 import { createConfig } from "ponder";
-import { erc20Abi, parseAbi } from "viem";
+import { type Address, erc20Abi, parseAbi } from "viem";
 import { base } from "viem/chains";
 import {
   baseDiscoveryStartBlock,
@@ -11,6 +11,7 @@ import {
 } from "./src/chains/base.chain.js";
 import { baseBlocksIn } from "./src/chains/base-block-time.js";
 import { liveRetentionIntervalBlocks } from "./src/retention/live-retention.js";
+import { rangedLogsTransport } from "./src/rpc/ranged-logs-transport.js";
 
 const uniswapV3FactoryAbi = parseAbi([
   "event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)",
@@ -43,84 +44,93 @@ const acrossSpokePoolAbi = parseAbi([
   "event FilledRelay(bytes32 inputToken, bytes32 outputToken, uint256 inputAmount, uint256 outputAmount, uint256 repaymentChainId, uint256 indexed originChainId, uint256 indexed depositId, uint32 fillDeadline, uint32 exclusivityDeadline, bytes32 exclusiveRelayer, bytes32 indexed relayer, bytes32 depositor, bytes32 recipient, bytes32 messageHash, (bytes32 updatedRecipient, bytes updatedMessage, uint256 updatedOutputAmount, uint8 fillType) relayExecutionInfo)",
 ]);
 
+const contracts = {
+  BaseUsdc: {
+    abi: erc20Abi,
+    chain: "base",
+    address: baseUsdc.address,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  AcrossSpokePool: {
+    abi: acrossSpokePoolAbi,
+    chain: "base",
+    address: baseProtocolContracts.acrossSpokePool,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  AerodromePoolFactory: {
+    abi: aerodromePoolFactoryAbi,
+    chain: "base",
+    address: baseProtocolFactories.aerodromePoolFactory,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  AerodromeSlipstreamFactory: {
+    abi: aerodromeSlipstreamFactoryAbi,
+    chain: "base",
+    address: baseProtocolFactories.aerodromeSlipstreamFactory,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  AerodromeSlipstream3Factory: {
+    abi: aerodromeSlipstreamFactoryAbi,
+    chain: "base",
+    address: baseProtocolFactories.aerodromeSlipstream3Factory,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  AerodromeSlipstreamPoolFactory: {
+    abi: aerodromeSlipstreamFactoryAbi,
+    chain: "base",
+    address: baseProtocolFactories.aerodromeSlipstreamPoolFactory,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  CircleCctpTokenMessengerV2: {
+    abi: circleCctpTokenMessengerV2Abi,
+    chain: "base",
+    address: baseProtocolContracts.circleCctpTokenMessengerV2,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  CircleCctpMessageTransmitterV2: {
+    abi: circleCctpMessageTransmitterV2Abi,
+    chain: "base",
+    address: baseProtocolContracts.circleCctpMessageTransmitterV2,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  MetaMorphoVaultFactory: {
+    abi: metaMorphoVaultFactoryAbi,
+    chain: "base",
+    address: baseProtocolFactories.metaMorphoVaultFactory,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  PancakeSwapV3Factory: {
+    abi: uniswapV3FactoryAbi,
+    chain: "base",
+    address: baseProtocolFactories.pancakeSwapV3Factory,
+    startBlock: baseDiscoveryStartBlock,
+  },
+  UniswapV3Factory: {
+    abi: uniswapV3FactoryAbi,
+    chain: "base",
+    address: baseProtocolFactories.uniswapV3Factory,
+    startBlock: baseDiscoveryStartBlock,
+  },
+} as const;
+
+// The RPC transport fetches logs for these addresses only, so a factory-pattern source
+// (child addresses known at runtime) would silently lose its realtime logs.
+const indexedAddresses = Object.entries(contracts).map(([name, { address }]): Address => {
+  if (typeof address !== "string") throw new Error(`${name} needs a plain address`);
+  return address;
+});
+
 export default createConfig({
   chains: {
     base: {
       id: base.id,
-      rpc: baseRpcUrl,
+      rpc: rangedLogsTransport({ addresses: indexedAddresses, url: baseRpcUrl }),
       pollingInterval: 2000,
       ethGetLogsBlockRange: 500,
       disableCache: baseRpcCacheDisabled,
     },
   },
-  contracts: {
-    BaseUsdc: {
-      abi: erc20Abi,
-      chain: "base",
-      address: baseUsdc.address,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    AcrossSpokePool: {
-      abi: acrossSpokePoolAbi,
-      chain: "base",
-      address: baseProtocolContracts.acrossSpokePool,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    AerodromePoolFactory: {
-      abi: aerodromePoolFactoryAbi,
-      chain: "base",
-      address: baseProtocolFactories.aerodromePoolFactory,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    AerodromeSlipstreamFactory: {
-      abi: aerodromeSlipstreamFactoryAbi,
-      chain: "base",
-      address: baseProtocolFactories.aerodromeSlipstreamFactory,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    AerodromeSlipstream3Factory: {
-      abi: aerodromeSlipstreamFactoryAbi,
-      chain: "base",
-      address: baseProtocolFactories.aerodromeSlipstream3Factory,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    AerodromeSlipstreamPoolFactory: {
-      abi: aerodromeSlipstreamFactoryAbi,
-      chain: "base",
-      address: baseProtocolFactories.aerodromeSlipstreamPoolFactory,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    CircleCctpTokenMessengerV2: {
-      abi: circleCctpTokenMessengerV2Abi,
-      chain: "base",
-      address: baseProtocolContracts.circleCctpTokenMessengerV2,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    CircleCctpMessageTransmitterV2: {
-      abi: circleCctpMessageTransmitterV2Abi,
-      chain: "base",
-      address: baseProtocolContracts.circleCctpMessageTransmitterV2,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    MetaMorphoVaultFactory: {
-      abi: metaMorphoVaultFactoryAbi,
-      chain: "base",
-      address: baseProtocolFactories.metaMorphoVaultFactory,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    PancakeSwapV3Factory: {
-      abi: uniswapV3FactoryAbi,
-      chain: "base",
-      address: baseProtocolFactories.pancakeSwapV3Factory,
-      startBlock: baseDiscoveryStartBlock,
-    },
-    UniswapV3Factory: {
-      abi: uniswapV3FactoryAbi,
-      chain: "base",
-      address: baseProtocolFactories.uniswapV3Factory,
-      startBlock: baseDiscoveryStartBlock,
-    },
-  },
+  contracts,
   blocks: {
     AaveReserveDiscovery: {
       chain: "base",
