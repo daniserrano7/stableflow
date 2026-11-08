@@ -1,16 +1,18 @@
+import { baseBlocksIn } from "../src/chains/base-block-time.js";
+
 /**
  * New deployments start 5 minutes of Base blocks before the archive's newest transfer:
  * at least one full minute of overlap, so the archive never needs the minute a new
  * deployment only partly saw, plus slack for archiver lag.
  */
-export const archiveOverlapBlocks = 150n;
+export const archiveOverlapBlocks = BigInt(baseBlocksIn(5 * 60));
 
 /**
  * A deployment never backfills more than 10 minutes of Base blocks. When the archive is
  * further behind (the indexer was down), the data in between is skipped: a gap is cheaper
  * than hours of RPC backfill and the database load that comes with it.
  */
-export const maxBackfillBlocks = 300n;
+export const maxBackfillBlocks = BigInt(baseBlocksIn(10 * 60));
 
 export type StartBlockChoice = {
   source: "archive" | "head" | "initial";

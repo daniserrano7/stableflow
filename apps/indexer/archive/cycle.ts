@@ -1,9 +1,8 @@
 import type pg from "pg";
+import { baseBlocksIn } from "../src/chains/base-block-time.js";
 import { type ArchivedTable, archivedTables } from "./tables.js";
 
 const baseChainId = 8453;
-// Base (OP Stack) produces a block every 2 seconds.
-const baseBlockSeconds = 2n;
 const bucketSeconds = 60n;
 const retentionBatchSize = 10_000;
 const archiveLockKey = [8453, 2] as const;
@@ -45,7 +44,7 @@ export const getBucketCopyStart = ({
 };
 
 export const getRetentionCutoffBlock = (latestBlock: bigint, retentionHours: number) =>
-  latestBlock - BigInt(Math.floor((retentionHours * 3600) / Number(baseBlockSeconds)));
+  latestBlock - BigInt(baseBlocksIn(retentionHours * 3600));
 
 const toBigIntOrNull = (value: string | null) => (value === null ? null : BigInt(value));
 

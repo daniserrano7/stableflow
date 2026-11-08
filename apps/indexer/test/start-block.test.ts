@@ -5,14 +5,15 @@ import {
   chooseStartBlock,
   maxBackfillBlocks,
 } from "../scripts/start-block.js";
+import { baseBlocksIn } from "../src/chains/base-block-time.js";
 
 test("new deployments start before the archive's newest transfer", () => {
   assert.deepEqual(
     chooseStartBlock({ archivedMaxBlock: 1_000n, headBlock: 1_100n, initialStartBlock: 5n }),
     { source: "archive", startBlock: 1_000n - archiveOverlapBlocks },
   );
-  // The overlap must cover at least one full minute of 2-second blocks.
-  assert.ok(archiveOverlapBlocks >= 30n);
+  // The overlap must cover at least one full minute of Base blocks.
+  assert.ok(archiveOverlapBlocks >= BigInt(baseBlocksIn(60)));
 });
 
 test("a stale archive is skipped: deployments start near the chain head", () => {

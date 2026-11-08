@@ -34,9 +34,9 @@ test("bucket copies start at unsettled minutes but never before a deployment's f
   );
 });
 
-test("retention cutoffs count Base blocks every 2 seconds", () => {
-  assert.equal(getRetentionCutoffBlock(1_000_000n, 14 * 24), 395_200n);
-  assert.equal(getRetentionCutoffBlock(1_000_000n, 0.5), 999_100n);
+test("retention cutoffs count Base blocks every 200 ms", () => {
+  assert.equal(getRetentionCutoffBlock(10_000_000n, 14 * 24), 3_952_000n);
+  assert.equal(getRetentionCutoffBlock(10_000_000n, 0.5), 9_991_000n);
 });
 
 test("archive tables mirror the indexer schema, plus an archived_at cursor for labels", () => {

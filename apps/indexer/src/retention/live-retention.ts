@@ -1,7 +1,8 @@
+import { baseBlocksIn } from "../chains/base-block-time.js";
 import { env } from "../env/env.js";
 
-/** Pruning runs every 150 Base blocks (5 minutes). */
-export const liveRetentionIntervalBlocks = 150;
+/** Pruning runs every 5 minutes of Base blocks. */
+export const liveRetentionIntervalBlocks = baseBlocksIn(5 * 60);
 
 /** Undefined keeps everything, e.g. local development without an archive. */
 export const liveRetentionSeconds =

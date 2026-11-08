@@ -9,6 +9,7 @@ import {
   baseRpcUrl,
   baseUsdc,
 } from "./src/chains/base.chain.js";
+import { baseBlocksIn } from "./src/chains/base-block-time.js";
 import { liveRetentionIntervalBlocks } from "./src/retention/live-retention.js";
 
 const uniswapV3FactoryAbi = parseAbi([
@@ -124,7 +125,7 @@ export default createConfig({
     AaveReserveDiscovery: {
       chain: "base",
       startBlock: baseDiscoveryStartBlock,
-      interval: 1800,
+      interval: baseBlocksIn(60 * 60),
     },
     // A no-op unless LIVE_RETENTION_HOURS is set.
     LiveRetention: {
