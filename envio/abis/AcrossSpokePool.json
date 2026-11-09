@@ -1,0 +1,298 @@
+[
+  {
+    "name": "V3FundsDeposited",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "inputToken"
+      },
+      {
+        "type": "address",
+        "name": "outputToken"
+      },
+      {
+        "type": "uint256",
+        "name": "inputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "outputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "destinationChainId",
+        "indexed": true
+      },
+      {
+        "type": "uint32",
+        "name": "depositId",
+        "indexed": true
+      },
+      {
+        "type": "uint32",
+        "name": "quoteTimestamp"
+      },
+      {
+        "type": "uint32",
+        "name": "fillDeadline"
+      },
+      {
+        "type": "uint32",
+        "name": "exclusivityDeadline"
+      },
+      {
+        "type": "address",
+        "name": "depositor",
+        "indexed": true
+      },
+      {
+        "type": "address",
+        "name": "recipient"
+      },
+      {
+        "type": "address",
+        "name": "exclusiveRelayer"
+      },
+      {
+        "type": "bytes",
+        "name": "message"
+      }
+    ]
+  },
+  {
+    "name": "FilledV3Relay",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "inputToken"
+      },
+      {
+        "type": "address",
+        "name": "outputToken"
+      },
+      {
+        "type": "uint256",
+        "name": "inputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "outputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "repaymentChainId"
+      },
+      {
+        "type": "uint256",
+        "name": "originChainId",
+        "indexed": true
+      },
+      {
+        "type": "uint32",
+        "name": "depositId",
+        "indexed": true
+      },
+      {
+        "type": "uint32",
+        "name": "fillDeadline"
+      },
+      {
+        "type": "uint32",
+        "name": "exclusivityDeadline"
+      },
+      {
+        "type": "address",
+        "name": "exclusiveRelayer"
+      },
+      {
+        "type": "address",
+        "name": "relayer",
+        "indexed": true
+      },
+      {
+        "type": "address",
+        "name": "depositor"
+      },
+      {
+        "type": "address",
+        "name": "recipient"
+      },
+      {
+        "type": "bytes",
+        "name": "message"
+      },
+      {
+        "type": "tuple",
+        "name": "relayExecutionInfo",
+        "components": [
+          {
+            "type": "address",
+            "name": "updatedRecipient"
+          },
+          {
+            "type": "bytes",
+            "name": "updatedMessage"
+          },
+          {
+            "type": "uint256",
+            "name": "updatedOutputAmount"
+          },
+          {
+            "type": "uint8",
+            "name": "fillType"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "FundsDeposited",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "bytes32",
+        "name": "inputToken"
+      },
+      {
+        "type": "bytes32",
+        "name": "outputToken"
+      },
+      {
+        "type": "uint256",
+        "name": "inputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "outputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "destinationChainId",
+        "indexed": true
+      },
+      {
+        "type": "uint256",
+        "name": "depositId",
+        "indexed": true
+      },
+      {
+        "type": "uint32",
+        "name": "quoteTimestamp"
+      },
+      {
+        "type": "uint32",
+        "name": "fillDeadline"
+      },
+      {
+        "type": "uint32",
+        "name": "exclusivityDeadline"
+      },
+      {
+        "type": "bytes32",
+        "name": "depositor",
+        "indexed": true
+      },
+      {
+        "type": "bytes32",
+        "name": "recipient"
+      },
+      {
+        "type": "bytes32",
+        "name": "exclusiveRelayer"
+      },
+      {
+        "type": "bytes",
+        "name": "message"
+      }
+    ]
+  },
+  {
+    "name": "FilledRelay",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "bytes32",
+        "name": "inputToken"
+      },
+      {
+        "type": "bytes32",
+        "name": "outputToken"
+      },
+      {
+        "type": "uint256",
+        "name": "inputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "outputAmount"
+      },
+      {
+        "type": "uint256",
+        "name": "repaymentChainId"
+      },
+      {
+        "type": "uint256",
+        "name": "originChainId",
+        "indexed": true
+      },
+      {
+        "type": "uint256",
+        "name": "depositId",
+        "indexed": true
+      },
+      {
+        "type": "uint32",
+        "name": "fillDeadline"
+      },
+      {
+        "type": "uint32",
+        "name": "exclusivityDeadline"
+      },
+      {
+        "type": "bytes32",
+        "name": "exclusiveRelayer"
+      },
+      {
+        "type": "bytes32",
+        "name": "relayer",
+        "indexed": true
+      },
+      {
+        "type": "bytes32",
+        "name": "depositor"
+      },
+      {
+        "type": "bytes32",
+        "name": "recipient"
+      },
+      {
+        "type": "bytes32",
+        "name": "messageHash"
+      },
+      {
+        "type": "tuple",
+        "name": "relayExecutionInfo",
+        "components": [
+          {
+            "type": "bytes32",
+            "name": "updatedRecipient"
+          },
+          {
+            "type": "bytes",
+            "name": "updatedMessage"
+          },
+          {
+            "type": "uint256",
+            "name": "updatedOutputAmount"
+          },
+          {
+            "type": "uint8",
+            "name": "fillType"
+          }
+        ]
+      }
+    ]
+  }
+]
